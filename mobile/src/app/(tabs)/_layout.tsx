@@ -38,8 +38,8 @@ function AuroraTabBar({ state, navigation }: TabBarProps) {
   return (
     <View style={[styles.wrap, { paddingBottom: insets.bottom ? insets.bottom : 14 }]} pointerEvents="box-none">
       <View style={[styles.bar, glow(T.primary, 22, 0.4)]}>
-        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(15,13,24,0.55)", borderRadius: Radius.xl, borderWidth: StyleSheet.hairlineWidth * 2, borderColor: T.hairline }]} />
+        <BlurView intensity={40} tint={T.scheme === "light" ? "light" : "dark"} style={StyleSheet.absoluteFill} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: T.scheme === "light" ? "rgba(255,255,255,0.6)" : "rgba(15,13,24,0.55)", borderRadius: Radius.xl, borderWidth: StyleSheet.hairlineWidth * 2, borderColor: T.hairline }]} />
         {routes.map((route) => {
           const meta = TABS[route.name] ?? { labelKey: route.name, icon: "•" as IoniconName };
           const focused = state.routes[state.index]?.key === route.key;

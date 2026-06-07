@@ -16,11 +16,27 @@ interface UserInfo {
   picture?: string;
 }
 
+/**
+ * Uygulamanın custom scheme'ine (meydanfest:// veya exp://) geri döner.
+ *
+ * ÖNEMLİ: Server-side 302 redirect kullanıyoruz. Android Chrome Custom Tabs,
+ * JS ile yapılan `location.href = "meydanfest://..."` gibi custom-scheme
+ * yönlendirmelerini kullanıcı etkileşimi olmadan BLOKLAR — eski HTML sayfası bu
+ * yüzden Android'de takılı kalıyordu. 302 Location header'ı ise OS tarafından
+ * intent olarak yakalanır ve expo-web-browser auth session'ı düzgün kapanır.
+ * Nadir bir tarayıcı 302'yi otomatik izlemezse diye meta-refresh + tıklanır
+ * link içeren küçük bir HTML gövdesi de fallback olarak ekleniyor.
+ */
 function htmlRedirect(target: string): Response {
-  const body = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#08070D;color:#F5F3FF;font-family:system-ui,sans-serif;text-align:center;padding-top:100px;margin:0"><div style="font-size:40px">✦</div><p style="margin-top:16px">MeydanFest'e dönülüyor…</p><a href="${target.replace(/"/g, "&quot;")}" style="color:#A855F7;font-weight:700;text-decoration:none">Uygulamaya dön →</a><script>location.href=${JSON.stringify(target)}</script></body></html>`;
+  const safe = target.replace(/"/g, "&quot;");
+  const body = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${safe}"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#08070D;color:#F5F3FF;font-family:system-ui,sans-serif;text-align:center;padding-top:100px;margin:0"><div style="font-size:40px">✦</div><p style="margin-top:16px">MeydanFest'e dönülüyor…</p><a href="${safe}" style="color:#A855F7;font-weight:700;text-decoration:none">Uygulamaya dön →</a></body></html>`;
   return new Response(body, {
-    status: 200,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+    status: 302,
+    headers: {
+      Location: target,
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
   });
 }
 

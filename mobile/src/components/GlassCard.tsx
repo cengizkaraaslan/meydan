@@ -27,7 +27,7 @@ export function GlassCard({
     : {};
   return (
     <View style={[{ borderRadius: radius, overflow: "hidden" }, glow, style]} {...rest}>
-      <BlurView intensity={intensity} tint="dark" style={StyleSheet.absoluteFill} />
+      <BlurView intensity={intensity} tint={T.scheme === "light" ? "light" : "dark"} style={StyleSheet.absoluteFill} />
       <View
         style={[
           StyleSheet.absoluteFill,

@@ -15,8 +15,8 @@ import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { router } from "expo-router";
-import { useTheme, themeForGender, PALETTES, type Palette, type Gender, type ThemeName } from "@/lib/theme";
-import { useT } from "@/lib/i18n";
+import { useTheme, themeForGender, PALETTES, THEME_NAMES, MODES, type Palette, type Gender, type ThemeName, type Mode } from "@/lib/theme";
+import { useT, LANGS } from "@/lib/i18n";
 import { useActiveCity } from "@/lib/location";
 import { syncProfile } from "@/lib/profileSync";
 import { tapH, impactH } from "@/lib/haptics";
@@ -76,11 +76,13 @@ function ThemeCard({
   );
 }
 
+const MODE_ICON: Record<Mode, string> = { dark: "🌙", light: "☀️", system: "⚙️" };
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { list } = useFavorites();
   const { user, signOut, signInWithGoogle, configured } = useAuth();
-  const { t: T, name, setTheme, gender, setGender } = useTheme();
+  const { t: T, name, setTheme, mode, setMode, gender, setGender } = useTheme();
   const { t, lang, setLang } = useT();
   const { city, detected, setCity } = useActiveCity();
 
@@ -263,12 +265,35 @@ export default function ProfileScreen() {
           {appearanceOpen && (
             <Animated.View entering={FadeInDown.duration(300)}>
               <GlassCard padded style={{ marginBottom: Space.xl }}>
+                {/* Görünüm modu — koyu / açık / sistem */}
+                <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>{t("mode")}</Text>
+                <View style={styles.pillWrap}>
+                  {MODES.map((m) => (
+                    <Pill
+                      key={m}
+                      label={`${MODE_ICON[m]} ${t(`mode_${m}`)}`}
+                      active={mode === m}
+                      gradient={mode === m ? T.primarySoft : undefined}
+                      onPress={() => setMode(m)}
+                    />
+                  ))}
+                </View>
+
+                <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
+
                 {/* Tema — renk önizlemeli kartlar */}
                 <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>{t("theme")}</Text>
                 <View style={styles.themeRow}>
-                  <ThemeCard name="aurora" label={t("theme_aurora")} active={name === "aurora"} T={T} onPress={() => setTheme("aurora")} />
-                  <ThemeCard name="blue" label={t("theme_blue")} active={name === "blue"} T={T} onPress={() => setTheme("blue")} />
-                  <ThemeCard name="pink" label={t("theme_pink")} active={name === "pink"} T={T} onPress={() => setTheme("pink")} />
+                  {THEME_NAMES.map((n) => (
+                    <ThemeCard
+                      key={n}
+                      name={n}
+                      label={t(`theme_${n}`)}
+                      active={name === n}
+                      T={T}
+                      onPress={() => setTheme(n)}
+                    />
+                  ))}
                 </View>
 
                 <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
@@ -276,8 +301,14 @@ export default function ProfileScreen() {
                 {/* Dil — bayraklı */}
                 <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>{t("language")}</Text>
                 <View style={styles.pillWrap}>
-                  <Pill label="🇹🇷 Türkçe" active={lang === "tr"} onPress={() => setLang("tr")} />
-                  <Pill label="🇬🇧 English" active={lang === "en"} onPress={() => setLang("en")} />
+                  {LANGS.map((l) => (
+                    <Pill
+                      key={l.code}
+                      label={`${l.flag} ${l.label}`}
+                      active={lang === l.code}
+                      onPress={() => setLang(l.code)}
+                    />
+                  ))}
                 </View>
 
                 <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
@@ -399,13 +430,14 @@ export default function ProfileScreen() {
         {/* Hakkında */}
         <Animated.View entering={FadeInDown.duration(450).delay(300)}>
           <SectionHeader title={t("about")} accent={T.gold} />
-          <GlassCard padded>
+          {/* Siyah cam kart kaldırıldı — Aurora zemini görünsün diye sade/şeffaf kapsayıcı */}
+          <View style={{ paddingHorizontal: 2, paddingBottom: Space.sm }}>
             <Text style={[Type.body, { color: T.textDim }]}>
               {t("about_text")}
             </Text>
             <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
             <Text style={[Type.label, { color: T.textFaint }]}>{t("version")}</Text>
-          </GlassCard>
+          </View>
         </Animated.View>
       </ScrollView>
     </View>
@@ -427,9 +459,11 @@ const styles = StyleSheet.create({
   stat: { flex: 1, alignItems: "center" },
   vline: { width: StyleSheet.hairlineWidth * 2, height: 38 },
   pillWrap: { flexDirection: "row", flexWrap: "wrap", gap: Space.sm },
-  themeRow: { flexDirection: "row", gap: Space.sm },
+  themeRow: { flexDirection: "row", flexWrap: "wrap", gap: Space.sm },
   themeCard: {
-    flex: 1,
+    flexBasis: "30%",
+    flexGrow: 1,
+    minWidth: 88,
     alignItems: "center",
     gap: Space.sm,
     paddingVertical: Space.md,

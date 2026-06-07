@@ -1,6 +1,6 @@
 import "react-native-reanimated";
 import { useEffect, useState } from "react";
-import { DarkTheme, ThemeProvider } from "expo-router";
+import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
@@ -16,24 +16,12 @@ import { Walkthrough } from "@/components/Walkthrough";
 import { GlobalSignInPrompt } from "@/components/SignInPrompt";
 import { initNotifications, scheduleNearbyTeaser, useNearbyNotificationNav } from "@/lib/notify";
 
-const navTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: Aurora.bg,
-    card: Aurora.bg,
-    text: Aurora.text,
-    primary: Aurora.violet,
-    border: Aurora.hairline,
-  },
-};
-
 // Native splash'ı biz kontrol edelim (yoksa üstte takılı kalabiliyor).
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function RootNavigator() {
   const { user, guest, ready: authReady } = useAuth();
-  const { gender, ready: themeReady } = useTheme();
+  const { gender, ready: themeReady, t: T, scheme } = useTheme();
   const authed = Boolean(user) || guest;
 
   // Bildirime dokununca kişi profiline yönlendir.
@@ -51,11 +39,27 @@ function RootNavigator() {
   // İÇİNDE gösterilir — sibling overlay native ekranın altında kalıyordu).
   const showAuthFlow = !authed || gender === null;
 
+  // Navigasyon teması paletten (aktif şema: dark/light) türetilir.
+  const base = scheme === "light" ? DefaultTheme : DarkTheme;
+  const navTheme = {
+    ...base,
+    colors: {
+      ...base.colors,
+      background: T.bg,
+      card: T.bg,
+      text: T.text,
+      primary: T.primary,
+      border: T.hairline,
+    },
+  };
+
   return (
+   <ThemeProvider value={navTheme}>
+    <StatusBar style={scheme === "light" ? "dark" : "light"} />
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: Aurora.bg },
+        contentStyle: { backgroundColor: T.bg },
         animation: "fade",
       }}
     >
@@ -74,6 +78,7 @@ function RootNavigator() {
         <Stack.Screen name="ara" options={{ presentation: "transparentModal", animation: "fade" }} />
       </Stack.Protected>
     </Stack>
+   </ThemeProvider>
   );
 }
 
@@ -95,26 +100,24 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: Aurora.bg }}>
       <SafeAreaProvider>
-        <ThemeProvider value={navTheme}>
-          <StatusBar style="light" />
+        {/* Navigasyon teması + StatusBar artık RootNavigator içinde (aktif şemaya göre). */}
+        <I18nProvider>
+          <PaletteProvider>
+            <AuthProvider>
+              <RootNavigator />
+              <GlobalSignInPrompt />
+            </AuthProvider>
+          </PaletteProvider>
+        </I18nProvider>
+        {showIntro && <IntroAnimation onDone={() => setShowIntro(false)} />}
+        {/* İlk açılış tanıtım turu (intro'dan sonra, yalnızca ilk kez) */}
+        {!showIntro && seenIntro === false && (
           <I18nProvider>
             <PaletteProvider>
-              <AuthProvider>
-                <RootNavigator />
-                <GlobalSignInPrompt />
-              </AuthProvider>
+              <Walkthrough onDone={finishWalkthrough} />
             </PaletteProvider>
           </I18nProvider>
-          {showIntro && <IntroAnimation onDone={() => setShowIntro(false)} />}
-          {/* İlk açılış tanıtım turu (intro'dan sonra, yalnızca ilk kez) */}
-          {!showIntro && seenIntro === false && (
-            <I18nProvider>
-              <PaletteProvider>
-                <Walkthrough onDone={finishWalkthrough} />
-              </PaletteProvider>
-            </I18nProvider>
-          )}
-        </ThemeProvider>
+        )}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
