@@ -64,9 +64,6 @@ function RootNavigator() {
         animation: "fade",
       }}
     >
-      {/* Google köprüsü dönüşü (meydanfest://auth) — guard'sız, her durumda erişilir. */}
-      <Stack.Screen name="auth" />
-
       <Stack.Protected guard={showAuthFlow}>
         <Stack.Screen name="giris" />
       </Stack.Protected>
@@ -82,6 +79,10 @@ function RootNavigator() {
         <Stack.Screen name="admin" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="ara" options={{ presentation: "transparentModal", animation: "fade" }} />
       </Stack.Protected>
+
+      {/* Google köprüsü dönüşü (meydanfest://auth) — guard'sız. EN SONDA: anchor
+          OLMAMALI; ilk koyunca "/" yönlendirmesi döngüye girip boş ekran veriyordu. */}
+      <Stack.Screen name="auth" />
     </Stack>
    </ThemeProvider>
   );
