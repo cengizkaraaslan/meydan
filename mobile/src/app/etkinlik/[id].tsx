@@ -389,7 +389,14 @@ export default function EventDetail() {
             {event.artist ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="🎤" label={t("artist")} value={event.artist} /></>) : null}
           </Animated.View>
 
-          {/* #18 — Hava durumu (yalnızca veri varsa) — siyah cam yerine sayfayla uyumlu şeffaf yüzey */}
+          {event.description ? (
+            <Animated.View entering={FadeInDown.duration(450).delay(60)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+              <Text style={[Type.label, { color: T.textFaint, marginBottom: 8 }]}>{t("description")}</Text>
+              <Text style={[Type.body, { color: T.textDim, lineHeight: 22 }]}>{event.description}</Text>
+            </Animated.View>
+          ) : null}
+
+          {/* #18 — Hava durumu (açıklamanın ALTINDA, yalnızca veri varsa) */}
           {weather ? (
             <Animated.View entering={FadeInDown.duration(450).delay(90)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
@@ -400,13 +407,6 @@ export default function EventDetail() {
                   <Text style={[Type.body, { color: T.textDim, marginTop: 2 }]}>{weather.label}</Text>
                 </View>
               </View>
-            </Animated.View>
-          ) : null}
-
-          {event.description ? (
-            <Animated.View entering={FadeInDown.duration(450).delay(60)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
-              <Text style={[Type.label, { color: T.textFaint, marginBottom: 8 }]}>{t("description")}</Text>
-              <Text style={[Type.body, { color: T.textDim, lineHeight: 22 }]}>{event.description}</Text>
             </Animated.View>
           ) : null}
 
