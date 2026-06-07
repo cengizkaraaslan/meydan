@@ -1,7 +1,23 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export type Lang = "tr" | "en";
+export type Lang =
+  | "tr"
+  | "en"
+  | "de"
+  | "fr"
+  | "es"
+  | "it"
+  | "pt"
+  | "nl"
+  | "ru"
+  | "uk"
+  | "ar"
+  | "fa"
+  | "az"
+  | "zh"
+  | "ja"
+  | "ko";
 
 type Dict = Record<string, string>;
 
@@ -100,6 +116,13 @@ const TR: Dict = {
   theme_aurora: "Aurora",
   theme_blue: "Mavi",
   theme_pink: "Pembe",
+  theme_emerald: "Zümrüt",
+  theme_sunset: "Gün Batımı",
+  theme_gold: "Altın",
+  theme_mono: "Mono",
+  theme_ocean: "Okyanus",
+  theme_plum: "Erik",
+  theme_crimson: "Kızıl",
   language: "Dil",
   gender: "Cinsiyet",
   male: "Erkek",
@@ -326,6 +349,13 @@ const EN: Dict = {
   theme_aurora: "Aurora",
   theme_blue: "Blue",
   theme_pink: "Pink",
+  theme_emerald: "Emerald",
+  theme_sunset: "Sunset",
+  theme_gold: "Gold",
+  theme_mono: "Mono",
+  theme_ocean: "Ocean",
+  theme_plum: "Plum",
+  theme_crimson: "Crimson",
   language: "Language",
   gender: "Gender",
   male: "Male",

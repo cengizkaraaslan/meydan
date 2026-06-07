@@ -138,7 +138,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSigningIn(true);
     try {
       const redirectUrl = Linking.createURL("auth"); // meydanfest://auth
-      const res = await WebBrowser.openAuthSessionAsync(`${API_BASE}/mobile-bridge`, redirectUrl);
+      // Doğrudan Google hesap seçici (etkinlikscout sayfası DEĞİL): web'in raw OAuth start route'u.
+      const startUrl = `${API_BASE}/api/mobile-auth/start?redirect=${encodeURIComponent(redirectUrl)}`;
+      const res = await WebBrowser.openAuthSessionAsync(startUrl, redirectUrl);
       if (res.type === "success" && res.url) {
         const { queryParams } = Linking.parse(res.url);
         const email = String(queryParams?.email ?? "");
