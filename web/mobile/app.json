@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "MeydanFest",
+    "slug": "meydanfest",
+    "version": "1.2.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "meydanfest",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#08070D",
+    "ios": {
+      "icon": "./assets/expo.icon",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "app.meydanfest",
+      "adaptiveIcon": {
+        "backgroundColor": "#08070D",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "MeydanFest, bulunduğun şehirdeki etkinlikleri öne çıkarmak için konumunu kullanır."
+        }
+      ],
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#08070D",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 120,
+          "dark": {
+            "backgroundColor": "#08070D"
+          }
+        }
+      ],
+      "expo-audio"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "apiBase": "https://etkinlikscout.vercel.app",
+      "apiKey": "meydanfest-app",
+      "googleWebClientId": "89266680677-kdi8lcjvsu8n619l1a9aoovhu640cbnp.apps.googleusercontent.com",
+      "googleAndroidClientId": "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com"
+    }
+  }
+}
