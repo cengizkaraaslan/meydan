@@ -13,5 +13,5 @@ export default function AutoGoogle() {
   useEffect(() => {
     void signIn("google", { callbackUrl: "/api/mobile-auth/return" });
   }, []);
-  return <p style={{ marginTop: 16 }}>Google&apos;a yönlendiriliyor…</p>;
+  return null; // görsel kısım page.tsx'te (sade yükleme ekranı)
 }

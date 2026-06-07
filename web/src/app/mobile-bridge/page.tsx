@@ -21,8 +21,44 @@ export default async function MobileBridge() {
 
   return (
     <html lang="tr">
-      <body style={{ background: "#08070D", color: "#F5F3FF", fontFamily: "system-ui, sans-serif", textAlign: "center", paddingTop: 100, margin: 0 }}>
-        <div style={{ fontSize: 40 }}>✦</div>
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <title>MeydanFest</title>
+        <style>{`@keyframes mf-spin{to{transform:rotate(360deg)}}@keyframes mf-pulse{0%,100%{opacity:.55}50%{opacity:1}}`}</style>
+      </head>
+      <body
+        style={{
+          margin: 0,
+          minHeight: "100dvh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 18,
+          padding: 24,
+          textAlign: "center",
+          background: "radial-gradient(120% 120% at 50% 0%, #1a0b2e 0%, #08070D 58%)",
+          color: "#F5F3FF",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: "50%",
+            border: "3px solid rgba(168,85,247,0.25)",
+            borderTopColor: "#A855F7",
+            animation: "mf-spin 0.9s linear infinite",
+          }}
+        />
+        <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.3px" }}>
+          Meydan<span style={{ color: "#A855F7" }}>Fest</span>
+        </div>
+        <div style={{ fontSize: 14, color: "#B9B4D0", animation: "mf-pulse 1.6s ease-in-out infinite", maxWidth: 280 }}>
+          Google ile güvenli giriş açılıyor…
+        </div>
         <AutoGoogle />
       </body>
     </html>

@@ -13,7 +13,13 @@ declare module "next-auth" {
   }
 }
 
-const useDatabase = isDbConfigured;
+/**
+ * DB (database session + PrismaAdapter) YALNIZCA AUTH_USE_DB=1 iken kullanılır.
+ * Prod DB erişilemez olduğunda (AdapterError) NextAuth tüm girişleri "Configuration"
+ * hatasıyla reddediyordu. Varsayılan artık JWT (DB'siz) — giriş DB sağlığına bağlı
+ * değil. DB düzeltilince AUTH_USE_DB=1 ekleyip database session'a geri dönülebilir.
+ */
+const useDatabase = isDbConfigured && process.env.AUTH_USE_DB === "1";
 
 /**
  * Admin emaillerini env var'dan al; yoksa bilinen kurucu email'leri kullan.
