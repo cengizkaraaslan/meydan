@@ -3,6 +3,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
+import * as Linking from "expo-linking";
+import { API_BASE } from "./api";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -125,11 +127,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.removeItem(KEY_GUEST);
   }, []);
 
-  const signInWithGoogle = useCallback(() => {
-    if (!CONFIGURED || !promptRef.current) return;
+  // Google girişi: web köprüsü (web'in mevcut next-auth Google'ı; native client ID gerekmez).
+  // Native android client ID yapılandırıldıysa onu kullanır; aksi halde WebBrowser köprüsü.
+  const signInWithGoogle = useCallback(async () => {
+    if (CONFIGURED && promptRef.current) {
+      setSigningIn(true);
+      promptRef.current();
+      return;
+    }
     setSigningIn(true);
-    promptRef.current();
-  }, []);
+    try {
+      const redirectUrl = Linking.createURL("auth"); // meydanfest://auth
+      const res = await WebBrowser.openAuthSessionAsync(`${API_BASE}/mobile-bridge`, redirectUrl);
+      if (res.type === "success" && res.url) {
+        const { queryParams } = Linking.parse(res.url);
+        const email = String(queryParams?.email ?? "");
+        if (email) {
+          await handleUser({
+            id: `google-${email.toLowerCase()}`,
+            name: String(queryParams?.name ?? "") || email.split("@")[0],
+            email: email.toLowerCase(),
+            photo: queryParams?.photo ? String(queryParams.photo) : undefined,
+          });
+        }
+      }
+    } catch {
+      /* iptal/başarısız → sessizce geç */
+    } finally {
+      setSigningIn(false);
+    }
+  }, [handleUser]);
 
   // E-posta ile giriş — Google OAuth client ID gerektirmez (hemen çalışır).
   const signInWithEmail = useCallback(async (name: string, email: string) => {
@@ -150,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, guest, ready, configured: CONFIGURED, signingIn, signInWithGoogle, signInWithEmail, continueAsGuest, signOut }}
+      value={{ user, guest, ready, configured: true, signingIn, signInWithGoogle, signInWithEmail, continueAsGuest, signOut }}
     >
       {CONFIGURED && (
         <GoogleBridge register={(fn) => (promptRef.current = fn)} onUser={handleUser} onSettled={() => setSigningIn(false)} />
