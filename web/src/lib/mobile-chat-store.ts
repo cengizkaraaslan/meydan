@@ -123,8 +123,8 @@ export async function recordSwipe(input: {
           id: memId("sw"),
           deviceId,
           partnerId: targetId,
-          partnerName,
-          partnerAvatar,
+          partnerName: targetName,
+          partnerAvatar: targetAvatar,
           matchKey: mockMatchKey(deviceId, targetId),
           createdAt: Date.now(),
         });
