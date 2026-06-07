@@ -1,0 +1,98 @@
+Faz 2 — Prisma şema değişiklik önerileri
+=========================================
+
+NOT: Bu dosya yalnızca PROPOSAL'dır; orchestrator schema.prisma'yı güncelleyecek,
+ardından `npx prisma migrate dev --name phase-2-uni-and-proposals` çalıştırılacak.
+
+------------------------------------------------------------
+A) EventSource enum'una üniversite kaynakları eklenmeli
+------------------------------------------------------------
+
+enum EventSource {
+  BILETIX
+  BUBILET
+  MOBILET
+  PASSO
+  IBB
+  ANKARA_BB
+  IZMIR_BB
+  ANADOLU_UNI    // YENİ
+  BILKENT        // YENİ
+  ITU            // YENİ
+  BOGAZICI       // YENİ
+  MANUAL
+}
+
+------------------------------------------------------------
+B) Kullanıcı önerileri (Proposal) — yeni model + enum
+------------------------------------------------------------
+
+enum ProposalStatus {
+  PENDING        // Eşiğe ulaşmamış, açık öneri
+  PROMOTED       // Eşik dolmuş → gerçek Event'e dönüştürüldü
+  REJECTED       // Moderasyon tarafından reddedildi
+}
+
+model Proposal {
+  id              String          @id @default(cuid())
+  slug            String          @unique
+  title           String
+  description     String
+  suggestedDate   DateTime
+  suggestedVenue  String
+  suggestedCity   String
+  category        EventCategory
+  status          ProposalStatus  @default(PENDING)
+  threshold       Int             @default(10)
+
+  // Eşik dolunca otomatik Event'e dönüştüğünde linklenecek
+  promotedEventId String?         @unique
+  promotedEvent   Event?          @relation("ProposalPromotion", fields: [promotedEventId], references: [id])
+
+  creatorId       String
+  creator         User            @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  attendees       ProposalAttendee[]
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([status, suggestedDate])
+  @@index([suggestedCity])
+  @@index([creatorId])
+}
+
+model ProposalAttendee {
+  id          String   @id @default(cuid())
+  proposalId  String
+  proposal    Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([proposalId, userId])
+  @@index([userId])
+}
+
+------------------------------------------------------------
+C) User modeline ters relation alanları
+------------------------------------------------------------
+
+model User {
+  // ... mevcut alanlar
+  proposals          Proposal[]
+  proposalAttendings ProposalAttendee[]
+}
+
+------------------------------------------------------------
+D) Event modeline ters relation (promotion için)
+------------------------------------------------------------
+
+model Event {
+  // ... mevcut alanlar
+  promotedFrom Proposal? @relation("ProposalPromotion")
+}
+
+------------------------------------------------------------
+Migration komutu (orchestrator çalıştıracak):
+  npx prisma migrate dev --name phase-2-uni-and-proposals

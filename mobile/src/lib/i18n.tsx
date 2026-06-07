@@ -1,0 +1,468 @@
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+export type Lang = "tr" | "en";
+
+type Dict = Record<string, string>;
+
+const TR: Dict = {
+  // genel
+  search: "Etkinlik, sanatçı, mekan ara…",
+  cancel: "İptal",
+  free: "Ücretsiz",
+  ticketed: "Biletli",
+  online: "çevrimiçi",
+  typing: "yazıyor…",
+  results: "SONUÇ",
+  away: "uzakta",
+  loading: "Etkinlikler yükleniyor…",
+  // tablar
+  tab_discover: "Keşfet",
+  tab_categories: "Kategori",
+  tab_nearby: "Yakın",
+  tab_calendar: "Takvim",
+  tab_favorites: "Favori",
+  tab_profile: "Profil",
+  // keşfet
+  welcome: "HOŞ GELDİN ✦",
+  your_location: "KONUMUN",
+  locating: "KONUM ALINIYOR…",
+  weekend: "Bu hafta sonu",
+  upcoming: "Yaklaşan etkinlikler",
+  in_city: "{city}'da olanlar",
+  filtered: "Filtrelenmiş",
+  all: "Tümü",
+  no_result: "Sonuç yok",
+  try_another: "Başka bir kategori dene.",
+  // kategoriler
+  categories: "Kategoriler",
+  pick_category: "Bir kategori seç ✨",
+  // yakın
+  nearby: "Yakınımdakiler",
+  nearby_sub: "Çevrende {count} kişi · {online} çevrimiçi 🟢",
+  // sohbet
+  message_hint: "{name}'e mesaj yaz…",
+  guest_notice: "Misafirsin · Google ile giriş yap, profilin görünsün →",
+  guest_soon: "Misafirsin · Google girişi yakında aktif",
+  person_not_found: "Kişi bulunamadı",
+  back: "Geri",
+  // arama
+  search_title: "Ne arıyorsun?",
+  search_hint: "İsim yaz ya da bir kategori seç.",
+  search_empty: "Sonuç bulunamadı",
+  search_empty_sub: "Farklı bir kelime dene.",
+  // favoriler
+  my_favorites: "Favorilerim",
+  fav_count: "{count} etkinlik",
+  no_fav: "Henüz favori yok",
+  no_fav_sub: "Beğendiğin etkinlikleri kalple kaydet",
+  explore_events: "Etkinlikleri Keşfet",
+  // takvim
+  calendar: "Takvim",
+  upcoming_n: "Yaklaşan {count} etkinlik",
+  no_upcoming: "Yaklaşan etkinlik yok",
+  // detay
+  date: "Tarih",
+  venue: "Mekan",
+  ticket: "Bilet",
+  artist: "Sanatçı",
+  description: "AÇIKLAMA",
+  see_on_map: "Haritada gör →",
+  buy_ticket: "Bilet Al",
+  go_detail: "Detaya Git",
+  no_ticket: "Bilet bağlantısı yok",
+  not_specified: "Belirtilmemiş",
+  event_not_found: "Etkinlik bulunamadı",
+  // giriş
+  tagline: "Türkiye'nin etkinlik meydanı.\nKonser, festival, tiyatro… hepsi tek yerde.",
+  continue_google: "Google ile devam et",
+  google_pending: "Google girişi yapılandırma bekliyor — şimdilik misafir olarak keşfet.",
+  explore_guest: "Misafir olarak keşfet →",
+  terms: "Devam ederek kullanım koşullarını kabul edersin.",
+  signin_google: "Google ile giriş yap",
+  // profil
+  guest: "Misafir",
+  exploring: "MeydanFest'i keşfediyorsun",
+  sign_out: "Çıkış yap",
+  city: "Şehrin",
+  discover_links: "Keşfet",
+  open_site: "Web sitesini aç",
+  suggest_event: "Etkinlik öner",
+  feedback: "Geri bildirim",
+  about: "Hakkında",
+  about_text: "MeydanFest, Türkiye'deki binlerce konser, festival, tiyatro ve etkinliği tek meydanda toplar.",
+  version: "Sürüm v1.2.0",
+  stat_event: "Etkinlik",
+  stat_city: "İl",
+  // tema & dil & cinsiyet
+  appearance: "Görünüm",
+  theme: "Tema",
+  theme_aurora: "Aurora",
+  theme_blue: "Mavi",
+  theme_pink: "Pembe",
+  language: "Dil",
+  gender: "Cinsiyet",
+  male: "Erkek",
+  female: "Kadın",
+  other: "Belirtmek istemiyorum",
+  detected_city: "Konumun",
+  edit: "Düzenle",
+  change_city: "Şehir değiştir",
+  // onboarding
+  ob_welcome: "MeydanFest'e hoş geldin",
+  ob_gender_q: "Sana özel bir deneyim için seni biraz tanıyalım",
+  ob_continue: "Devam et",
+  // kişi profili + bildirim
+  person_message: "Mesaj Gönder",
+  person_about: "Hakkında",
+  person_interests: "İlgi alanları",
+  person_nearby: "yakınında",
+  notif_nearby_title: "✨ {name} yakınında!",
+  notif_nearby_body: "{name} · {km} km uzakta — profiline göz at 👀",
+  // #2 takvim
+  cal_general: "Genel",
+  cal_attending: "Katılacaklarım",
+  attending_login: "Katılacaklarını görmek için giriş yap",
+  // #3 kategori konum filtresi
+  location_filter: "Konum",
+  all_cities: "Tüm şehirler",
+  // #4 dating / eşleşme
+  tab_match: "Eşleş",
+  match_title: "Eşleş",
+  match_sub: "Etkinlik sevenlerle tanış",
+  its_a_match: "Eşleştiniz! 💜",
+  match_body: "{name} ile eşleştin — hemen yaz!",
+  no_more_people: "Şimdilik bu kadar 🌙",
+  no_more_sub: "Yeni kişiler için sonra tekrar bak.",
+  keep_swiping: "Kaydırmaya devam",
+  // #5 bluetooth yakınlık
+  bt_nearby_title: "Çok yakında biri var! 👀",
+  bt_suggest: "{name} 1 km içinde! Bluetooth'u aç — 30 m'ye girince haber verelim, sen de etrafına bakmaya başla 😏",
+  bt_enable: "Bluetooth'u Aç",
+  bt_later: "Sonra",
+  // #6 admin
+  admin_panel: "Yönetim",
+  admin_users: "Kullanıcılar",
+  make_admin: "Admin yap",
+  remove_admin: "Adminliği al",
+  admin_badge: "Yönetici",
+  // #7 etkinlik oluştur
+  create_event: "Etkinlik Oluştur",
+  create_cta: "Antrenör, öğretmen ya da organizatör müsün? Kendi etkinliğini oluştur, işini büyüt ✨",
+  signin_creators: "Antrenörler & öğretmenler kendi etkinliğini oluşturur — işini büyüt ✨",
+  ev_title: "Etkinlik adı",
+  ev_category: "Kategori",
+  ev_date: "Tarih (örn. 12 Tem 20:00)",
+  ev_venue: "Mekan",
+  ev_city: "Şehir",
+  ev_desc: "Açıklama",
+  ev_website: "Web sitesi (opsiyonel)",
+  ev_instagram: "Instagram (opsiyonel)",
+  ev_facebook: "Facebook (opsiyonel)",
+  ev_tiktok: "TikTok (opsiyonel)",
+  ev_add_image: "Görsel ekle",
+  ev_change_image: "Görseli değiştir",
+  ev_publish: "Yayınla",
+  ev_examples: "Köpek gezdirme · İngilizce konuşma · Koşu grubu…",
+  ev_helper: "Birkaç alanı doldur, gerisini biz hallederiz ✨",
+  ev_published: "Etkinliğin oluşturuldu! 🎉",
+  // #10 / giriş gerekli
+  login_required: "Bunun için giriş yapmalısın",
+  login_required_fav: "Favorilere eklemek için giriş yap",
+  signin_now: "Giriş yap",
+  // #11 konum modalı
+  change_location: "Konumu değiştir",
+  select_city: "Şehir seç",
+  use_my_location: "Konumumu kullan",
+  // #12 gelişmiş filtre
+  filters: "Filtreler",
+  f_all: "Tümü",
+  f_free: "Ücretsiz",
+  f_paid: "Biletli",
+  f_student: "Öğrenciye açık",
+  f_district: "İlçe",
+  f_apply: "Uygula",
+  f_clear: "Temizle",
+  advanced_filter: "Gelişmiş filtre",
+  // #14 katılımcı + yorum
+  attendees: "Katılacaklar",
+  join_event: "Katıl",
+  joined_event: "Katılıyorsun ✓",
+  comments: "Yorumlar",
+  write_comment: "Yorum yaz…",
+  no_comments: "İlk yorumu sen yaz ✍️",
+  add_photo: "Fotoğraf ekle",
+  send: "Gönder",
+  // #17 giriş zorlama modalı
+  lock_match_title: "Eşleşmek için giriş yap 💜",
+  lock_chat_title: "Sohbet için giriş yap",
+  lock_fav_title: "Favorilemek için giriş yap",
+  lock_body: "Etkinlik sevenlerle tanış, sohbet et ve favorilerini kaydet — Google ile saniyeler içinde başla.",
+  maybe_later: "Belki sonra",
+  open_bluetooth: "Bluetooth ayarlarını aç",
+  // #18 hava durumu
+  weather: "Hava durumu",
+  weather_unavailable: "Hava durumu yakında",
+  // #19a tanıtım turu
+  wt_skip: "Atla",
+  wt_next: "İleri",
+  wt_start: "Başla ✦",
+  wt1_title: "Binlerce etkinlik",
+  wt1_body: "Konser, festival, tiyatro, atölye — şehrindeki her şey tek meydanda.",
+  wt2_title: "Yakınındakilerle tanış",
+  wt2_body: "Yakındaki etkinlikseverleri keşfet, eşleş ve sohbet et 💜",
+  wt3_title: "Kendi etkinliğini oluştur",
+  wt3_body: "Antrenör, öğretmen ya da organizatör müsün? Etkinliğini yarat, işini büyüt.",
+  wt4_title: "Sana özel tema",
+  wt4_body: "Mavi, pembe, aurora — uygulamayı kendine göre renklendir.",
+  // #19b
+  message_attendee: "Mesaj at",
+  // e-posta giriş (Google alternatifi)
+  email_continue: "E-posta ile devam et",
+  email_name: "Adın",
+  email_addr: "E-posta adresin",
+  email_go: "Devam et",
+  or: "veya",
+};
+
+const EN: Dict = {
+  search: "Search events, artists, venues…",
+  cancel: "Cancel",
+  free: "Free",
+  ticketed: "Ticketed",
+  online: "online",
+  typing: "typing…",
+  results: "RESULTS",
+  away: "away",
+  loading: "Loading events…",
+  tab_discover: "Discover",
+  tab_categories: "Category",
+  tab_nearby: "Nearby",
+  tab_calendar: "Calendar",
+  tab_favorites: "Saved",
+  tab_profile: "Profile",
+  welcome: "WELCOME ✦",
+  your_location: "YOUR LOCATION",
+  locating: "GETTING LOCATION…",
+  weekend: "This weekend",
+  upcoming: "Upcoming events",
+  in_city: "Happening in {city}",
+  filtered: "Filtered",
+  all: "All",
+  no_result: "No results",
+  try_another: "Try another category.",
+  categories: "Categories",
+  pick_category: "Pick a category ✨",
+  nearby: "People nearby",
+  nearby_sub: "{count} people around · {online} online 🟢",
+  message_hint: "Message {name}…",
+  guest_notice: "You're a guest · Sign in with Google to show your profile →",
+  guest_soon: "You're a guest · Google sign-in coming soon",
+  person_not_found: "Person not found",
+  back: "Back",
+  search_title: "What are you looking for?",
+  search_hint: "Type a name or pick a category.",
+  search_empty: "No results found",
+  search_empty_sub: "Try a different word.",
+  my_favorites: "My favorites",
+  fav_count: "{count} events",
+  no_fav: "No favorites yet",
+  no_fav_sub: "Save events you like with a heart",
+  explore_events: "Explore events",
+  calendar: "Calendar",
+  upcoming_n: "{count} upcoming events",
+  no_upcoming: "No upcoming events",
+  date: "Date",
+  venue: "Venue",
+  ticket: "Ticket",
+  artist: "Artist",
+  description: "DESCRIPTION",
+  see_on_map: "See on map →",
+  buy_ticket: "Get Ticket",
+  go_detail: "View Detail",
+  no_ticket: "No ticket link",
+  not_specified: "Not specified",
+  event_not_found: "Event not found",
+  tagline: "Turkey's events square.\nConcerts, festivals, theatre… all in one place.",
+  continue_google: "Continue with Google",
+  google_pending: "Google sign-in pending setup — explore as a guest for now.",
+  explore_guest: "Explore as guest →",
+  terms: "By continuing you accept the terms of use.",
+  signin_google: "Sign in with Google",
+  guest: "Guest",
+  exploring: "You're exploring MeydanFest",
+  sign_out: "Sign out",
+  city: "Your city",
+  discover_links: "Discover",
+  open_site: "Open website",
+  suggest_event: "Suggest an event",
+  feedback: "Feedback",
+  about: "About",
+  about_text: "MeydanFest gathers thousands of concerts, festivals, theatre and events across Turkey in one square.",
+  version: "Version v1.2.0",
+  stat_event: "Events",
+  stat_city: "Cities",
+  appearance: "Appearance",
+  theme: "Theme",
+  theme_aurora: "Aurora",
+  theme_blue: "Blue",
+  theme_pink: "Pink",
+  language: "Language",
+  gender: "Gender",
+  male: "Male",
+  female: "Female",
+  other: "Prefer not to say",
+  detected_city: "Your location",
+  edit: "Edit",
+  change_city: "Change city",
+  ob_welcome: "Welcome to MeydanFest",
+  ob_gender_q: "Let's get to know you for a tailored experience",
+  ob_continue: "Continue",
+  person_message: "Send Message",
+  person_about: "About",
+  person_interests: "Interests",
+  person_nearby: "nearby",
+  notif_nearby_title: "✨ {name} is nearby!",
+  notif_nearby_body: "{name} · {km} km away — check out their profile 👀",
+  cal_general: "All",
+  cal_attending: "My events",
+  attending_login: "Sign in to see your events",
+  location_filter: "Location",
+  all_cities: "All cities",
+  tab_match: "Match",
+  match_title: "Match",
+  match_sub: "Meet people who love events",
+  its_a_match: "It's a match! 💜",
+  match_body: "You matched with {name} — say hi!",
+  no_more_people: "That's everyone for now 🌙",
+  no_more_sub: "Check back later for new people.",
+  keep_swiping: "Keep swiping",
+  bt_nearby_title: "Someone's super close! 👀",
+  bt_suggest: "{name} is within 1 km! Turn on Bluetooth — we'll ping you within 30 m, start looking around 😏",
+  bt_enable: "Turn on Bluetooth",
+  bt_later: "Later",
+  admin_panel: "Admin",
+  admin_users: "Users",
+  make_admin: "Make admin",
+  remove_admin: "Remove admin",
+  admin_badge: "Admin",
+  create_event: "Create Event",
+  create_cta: "Are you a trainer, teacher or organizer? Create your own event and grow your business ✨",
+  signin_creators: "Trainers & teachers create their own events — grow your business ✨",
+  ev_title: "Event name",
+  ev_category: "Category",
+  ev_date: "Date (e.g. Jul 12 20:00)",
+  ev_venue: "Venue",
+  ev_city: "City",
+  ev_desc: "Description",
+  ev_website: "Website (optional)",
+  ev_instagram: "Instagram (optional)",
+  ev_facebook: "Facebook (optional)",
+  ev_tiktok: "TikTok (optional)",
+  ev_add_image: "Add image",
+  ev_change_image: "Change image",
+  ev_publish: "Publish",
+  ev_examples: "Dog walking · English speaking · Running group…",
+  ev_helper: "Fill a few fields, we'll handle the rest ✨",
+  ev_published: "Your event is created! 🎉",
+  login_required: "Sign in to do this",
+  login_required_fav: "Sign in to save favorites",
+  signin_now: "Sign in",
+  change_location: "Change location",
+  select_city: "Select city",
+  use_my_location: "Use my location",
+  filters: "Filters",
+  f_all: "All",
+  f_free: "Free",
+  f_paid: "Ticketed",
+  f_student: "Student-friendly",
+  f_district: "District",
+  f_apply: "Apply",
+  f_clear: "Clear",
+  advanced_filter: "Advanced filter",
+  attendees: "Attendees",
+  join_event: "Join",
+  joined_event: "Going ✓",
+  comments: "Comments",
+  write_comment: "Write a comment…",
+  no_comments: "Be the first to comment ✍️",
+  add_photo: "Add photo",
+  send: "Send",
+  lock_match_title: "Sign in to match 💜",
+  lock_chat_title: "Sign in to chat",
+  lock_fav_title: "Sign in to save",
+  lock_body: "Meet event lovers, chat and save your favorites — get started with Google in seconds.",
+  maybe_later: "Maybe later",
+  open_bluetooth: "Open Bluetooth settings",
+  weather: "Weather",
+  weather_unavailable: "Weather coming soon",
+  wt_skip: "Skip",
+  wt_next: "Next",
+  wt_start: "Get started ✦",
+  wt1_title: "Thousands of events",
+  wt1_body: "Concerts, festivals, theatre, workshops — everything in your city, one square.",
+  wt2_title: "Meet people nearby",
+  wt2_body: "Discover nearby event-lovers, match and chat 💜",
+  wt3_title: "Create your own event",
+  wt3_body: "Trainer, teacher or organizer? Create your event and grow your business.",
+  wt4_title: "A theme that's yours",
+  wt4_body: "Blue, pink, aurora — color the app your way.",
+  message_attendee: "Message",
+  email_continue: "Continue with email",
+  email_name: "Your name",
+  email_addr: "Your email",
+  email_go: "Continue",
+  or: "or",
+};
+
+const DICTS: Record<Lang, Dict> = { tr: TR, en: EN };
+const KEY = "meydanfest:lang";
+
+function deviceLang(): Lang {
+  try {
+    const loc = (typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().locale) || "tr";
+    return loc.toLowerCase().startsWith("en") ? "en" : "tr";
+  } catch {
+    return "tr";
+  }
+}
+
+interface I18nState {
+  lang: Lang;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  setLang: (l: Lang) => void;
+}
+
+const I18nCtx = createContext<I18nState | null>(null);
+
+export function I18nProvider({ children }: { children: React.ReactNode }) {
+  const [lang, setLangState] = useState<Lang>(deviceLang());
+
+  useEffect(() => {
+    AsyncStorage.getItem(KEY).then((v) => {
+      if (v === "tr" || v === "en") setLangState(v);
+    });
+  }, []);
+
+  const t = useCallback(
+    (key: string, vars?: Record<string, string | number>) => {
+      let s = DICTS[lang][key] ?? DICTS.tr[key] ?? key;
+      if (vars) for (const k of Object.keys(vars)) s = s.replace(`{${k}}`, String(vars[k]));
+      return s;
+    },
+    [lang],
+  );
+
+  const setLang = useCallback((l: Lang) => {
+    setLangState(l);
+    AsyncStorage.setItem(KEY, l);
+  }, []);
+
+  return <I18nCtx.Provider value={{ lang, t, setLang }}>{children}</I18nCtx.Provider>;
+}
+
+export function useT(): I18nState {
+  const ctx = useContext(I18nCtx);
+  if (!ctx) throw new Error("useT must be used within I18nProvider");
+  return ctx;
+}

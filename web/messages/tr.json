@@ -1,0 +1,108 @@
+{
+  "nav": {
+    "home": "Anasayfa",
+    "events": "Etkinlikler",
+    "api": "API",
+    "admin": "Yönetim",
+    "login": "Giriş Yap",
+    "logout": "Çıkış",
+    "profile": "Profil"
+  },
+  "home": {
+    "hero_eyebrow": "Etkinliğe yalnız gitme — ekibini topla",
+    "hero_title": "Plan senden, <accent>kalabalık</accent> bizden",
+    "hero_tagline": "En iyi etkinlik, doğru kişilerle.",
+    "hero_subtitle": "Konser, festival, tiyatro, spor ve ücretsiz belediye etkinlikleri — keşfet, ekibini topla, birlikte git.",
+    "hero_cta": "Etkinlikleri Keşfet",
+    "hero_cta_api": "API'yi İncele",
+    "featured_title": "Öne Çıkan Etkinlikler",
+    "featured_subtitle": "Bu hafta kaçırılmayacaklar",
+    "free_section_title": "Ücretsiz Etkinlikler",
+    "free_section_subtitle": "Belediye ve kurumlardan ücretsiz program",
+    "stats_events": "etkinlik",
+    "stats_sources": "kaynak",
+    "stats_cities": "şehir"
+  },
+  "events": {
+    "title": "Tüm Etkinlikler",
+    "result_count": "{count} etkinlik bulundu",
+    "no_results_title": "Bu filtreyle eşleşen etkinlik bulunamadı",
+    "no_results_subtitle": "Farklı bir şehir, tarih veya kategoriyle dene.",
+    "clear_filters": "Filtreleri temizle"
+  },
+  "filters": {
+    "title": "Filtrele",
+    "city": "Şehir",
+    "all_cities": "Tüm şehirler",
+    "category": "Kategori",
+    "all_categories": "Tüm kategoriler",
+    "source": "Kaynak",
+    "all_sources": "Tüm kaynaklar",
+    "free_only": "Sadece ücretsiz",
+    "from_date": "Başlangıç",
+    "to_date": "Bitiş",
+    "search": "Etkinlik veya sanatçı ara",
+    "apply": "Uygula",
+    "district": "İlçe",
+    "date": "Tarih",
+    "date_options": {
+      "all": "Tüm tarihler",
+      "today": "Bugün",
+      "tomorrow": "Yarın",
+      "weekend": "Bu hafta sonu",
+      "week": "Bu hafta",
+      "month": "Bu ay"
+    }
+  },
+  "event": {
+    "going_count": "{count} kişi katılıyor",
+    "interested_count": "{count} ilgileniyor",
+    "rsvp_going": "Katılacağım",
+    "rsvp_maybe": "Belki",
+    "rsvp_interested": "İlgileniyorum",
+    "ticket_cta": "Bilet Al",
+    "share": "Paylaş",
+    "favorite": "Favori",
+    "price_alert": "Fiyat Alarmı",
+    "comments_title": "Yorumlar",
+    "comment_placeholder": "Etkinlik hakkında ne düşünüyorsun?",
+    "comment_send": "Yorum Yap",
+    "attendees_title": "Katılacaklar",
+    "details_title": "Etkinlik Detayları"
+  },
+  "categories": {
+    "KONSER": "Konser",
+    "FESTIVAL": "Festival",
+    "TIYATRO": "Tiyatro",
+    "STANDUP": "Stand-Up",
+    "SPOR": "Spor",
+    "SERGI": "Sergi",
+    "ATOLYE": "Atölye",
+    "COCUK": "Çocuk",
+    "DIGER": "Diğer"
+  },
+  "common": {
+    "loading": "Yükleniyor…",
+    "error_title": "Bir şeyler ters gitti",
+    "error_retry": "Yeniden dene",
+    "free": "Ücretsiz",
+    "language": "Dil",
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "back": "Geri",
+    "more": "Daha fazla"
+  },
+  "footer": {
+    "tagline": "Türkiye etkinlik agregatörü — açık API ile geliştiriciler için.",
+    "made_with": "❤ ile yapıldı",
+    "explore": "Keşfet",
+    "developers": "Geliştiriciler",
+    "company": "Şirket"
+  },
+  "voice": {
+    "listen": "Dinliyorum...",
+    "start": "Sesle ara",
+    "unsupported": "Tarayıcın sesli aramayı desteklemiyor",
+    "denied": "Mikrofon izni reddedildi"
+  }
+}

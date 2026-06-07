@@ -1,0 +1,101 @@
+{
+  "nav": {
+    "home": "Inicio",
+    "events": "Eventos",
+    "api": "API",
+    "admin": "Admin",
+    "login": "Iniciar sesión",
+    "logout": "Cerrar sesión",
+    "profile": "Perfil"
+  },
+  "home": {
+    "hero_eyebrow": "Todos los eventos de Türkiye en un solo lugar",
+    "hero_title": "No te pierdas ningún <accent>evento</accent> en tu ciudad",
+    "hero_subtitle": "Conciertos, festivales, teatro, deportes y eventos municipales gratuitos — todo en una interfaz, con seguimiento de precios en vivo.",
+    "hero_cta": "Explorar eventos",
+    "hero_cta_api": "Ver la API",
+    "featured_title": "Eventos destacados",
+    "featured_subtitle": "Imperdibles de esta semana",
+    "free_section_title": "Eventos gratuitos",
+    "free_section_subtitle": "Programas gratuitos de municipios e instituciones",
+    "stats_events": "eventos",
+    "stats_sources": "fuentes",
+    "stats_cities": "ciudades"
+  },
+  "events": {
+    "title": "Todos los eventos",
+    "result_count": "{count} eventos encontrados",
+    "no_results_title": "No hay resultados con estos filtros",
+    "no_results_subtitle": "Prueba con otra ciudad, fecha o categoría.",
+    "clear_filters": "Limpiar filtros"
+  },
+  "filters": {
+    "title": "Filtrar",
+    "city": "Ciudad",
+    "all_cities": "Todas las ciudades",
+    "category": "Categoría",
+    "all_categories": "Todas las categorías",
+    "source": "Fuente",
+    "all_sources": "Todas las fuentes",
+    "free_only": "Solo gratis",
+    "from_date": "Desde",
+    "to_date": "Hasta",
+    "search": "Busca evento o artista",
+    "apply": "Aplicar",
+    "district": "Distrito",
+    "date": "Fecha",
+    "date_options": {
+      "all": "Todas las fechas",
+      "today": "Hoy",
+      "tomorrow": "Mañana",
+      "weekend": "Este fin de semana",
+      "week": "Esta semana",
+      "month": "Este mes"
+    }
+  },
+  "event": {
+    "going_count": "{count} asisten",
+    "interested_count": "{count} interesados",
+    "rsvp_going": "Voy a ir",
+    "rsvp_maybe": "Tal vez",
+    "rsvp_interested": "Me interesa",
+    "ticket_cta": "Comprar entrada",
+    "share": "Compartir",
+    "favorite": "Favorito",
+    "price_alert": "Alerta de precio",
+    "comments_title": "Comentarios",
+    "comment_placeholder": "¿Qué opinas de este evento?",
+    "comment_send": "Publicar",
+    "attendees_title": "Asistentes",
+    "details_title": "Detalles"
+  },
+  "categories": {
+    "KONSER": "Concierto",
+    "FESTIVAL": "Festival",
+    "TIYATRO": "Teatro",
+    "STANDUP": "Stand-up",
+    "SPOR": "Deportes",
+    "SERGI": "Exposición",
+    "ATOLYE": "Taller",
+    "COCUK": "Niños",
+    "DIGER": "Otro"
+  },
+  "common": {
+    "loading": "Cargando…",
+    "error_title": "Algo salió mal",
+    "error_retry": "Reintentar",
+    "free": "Gratis",
+    "language": "Idioma",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "back": "Atrás",
+    "more": "Más"
+  },
+  "footer": {
+    "tagline": "Agregador de eventos turcos — API abierta para desarrolladores.",
+    "made_with": "Hecho con ❤",
+    "explore": "Explorar",
+    "developers": "Desarrolladores",
+    "company": "Empresa"
+  }
+}

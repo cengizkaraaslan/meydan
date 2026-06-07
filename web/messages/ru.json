@@ -1,0 +1,101 @@
+{
+  "nav": {
+    "home": "Главная",
+    "events": "События",
+    "api": "API",
+    "admin": "Админ",
+    "login": "Войти",
+    "logout": "Выйти",
+    "profile": "Профиль"
+  },
+  "home": {
+    "hero_eyebrow": "Все события Турции в одном месте",
+    "hero_title": "Не пропустите <accent>события</accent> в своём городе",
+    "hero_subtitle": "Концерты, фестивали, театр, спорт и бесплатные муниципальные события — всё в одном интерфейсе, с отслеживанием цен в реальном времени.",
+    "hero_cta": "Смотреть события",
+    "hero_cta_api": "Открыть API",
+    "featured_title": "Избранные события",
+    "featured_subtitle": "Хиты этой недели",
+    "free_section_title": "Бесплатные события",
+    "free_section_subtitle": "Программы муниципалитетов и учреждений",
+    "stats_events": "событий",
+    "stats_sources": "источников",
+    "stats_cities": "городов"
+  },
+  "events": {
+    "title": "Все события",
+    "result_count": "Найдено: {count}",
+    "no_results_title": "По вашим фильтрам ничего не найдено",
+    "no_results_subtitle": "Попробуйте другой город, дату или категорию.",
+    "clear_filters": "Сбросить фильтры"
+  },
+  "filters": {
+    "title": "Фильтр",
+    "city": "Город",
+    "all_cities": "Все города",
+    "category": "Категория",
+    "all_categories": "Все категории",
+    "source": "Источник",
+    "all_sources": "Все источники",
+    "free_only": "Только бесплатные",
+    "from_date": "С",
+    "to_date": "По",
+    "search": "Поиск события или артиста",
+    "apply": "Применить",
+    "district": "Район",
+    "date": "Дата",
+    "date_options": {
+      "all": "Все даты",
+      "today": "Сегодня",
+      "tomorrow": "Завтра",
+      "weekend": "В эти выходные",
+      "week": "На этой неделе",
+      "month": "В этом месяце"
+    }
+  },
+  "event": {
+    "going_count": "Пойдут: {count}",
+    "interested_count": "Интересно: {count}",
+    "rsvp_going": "Я пойду",
+    "rsvp_maybe": "Возможно",
+    "rsvp_interested": "Интересно",
+    "ticket_cta": "Купить билет",
+    "share": "Поделиться",
+    "favorite": "В избранное",
+    "price_alert": "Уведомление о цене",
+    "comments_title": "Комментарии",
+    "comment_placeholder": "Что вы думаете об этом событии?",
+    "comment_send": "Отправить",
+    "attendees_title": "Участники",
+    "details_title": "Подробности"
+  },
+  "categories": {
+    "KONSER": "Концерт",
+    "FESTIVAL": "Фестиваль",
+    "TIYATRO": "Театр",
+    "STANDUP": "Стендап",
+    "SPOR": "Спорт",
+    "SERGI": "Выставка",
+    "ATOLYE": "Мастер-класс",
+    "COCUK": "Дети",
+    "DIGER": "Другое"
+  },
+  "common": {
+    "loading": "Загрузка…",
+    "error_title": "Что-то пошло не так",
+    "error_retry": "Повторить",
+    "free": "Бесплатно",
+    "language": "Язык",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "back": "Назад",
+    "more": "Ещё"
+  },
+  "footer": {
+    "tagline": "Агрегатор событий Турции — открытое API для разработчиков.",
+    "made_with": "Сделано с ❤",
+    "explore": "Обзор",
+    "developers": "Разработчикам",
+    "company": "Компания"
+  }
+}

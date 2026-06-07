@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --muted: #6b7280;
+  --muted-bg: #f4f4f5;
+  --border: #e5e7eb;
+  --card: #ffffff;
+  --primary: #7c3aed;
+  --primary-foreground: #ffffff;
+  --accent: #f59e0b;
+  --success: #10b981;
+  --danger: #ef4444;
+  --radius: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0f;
+    --foreground: #f5f5f7;
+    --muted: #9ca3af;
+    --muted-bg: #18181b;
+    --border: #27272a;
+    --card: #111118;
+    --primary: #a78bfa;
+    --primary-foreground: #0a0a0f;
+    --accent: #fbbf24;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-bg: var(--muted-bg);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --radius: var(--radius);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html, body { background: var(--background); color: var(--foreground); color-scheme: light dark; }
+body { font-family: var(--font-sans), Inter, system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+
+* { border-color: var(--border); }
+
+::selection { background: color-mix(in oklch, var(--primary), transparent 70%); }
+
+/* Native <select> dropdown'larında option'lar sistem rengini kullanır;
+   tema değişkenlerimizi zorla ki light/dark karışımı olmasın */
+select { color: var(--foreground); }
+select option,
+select optgroup {
+  background-color: var(--card);
+  color: var(--foreground);
+}
+select option:checked,
+select option:hover {
+  background-color: color-mix(in oklch, var(--primary), transparent 80%);
+  color: var(--foreground);
+}
+
+/* RTL adjustments */
+html[dir="rtl"] body { font-feature-settings: "ss01"; }
+
+/* Hide scrollbar on filter chips */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, var(--muted-bg) 0%, color-mix(in srgb, var(--muted-bg), white 8%) 50%, var(--muted-bg) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.animate-pulse-soft { animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+.gradient-text {
+  background: linear-gradient(120deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.glow-primary {
+  box-shadow: 0 10px 40px -10px color-mix(in oklch, var(--primary), transparent 50%);
+}
+
+.glass {
+  background: color-mix(in oklch, var(--background), transparent 25%);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+}

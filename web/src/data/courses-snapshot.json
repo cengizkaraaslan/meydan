@@ -1,0 +1,466 @@
+{
+  "scrapedAt": "2026-05-31T19:37:06.679Z",
+  "data": {
+    "GASMEK": [
+      {
+        "name": "Adalet",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/fadd18c94282410ae286ab43cf6e7e76.jpeg"
+      },
+      {
+        "name": "Ahşap Teknolojisi",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/8f59f4d074db7afd3ebae17a97b682e4.jpeg"
+      },
+      {
+        "name": "Aile Okulu",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/6508d260c1a1dae467de485e753b3f92.jpeg"
+      },
+      {
+        "name": "Aile ve Tüketici Bilimleri",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/f27a4617e16d0b952044af52bb5a5496.jpeg"
+      },
+      {
+        "name": "Bahçecilik",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/75e0bc8049aac90a71f1b5d85185ff26.jpeg"
+      },
+      {
+        "name": "Bilişim Teknolojileri",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/97b4e09b9aeb6092800d79e1683418d6.jpeg"
+      },
+      {
+        "name": "Büro Yönetimi ve Sekreterlik",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/9064471ebf05d388b63bf47d93fcc000.jpeg"
+      },
+      {
+        "name": "Can ve Mal Güvenliği",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/e2a4910c9bfc6b4aa25a20418448430b.jpeg"
+      },
+      {
+        "name": "Çocuk Gelişimi ve Eğitimi",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/ab5779ed10829f135ad0c10261ccb2af.jpeg"
+      },
+      {
+        "name": "Din Eğitimi",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/53c06930cc3df720248c2f55e71c95d4.jpeg"
+      },
+      {
+        "name": "El Sanatları Teknolojisi",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/74eb7c1ca95350910edf48d78a5bb982.jpeg"
+      },
+      {
+        "name": "Elektrik Elektronik Teknolojisi",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/492284f2b799a362a347fe317cb9ad2a.jpeg"
+      },
+      {
+        "name": "Geleneksel Oyunlar ve Zeka Oyunları",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/c41be1dbad32e16cd704403277bfc03f.jpeg"
+      },
+      {
+        "name": "Giyim Üretim Teknolojisi",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/ffa4702e770624c0212b959b6efa25bf.jpeg"
+      },
+      {
+        "name": "Grafik ve Fotoğraf",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/71a12e07cc7ac9d3ec6c925448673df3.jpeg"
+      },
+      {
+        "name": "Güvenlik Hizmetleri",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/600215eda399fcbdaa7dda051ebaf726.jpeg"
+      },
+      {
+        "name": "Güzellik ve Saç Bakım Hizmetleri",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/70921739173367b4c8cf58a85618d0ae.jpeg"
+      },
+      {
+        "name": "Halkla İlişkiler ve Organizasyon Hizmetleri",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/7545b361227cbf2b5099bfcdeed0594c.jpeg"
+      },
+      {
+        "name": "Hasta ve Yaşlı Hizmetleri",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/004877c63866896e36de0f50c8a9f14c.jpeg"
+      },
+      {
+        "name": "Havacılık",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/48a6be3cbcd48571199cc9bc37f7ca47.jpeg"
+      },
+      {
+        "name": "Hayvan Sağlığı",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/b3ee328b53198983ec3b7eb721c27f15.jpeg"
+      },
+      {
+        "name": "Hayvan Yetiştiriciliği",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/ce0a30bf8bac3f62c0cf36e55477e6ea.jpeg"
+      },
+      {
+        "name": "Hukuk",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/6ec0c49190ff8e8b09c7ed7d986cae23.jpeg"
+      },
+      {
+        "name": "İnşaat Teknolojisi",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/dcfd441b2e450415f923fb7c32807ae3.jpeg"
+      },
+      {
+        "name": "Kişisel Gelişim ve Eğitim",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/6bbad5717af64e24e5bccc6f124a472c.jpeg"
+      },
+      {
+        "name": "Konaklama ve Seyahat Hizmetleri",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/62277b951f7902b2cf9cd435d8bd6b66.jpeg"
+      },
+      {
+        "name": "Kuyumculuk Teknolojisi",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/e9a9052d9e57aa738731b7f931df0c25.jpeg"
+      },
+      {
+        "name": "Makine Teknolojisi",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/8e3ee838b85faf8350302ecf3a7370da.jpeg"
+      },
+      {
+        "name": "Metal Teknolojisi",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/608da8745543116f1d8ab803e120139e.jpeg"
+      },
+      {
+        "name": "Muhasebe ve Finansman",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/c70cb873262e085efca2a0bb57168890.jpeg"
+      },
+      {
+        "name": "Müzik ve Gösteri Sanatları",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/00349041a0e54abc014dad8345a5cfbc.jpeg"
+      },
+      {
+        "name": "Okuma Yazma",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/0af7ba529e3d9455fd431394ddc3b875.jpeg"
+      },
+      {
+        "name": "Öğretmenlik ve Öğretim",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/512c6b1d2ebe758f73b812a6fa5075c6.jpeg"
+      },
+      {
+        "name": "Pazarlama ve Perakende",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/ff0082bf69dff53d78e0cc89ed030eb7.jpeg"
+      },
+      {
+        "name": "Radyo Televizyon",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/7567a27c77fe4b7ed69955e46ed7c432.jpeg"
+      },
+      {
+        "name": "Sağlık",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/4cd17a1443c365c946e165651e17d713.jpeg"
+      },
+      {
+        "name": "Sanat ve Tasarım",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/09034aed938f57b99ba4b0e7afbc6dea.jpeg"
+      },
+      {
+        "name": "Seramik Cam Teknolojisi",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/f939dd8f20a44b5bf70a94c2000a7ccb.jpeg"
+      },
+      {
+        "name": "Spor",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/48eb58ee27c2e72b5ae2976f0742cf7e.jpeg"
+      },
+      {
+        "name": "Tarım Teknolojileri",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/f30906a39edb092dfed8221aa9f2ca9e.jpeg"
+      },
+      {
+        "name": "Tekstil Teknolojisi",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/b044e0d035792e38ef459ee6b342dece.jpeg"
+      },
+      {
+        "name": "Tesisat Teknolojisi ve İklimlendirme",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/d78e07d9212f227f05f46080d436aa93.jpeg"
+      },
+      {
+        "name": "Uçak Bakım",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/9f4f1451621f06789daa2ce59cc092aa.jpeg"
+      },
+      {
+        "name": "Yabancı Diller",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/9c2166dfb4245bffe04b4af50b559da2.jpeg"
+      },
+      {
+        "name": "Yiyecek İçecek Hizmetleri",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/f1e1abb715fb28e628bf0214a4b433fb.jpeg"
+      },
+      {
+        "name": "Yks-lgs Hazırlık Kursları",
+        "image": "https://gasmek.gaziantep.bel.tr/upload/branch_fields/268e9bef8614110c18dc5f3c71b758bf.jpeg"
+      },
+      {
+        "name": "Yönetin ve İdare",
+        "image": "https://gasmek.gaziantep.bel.tr/assets/img/logo/gasmek_logo.png"
+      },
+      {
+        "name": "Geleneksel Türk Sanatları",
+        "image": "https://gasmek.gaziantep.bel.tr/assets/img/logo/gasmek_logo.png"
+      },
+      {
+        "name": "Ayakkabı Ve Saraciye Teknolojisi",
+        "image": "https://gasmek.gaziantep.bel.tr/assets/img/logo/gasmek_logo.png"
+      }
+    ],
+    "KAYMEK": [],
+    "ESMEK": [
+      {
+        "name": "Oyun Evi",
+        "center": "Alpu Eğitim Merkezi",
+        "start": "15.09.2025",
+        "end": "31.07.2026",
+        "schedule": "Pzt: 10:00 - 17:00 Sal: 10:00 - 17:00 Çar: 10:00 - 17:00 Per: 10:00 - 17:00 Cum: 10:00 - 17:00",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Resim",
+        "center": "Beylikova Eğitim Merkezi",
+        "start": "02.02.2026",
+        "end": "03.07.2026",
+        "schedule": "Pzt: 16:00 - 18:00 Sal: 16:00 - 18:00",
+        "full": true,
+        "open": false
+      },
+      {
+        "name": "Çocuk Zumba",
+        "center": "Emek Eğitim Merkezi",
+        "start": "04.02.2026",
+        "end": "27.05.2026",
+        "schedule": "Çar: 15:00 - 15:50",
+        "full": true,
+        "open": true
+      },
+      {
+        "name": "Step-Aerobik",
+        "center": "Emek Eğitim Merkezi",
+        "start": "02.02.2026",
+        "end": "27.05.2026",
+        "schedule": "Pzt: 10:00 - 11:00 Çar: 10:00 - 11:00",
+        "full": true,
+        "open": true
+      },
+      {
+        "name": "5. Sınıf Fen Bilimleri",
+        "center": "İnönü Eğitim Merkezi",
+        "start": "05.02.2026",
+        "end": "21.05.2026",
+        "schedule": "Per: 15:45 - 17:30",
+        "full": true,
+        "open": true
+      },
+      {
+        "name": "5. Sınıf Matematik",
+        "center": "İnönü Eğitim Merkezi",
+        "start": "02.02.2026",
+        "end": "18.05.2026",
+        "schedule": "Pzt: 15:45 - 17:30",
+        "full": true,
+        "open": true
+      },
+      {
+        "name": "Ödev Etüdü",
+        "center": "Mihalgazi Eğitim Merkezi",
+        "schedule": "Çar: 16:00 - 17:00",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "5. Sınıf İngilizce",
+        "center": "Mihalıççık Eğitim Merkezi",
+        "start": "20.02.2026",
+        "end": "22.05.2026",
+        "schedule": "Cum: 16:00 - 19:00",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Etkili ve Hızlı Okuma",
+        "center": "Mihalıççık Eğitim Merkezi",
+        "start": "19.02.2026",
+        "end": "22.05.2026",
+        "schedule": "Per: 19:00 - 20:00 Cum: 19:00 - 20:00",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk İngilizce",
+        "center": "Mihalıççık Eğitim Merkezi",
+        "start": "06.02.2026",
+        "end": "22.05.2026",
+        "schedule": "Cum: 16:00 - 18:00",
+        "full": true,
+        "open": true
+      },
+      {
+        "name": "Giyim",
+        "center": "Mihalıççık Eğitim Merkezi",
+        "start": "20.02.2026",
+        "end": "22.05.2026",
+        "schedule": "Cum: 10:00 - 16:00",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Makrome Bağlama",
+        "center": "Mihalıççık Eğitim Merkezi",
+        "start": "03.10.2025",
+        "end": "22.05.2026",
+        "schedule": "Cum: 10:00 - 16:00",
+        "full": true,
+        "open": true
+      },
+      {
+        "name": "Oyun Evi",
+        "center": "Mihalıççık Eğitim Merkezi",
+        "start": "02.02.2026",
+        "end": "22.05.2026",
+        "schedule": "Pzt: 10:00 - 17:00 Sal: 10:00 - 17:00 Çar: 10:00 - 17:00 Per: 10:00 - 17:00 Cum: 10:00 - 17:00",
+        "full": true,
+        "open": true
+      },
+      {
+        "name": "2. Sınıf Matematik",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "02.02.2026",
+        "end": "18.05.2026",
+        "schedule": "Pzt: 16:00 - 16:50",
+        "full": true,
+        "open": true
+      },
+      {
+        "name": "2. Sınıf Türkçe",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "02.02.2026",
+        "end": "18.05.2026",
+        "schedule": "Pzt: 15:00 - 15:50",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "3. Sınıf Matematik",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "03.02.2026",
+        "end": "19.05.2026",
+        "schedule": "Sal: 16:00 - 16:50",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "3. Sınıf Türkçe",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "03.02.2026",
+        "end": "19.05.2026",
+        "schedule": "Sal: 15:00 - 15:50",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "4. Sınıf Matematik",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "04.02.2026",
+        "end": "20.05.2026",
+        "schedule": "Çar: 16:00 - 16:50",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "4. Sınıf Türkçe",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "04.02.2026",
+        "end": "20.05.2026",
+        "schedule": "Çar: 15:00 - 15:50",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Ahşap Boyama - Taş Boyama",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "29.10.2025",
+        "end": "20.05.2026",
+        "schedule": "Çar: 13:00 - 15:50",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Kağıt Rölyef Resim",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "02.10.2025",
+        "end": "21.05.2026",
+        "schedule": "Pzt: 13:00 - 16:50 Per: 13:00 - 16:50",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Pilates",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "02.02.2026",
+        "end": "19.05.2026",
+        "schedule": "Pzt: 9:00 - 10:50 Sal: 9:00 - 10:50",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Pilates",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "04.02.2026",
+        "end": "20.05.2026",
+        "schedule": "Çar: 20:00 - 21:50",
+        "full": true,
+        "open": true
+      },
+      {
+        "name": "Step-Aerobik",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "06.02.2026",
+        "end": "22.05.2026",
+        "schedule": "Cum: 9:00 - 10:50",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Tel Kırma",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "01.10.2025",
+        "end": "21.05.2026",
+        "schedule": "Sal: 19:00 - 22:50 Çar: 19:00 - 22:50 Per: 19:00 - 22:50",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Zumba",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "05.02.2026",
+        "end": "21.05.2026",
+        "schedule": "Per: 9:00 - 10:50",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Zumba",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "03.02.2026",
+        "end": "21.05.2026",
+        "schedule": "Sal: 20:00 - 21:50 Per: 20:00 - 21:50",
+        "full": true,
+        "open": true
+      },
+      {
+        "name": "Miyuki Takı Tasarımı",
+        "center": "Turistik El Sanatları Merkezi",
+        "start": "25.01.2026",
+        "end": "15.06.2026",
+        "schedule": "Pzr: 10:00 - 16:00",
+        "note": "Turistik El Sanatları Merkezinde kayıtlar kurs merkezinde yüz yüze yapılmaktadır.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Bağlama",
+        "center": "Yunusemre Eğitim Merkezi",
+        "start": "13.02.2026",
+        "end": "22.05.2026",
+        "schedule": "Cum: 9:00 - 12:50",
+        "full": true,
+        "open": true
+      }
+    ]
+  }
+}

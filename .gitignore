@@ -1,0 +1,21 @@
+# deps
+**/node_modules/
+
+# next / expo build
+web/.next/
+web/out/
+**/.expo/
+**/dist/
+
+# native
+mobile/android/
+mobile/ios/
+
+# env / secrets
+**/.env*.local
+*.keystore
+*.jks
+
+# misc
+**/.DS_Store
+**/*.tsbuildinfo

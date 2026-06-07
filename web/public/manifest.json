@@ -1,0 +1,67 @@
+{
+  "name": "MeydanFest — Türkiye'nin Etkinlik Rehberi",
+  "short_name": "MeydanFest",
+  "description": "Türkiye'deki konser, festival, tiyatro ve daha fazlasını tek yerde keşfet. Yalnız gitme — buddy bul.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#7c3aed",
+  "background_color": "#0f0c1e",
+  "lang": "tr",
+  "dir": "ltr",
+  "categories": ["entertainment", "lifestyle", "social"],
+  "icons": [
+    {
+      "src": "/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Etkinlikler",
+      "short_name": "Etkinlikler",
+      "url": "/etkinlikler",
+      "description": "Tüm etkinlikleri keşfet"
+    },
+    {
+      "name": "Harita",
+      "short_name": "Harita",
+      "url": "/harita",
+      "description": "Türkiye haritasında etkinlikler"
+    },
+    {
+      "name": "Yakınımda",
+      "short_name": "Yakınımda",
+      "url": "/yakinimda",
+      "description": "Konumuna göre etkinlikler"
+    },
+    {
+      "name": "Hafta Sonu",
+      "short_name": "Hafta Sonu",
+      "url": "/hafta-sonu",
+      "description": "Bu hafta sonu etkinlikler"
+    }
+  ],
+  "screenshots": []
+}

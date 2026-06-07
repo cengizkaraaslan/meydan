@@ -1,0 +1,552 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum SubscriptionPlan {
+  FREE
+  PRO
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+}
+
+enum AttendanceStatus {
+  GOING
+  MAYBE
+  INTERESTED
+}
+
+enum EventCategory {
+  KONSER
+  FESTIVAL
+  TIYATRO
+  STANDUP
+  SPOR
+  SERGI
+  ATOLYE
+  COCUK
+  DIGER
+}
+
+enum EventSource {
+  BILETIX
+  BUBILET
+  MOBILET
+  PASSO
+  IBB
+  ANKARA_BB
+  IZMIR_BB
+  MANUAL
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  username      String?   @unique
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(USER)
+  gender        Gender?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  attendances   Attendance[]
+  comments      Comment[]
+  apiKeys       ApiKey[]
+  subscription  Subscription?
+  priceAlerts   PriceAlert[]
+
+  @@index([username])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/// 24 saatlik "anlık paylaşım" (story). Uploader bilgisi denormalize tutulur
+/// (seed/eski kullanıcılar için User FK'sine bağımlı olmasın diye, in-memory şekille birebir).
+model Story {
+  id            String      @id @default(cuid())
+  userEmail     String
+  userName      String
+  userAvatarUrl String?
+  userColor     String      @default("#7c3aed")
+  imageUrl      String
+  caption       String?
+  eventSlug     String?
+  eventTitle    String?
+  city          String?
+  createdAt     DateTime    @default(now())
+
+  views         StoryView[]
+
+  @@index([createdAt])
+  @@index([userEmail])
+  @@index([eventSlug])
+}
+
+/// Bir story'i kimin gördüğü — (story, viewer) tekil.
+model StoryView {
+  id          String   @id @default(cuid())
+  storyId     String
+  story       Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  viewerEmail String
+  viewedAt    DateTime @default(now())
+
+  @@unique([storyId, viewerEmail])
+  @@index([storyId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Slug-bazlı sosyal veriler. Etkinlikler çoğunlukla mock/scraped (DB'de Event
+// satırı olmayabilir) → Event FK yerine eventSlug string (Story ile aynı yaklaşım).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Kullanıcının bir etkinliğe katılım durumu (GOING/MAYBE/INTERESTED).
+model Rsvp {
+  id            String   @id @default(cuid())
+  userEmail     String
+  eventSlug     String
+  status        String
+  eventStartsAt DateTime
+  eventTitle    String
+  eventCity     String
+  createdAt     DateTime @default(now())
+
+  @@unique([userEmail, eventSlug])
+  @@index([eventSlug])
+  @@index([userEmail])
+}
+
+/// Etkinlik yorumu (thread destekli: parentId).
+model EventComment {
+  id             String        @id @default(cuid())
+  eventSlug      String
+  authorUsername String
+  authorName     String
+  authorColor    String
+  text           String        @db.Text
+  parentId       String?
+  createdAt      DateTime      @default(now())
+
+  likes          CommentLike[]
+
+  @@index([eventSlug])
+}
+
+/// Yorum beğenisi — (yorum, viewer) tekil.
+model CommentLike {
+  id        String       @id @default(cuid())
+  commentId String
+  comment   EventComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  viewerId  String
+  createdAt DateTime     @default(now())
+
+  @@unique([commentId, viewerId])
+  @@index([commentId])
+}
+
+/// Etkinlik değerlendirmesi (1-5 yıldız). Kullanıcı başına etkinlik başına tek.
+model EventReview {
+  id          String   @id @default(cuid())
+  eventSlug   String
+  authorEmail String
+  authorName  String
+  authorColor String
+  rating      Int
+  comment     String   @db.Text
+  createdAt   DateTime @default(now())
+
+  @@unique([eventSlug, authorEmail])
+  @@index([eventSlug])
+}
+
+/// Etkinlik galerisine kullanıcı fotoğrafı (R2 URL).
+model GalleryPhoto {
+  id            String   @id @default(cuid())
+  eventSlug     String
+  uploaderEmail String
+  uploaderName  String
+  url           String
+  caption       String
+  reportCount   Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  @@index([eventSlug])
+}
+
+/// Etkinliğe check-in ("buradayım"). Kullanıcı başına etkinlik başına tek.
+model CheckIn {
+  id            String   @id @default(cuid())
+  userEmail     String
+  userName      String
+  userAvatarUrl String?
+  userColor     String
+  eventSlug     String
+  eventTitle    String
+  city          String
+  mood          String?
+  createdAt     DateTime @default(now())
+
+  @@unique([userEmail, eventSlug])
+  @@index([eventSlug])
+  @@index([userEmail])
+}
+
+/// Direkt mesaj (DM). Konuşma partnerUsername'e göre gruplanır; senderUsername
+/// "you" (mevcut kullanıcı placeholder) veya partner. Mevcut in-memory tasarımla birebir.
+model DirectMessage {
+  id              String    @id @default(cuid())
+  partnerUsername String
+  senderUsername  String
+  text            String    @db.Text
+  readAt          DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([partnerUsername, createdAt])
+}
+
+/// Etkinlik grup sohbeti mesajı (slug bazlı oda).
+model ChatMessage {
+  id             String   @id @default(cuid())
+  eventSlug      String
+  senderUsername String
+  senderName     String
+  senderColor    String
+  text           String   @db.Text
+  createdAt      DateTime @default(now())
+
+  @@index([eventSlug, createdAt])
+}
+
+/// Uygulama içi bildirim feed'i (kullanıcı başına son ~50).
+model Notification {
+  id        String   @id @default(cuid())
+  userEmail String
+  type      String
+  title     String
+  body      String   @db.Text
+  url       String
+  read      Boolean  @default(false)
+  fromName  String?
+  fromColor String?
+  createdAt DateTime @default(now())
+
+  @@index([userEmail, createdAt])
+}
+
+/// Site teması (admin tarafından özelleştirilen global görünüm). Tek satır (singleton).
+model SiteTheme {
+  id              String   @id @default("default")
+  mode            String   @default("auto")
+  primary         String   @default("#7c3aed")
+  accent          String   @default("#f59e0b")
+  backgroundLight String   @default("#ffffff")
+  backgroundDark  String   @default("#0a0a0f")
+  foregroundLight String   @default("#0a0a0a")
+  foregroundDark  String   @default("#f5f5f7")
+  radius          Int      @default(14)
+  fontFamily      String   @default("geist")
+  updatedAt       DateTime @updatedAt
+  updatedBy       String?
+}
+
+/// Web-push aboneliği (kategori bazlı tarayıcı bildirimi). endpoint tekil.
+model PushSubscription {
+  id         String   @id @default(cuid())
+  userId     String
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  categories String[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/// Mobil app profili. Mobil app gerçek hesap kullanmaz → User FK yerine deviceId.
+model MobileProfile {
+  id         String   @id @default(cuid())
+  deviceId   String   @unique
+  gender     Gender?
+  city       String?
+  lang       String?
+  /// Tanışma (dating) alanları — mobil swipe/eşleşme akışı için.
+  bio        String?  @db.Text
+  /// Kimi arıyor: "male" / "female" / "any".
+  lookingFor String?
+  /// Virgülle ayrık fotoğraf URL'leri.
+  photos     String?  @db.Text
+  isAdmin    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+/// Mobil tanışma akışında bir cihazın bir hedefe verdiği beğeni/geçme kararı.
+/// Eşleşme: iki taraf da liked=true ise. (deviceId bazlı — User FK yok.)
+model Swipe {
+  id             String   @id @default(cuid())
+  swiperDeviceId String
+  targetId       String
+  liked          Boolean
+  createdAt      DateTime @default(now())
+
+  @@unique([swiperDeviceId, targetId])
+  @@index([targetId])
+}
+
+/// Mobil favori (#10). Mobil app gerçek hesap kullanmaz → deviceId + slug bazlı.
+model Favorite {
+  id        String   @id @default(cuid())
+  deviceId  String
+  eventSlug String
+  createdAt DateTime @default(now())
+
+  @@unique([deviceId, eventSlug])
+  @@index([deviceId])
+}
+
+/// Mobil etkinlik katılımı (#14). deviceId + slug bazlı, etkinlik başına tekil.
+model EventAttendance {
+  id        String   @id @default(cuid())
+  deviceId  String
+  eventSlug String
+  createdAt DateTime @default(now())
+
+  @@unique([deviceId, eventSlug])
+  @@index([eventSlug])
+}
+
+/// Mobil etkinlik yorumu (#14). deviceId bazlı, authorName denormalize.
+model EventCommentMobile {
+  id         String   @id @default(cuid())
+  eventSlug  String
+  deviceId   String
+  authorName String
+  text       String   @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([eventSlug])
+}
+
+model Event {
+  id            String        @id @default(cuid())
+  // Scraper'lar onlarca dinamik kaynak üretir (UNI_HACETTEPE, BUGECE, MUNI_BURSA...)
+  // → enum yerine String. (EventSource enum'u NextAuth/eski referanslar için duruyor.)
+  source        String
+  externalId    String
+  slug          String        @unique
+  title         String
+  description   String?       @db.Text
+  category      EventCategory
+  venue         String
+  city          String
+  startsAt      DateTime
+  endsAt        DateTime?
+  priceMin      Float?
+  priceMax      Float?
+  isFree        Boolean       @default(false)
+  ticketUrl     String?
+  imageUrl      String?
+  artist        String?
+  district      String?
+  hidden        Boolean       @default(false)
+  featured      Boolean       @default(false)
+  /// Kullanıcı oluşturduğu (source:"USER"/"MANUAL") etkinlikler için sosyal/web bağlantıları.
+  website       String?
+  instagram     String?
+  facebook      String?
+  tiktok        String?
+  /// Kullanıcı tarafından oluşturulduysa oluşturanın e-postası/adı (scraped'lerde null).
+  creatorEmail  String?
+  creatorName   String?
+  lastScrapedAt DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  priceHistory  PriceHistory[]
+  attendances   Attendance[]
+  comments      Comment[]
+  priceAlerts   PriceAlert[]
+
+  @@unique([source, externalId])
+  @@index([city, startsAt])
+  @@index([category, startsAt])
+  @@index([isFree, startsAt])
+  @@index([startsAt])
+  @@index([featured])
+  @@index([creatorEmail])
+}
+
+model PriceHistory {
+  id        String   @id @default(cuid())
+  eventId   String
+  priceMin  Float?
+  priceMax  Float?
+  scrapedAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, scrapedAt])
+}
+
+model Attendance {
+  id        String           @id @default(cuid())
+  userId    String
+  eventId   String
+  status    AttendanceStatus
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@index([eventId, status])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
+  text      String   @db.Text
+  parentId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event   Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([eventId, createdAt])
+  @@index([userId])
+}
+
+model PriceAlert {
+  id          String   @id @default(cuid())
+  userId      String
+  eventId     String
+  targetPrice Float
+  triggered   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+}
+
+model Subscription {
+  id                String             @id @default(cuid())
+  userId            String             @unique
+  plan              SubscriptionPlan   @default(FREE)
+  status            SubscriptionStatus @default(ACTIVE)
+  currentPeriodEnd  DateTime?
+  providerCustomer  String?
+  providerSub       String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  keyHash    String    @unique
+  keyPrefix  String
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usage ApiUsage[]
+
+  @@index([userId])
+}
+
+model ApiUsage {
+  id        String   @id @default(cuid())
+  apiKeyId  String
+  endpoint  String
+  status    Int
+  ms        Int
+  createdAt DateTime @default(now())
+
+  apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId, createdAt])
+}
+
+model ScraperRun {
+  id           String   @id @default(cuid())
+  // Event.source gibi: scraper'lar onlarca dinamik kaynak üretir (MUNI_MERSIN, UNI_*…)
+  // → enum değil String, yoksa create enum kısıtında patlar.
+  source       String
+  startedAt    DateTime @default(now())
+  finishedAt   DateTime?
+  itemsFound   Int      @default(0)
+  itemsCreated Int      @default(0)
+  itemsUpdated Int      @default(0)
+  success      Boolean  @default(false)
+  errorMessage String?  @db.Text
+
+  @@index([source, startedAt])
+}

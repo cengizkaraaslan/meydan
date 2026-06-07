@@ -1,0 +1,108 @@
+{
+  "nav": {
+    "home": "Home",
+    "events": "Events",
+    "api": "API",
+    "admin": "Admin",
+    "login": "Sign in",
+    "logout": "Sign out",
+    "profile": "Profile"
+  },
+  "home": {
+    "hero_eyebrow": "Don't go alone — bring your crew",
+    "hero_title": "Your plan, our <accent>crowd</accent>",
+    "hero_tagline": "Best events come with the right people.",
+    "hero_subtitle": "Concerts, festivals, theatre, sports and free municipal events — discover, gather your crew, go together.",
+    "hero_cta": "Explore events",
+    "hero_cta_api": "Browse the API",
+    "featured_title": "Featured events",
+    "featured_subtitle": "Can't-miss picks this week",
+    "free_section_title": "Free events",
+    "free_section_subtitle": "Free programs from municipalities and institutions",
+    "stats_events": "events",
+    "stats_sources": "sources",
+    "stats_cities": "cities"
+  },
+  "events": {
+    "title": "All events",
+    "result_count": "{count} events found",
+    "no_results_title": "No events match these filters",
+    "no_results_subtitle": "Try a different city, date or category.",
+    "clear_filters": "Clear filters"
+  },
+  "filters": {
+    "title": "Filter",
+    "city": "City",
+    "all_cities": "All cities",
+    "category": "Category",
+    "all_categories": "All categories",
+    "source": "Source",
+    "all_sources": "All sources",
+    "free_only": "Free only",
+    "from_date": "From",
+    "to_date": "To",
+    "search": "Search event or artist",
+    "apply": "Apply",
+    "district": "District",
+    "date": "Date",
+    "date_options": {
+      "all": "All dates",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "weekend": "This weekend",
+      "week": "This week",
+      "month": "This month"
+    }
+  },
+  "event": {
+    "going_count": "{count} going",
+    "interested_count": "{count} interested",
+    "rsvp_going": "I'm going",
+    "rsvp_maybe": "Maybe",
+    "rsvp_interested": "Interested",
+    "ticket_cta": "Buy ticket",
+    "share": "Share",
+    "favorite": "Favourite",
+    "price_alert": "Price alert",
+    "comments_title": "Comments",
+    "comment_placeholder": "What do you think about this event?",
+    "comment_send": "Post",
+    "attendees_title": "Attendees",
+    "details_title": "Event details"
+  },
+  "categories": {
+    "KONSER": "Concert",
+    "FESTIVAL": "Festival",
+    "TIYATRO": "Theatre",
+    "STANDUP": "Stand-up",
+    "SPOR": "Sports",
+    "SERGI": "Exhibition",
+    "ATOLYE": "Workshop",
+    "COCUK": "Kids",
+    "DIGER": "Other"
+  },
+  "common": {
+    "loading": "Loading…",
+    "error_title": "Something went wrong",
+    "error_retry": "Try again",
+    "free": "Free",
+    "language": "Language",
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "more": "More"
+  },
+  "footer": {
+    "tagline": "Türkiye event aggregator — open API for developers.",
+    "made_with": "Made with ❤",
+    "explore": "Explore",
+    "developers": "Developers",
+    "company": "Company"
+  },
+  "voice": {
+    "listen": "Listening...",
+    "start": "Search by voice",
+    "unsupported": "Your browser does not support voice search",
+    "denied": "Microphone permission denied"
+  }
+}

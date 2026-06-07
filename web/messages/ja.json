@@ -1,0 +1,101 @@
+{
+  "nav": {
+    "home": "ホーム",
+    "events": "イベント",
+    "api": "API",
+    "admin": "管理",
+    "login": "ログイン",
+    "logout": "ログアウト",
+    "profile": "プロフィール"
+  },
+  "home": {
+    "hero_eyebrow": "トルコのすべてのイベントを一か所に",
+    "hero_title": "あなたの街の<accent>イベント</accent>を見逃さない",
+    "hero_subtitle": "コンサート、フェス、演劇、スポーツ、市の無料イベント — 一つのインターフェースでリアルタイム価格追跡。",
+    "hero_cta": "イベントを探す",
+    "hero_cta_api": "APIを見る",
+    "featured_title": "注目のイベント",
+    "featured_subtitle": "今週見逃せないピック",
+    "free_section_title": "無料イベント",
+    "free_section_subtitle": "自治体や機関の無料プログラム",
+    "stats_events": "イベント",
+    "stats_sources": "ソース",
+    "stats_cities": "都市"
+  },
+  "events": {
+    "title": "全イベント",
+    "result_count": "{count} 件見つかりました",
+    "no_results_title": "このフィルターに該当するイベントはありません",
+    "no_results_subtitle": "別の都市・日付・カテゴリーをお試しください。",
+    "clear_filters": "フィルターをクリア"
+  },
+  "filters": {
+    "title": "絞り込み",
+    "city": "都市",
+    "all_cities": "すべての都市",
+    "category": "カテゴリー",
+    "all_categories": "すべてのカテゴリー",
+    "source": "ソース",
+    "all_sources": "すべてのソース",
+    "free_only": "無料のみ",
+    "from_date": "開始",
+    "to_date": "終了",
+    "search": "イベントやアーティストを検索",
+    "apply": "適用",
+    "district": "地区",
+    "date": "日付",
+    "date_options": {
+      "all": "すべての日付",
+      "today": "今日",
+      "tomorrow": "明日",
+      "weekend": "今週末",
+      "week": "今週",
+      "month": "今月"
+    }
+  },
+  "event": {
+    "going_count": "{count} 人参加予定",
+    "interested_count": "{count} 人興味あり",
+    "rsvp_going": "参加する",
+    "rsvp_maybe": "たぶん",
+    "rsvp_interested": "興味あり",
+    "ticket_cta": "チケット購入",
+    "share": "シェア",
+    "favorite": "お気に入り",
+    "price_alert": "価格アラート",
+    "comments_title": "コメント",
+    "comment_placeholder": "このイベントについてどう思いますか？",
+    "comment_send": "投稿",
+    "attendees_title": "参加者",
+    "details_title": "詳細"
+  },
+  "categories": {
+    "KONSER": "コンサート",
+    "FESTIVAL": "フェス",
+    "TIYATRO": "演劇",
+    "STANDUP": "スタンダップ",
+    "SPOR": "スポーツ",
+    "SERGI": "展示",
+    "ATOLYE": "ワークショップ",
+    "COCUK": "子ども",
+    "DIGER": "その他"
+  },
+  "common": {
+    "loading": "読み込み中…",
+    "error_title": "問題が発生しました",
+    "error_retry": "再試行",
+    "free": "無料",
+    "language": "言語",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "back": "戻る",
+    "more": "もっと見る"
+  },
+  "footer": {
+    "tagline": "トルコのイベント集約サービス — 開発者向けオープン API。",
+    "made_with": "❤ で作成",
+    "explore": "見る",
+    "developers": "開発者",
+    "company": "会社"
+  }
+}

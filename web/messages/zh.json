@@ -1,0 +1,101 @@
+{
+  "nav": {
+    "home": "首页",
+    "events": "活动",
+    "api": "API",
+    "admin": "管理",
+    "login": "登录",
+    "logout": "退出",
+    "profile": "个人资料"
+  },
+  "home": {
+    "hero_eyebrow": "土耳其所有活动一站汇总",
+    "hero_title": "不再错过你所在城市的<accent>活动</accent>",
+    "hero_subtitle": "演唱会、音乐节、剧场、体育和市政免费活动 — 一个界面，实时价格追踪。",
+    "hero_cta": "探索活动",
+    "hero_cta_api": "查看 API",
+    "featured_title": "精选活动",
+    "featured_subtitle": "本周不容错过",
+    "free_section_title": "免费活动",
+    "free_section_subtitle": "市政与机构的免费项目",
+    "stats_events": "活动",
+    "stats_sources": "来源",
+    "stats_cities": "城市"
+  },
+  "events": {
+    "title": "全部活动",
+    "result_count": "找到 {count} 个活动",
+    "no_results_title": "没有匹配的活动",
+    "no_results_subtitle": "尝试不同的城市、日期或类别。",
+    "clear_filters": "清除筛选"
+  },
+  "filters": {
+    "title": "筛选",
+    "city": "城市",
+    "all_cities": "全部城市",
+    "category": "类别",
+    "all_categories": "全部类别",
+    "source": "来源",
+    "all_sources": "全部来源",
+    "free_only": "仅免费",
+    "from_date": "起",
+    "to_date": "止",
+    "search": "搜索活动或艺人",
+    "apply": "应用",
+    "district": "区",
+    "date": "日期",
+    "date_options": {
+      "all": "所有日期",
+      "today": "今天",
+      "tomorrow": "明天",
+      "weekend": "本周末",
+      "week": "本周",
+      "month": "本月"
+    }
+  },
+  "event": {
+    "going_count": "{count} 人参加",
+    "interested_count": "{count} 人感兴趣",
+    "rsvp_going": "我要参加",
+    "rsvp_maybe": "也许",
+    "rsvp_interested": "感兴趣",
+    "ticket_cta": "购买门票",
+    "share": "分享",
+    "favorite": "收藏",
+    "price_alert": "价格提醒",
+    "comments_title": "评论",
+    "comment_placeholder": "你怎么看这个活动？",
+    "comment_send": "发布",
+    "attendees_title": "参加者",
+    "details_title": "活动详情"
+  },
+  "categories": {
+    "KONSER": "演唱会",
+    "FESTIVAL": "音乐节",
+    "TIYATRO": "剧场",
+    "STANDUP": "脱口秀",
+    "SPOR": "体育",
+    "SERGI": "展览",
+    "ATOLYE": "工作坊",
+    "COCUK": "儿童",
+    "DIGER": "其他"
+  },
+  "common": {
+    "loading": "加载中…",
+    "error_title": "出错了",
+    "error_retry": "重试",
+    "free": "免费",
+    "language": "语言",
+    "save": "保存",
+    "cancel": "取消",
+    "back": "返回",
+    "more": "更多"
+  },
+  "footer": {
+    "tagline": "土耳其活动聚合器 — 面向开发者的开放 API。",
+    "made_with": "用 ❤ 制作",
+    "explore": "探索",
+    "developers": "开发者",
+    "company": "公司"
+  }
+}

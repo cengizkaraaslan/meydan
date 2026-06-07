@@ -1,0 +1,49 @@
+// FAZ 4 — Önerilen Prisma şema eklemeleri (Web Push)
+// Şu an in-memory tracker (src/lib/push-server.ts) kullanıyoruz.
+// Kalıcı depolamaya geçildiğinde aşağıdaki modeller schema.prisma'ya eklenebilir.
+// NOT: Bu sadece bir öneri taslağı — schema.prisma'ya dokunulmadı.
+
+model PushSubscription {
+  id          String              @id @default(cuid())
+  userId      String?             // null → anonim/demo abone
+  user        User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint    String              @unique
+  p256dh      String              // subscription.keys.p256dh
+  auth        String              // subscription.keys.auth
+  userAgent   String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  lastSeenAt  DateTime            @default(now())
+
+  prefs       NotificationPref[]
+
+  @@index([userId])
+}
+
+model NotificationPref {
+  id              String           @id @default(cuid())
+  subscriptionId  String
+  subscription    PushSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  category        EventCategory    // KONSER | FESTIVAL | ...
+  city            String?          // opsiyonel şehir filtresi
+  createdAt       DateTime         @default(now())
+
+  @@unique([subscriptionId, category, city])
+  @@index([category])
+}
+
+// User modeline opsiyonel back-relation:
+// pushSubscriptions PushSubscription[]
+
+// Migration komutu (örnek):
+//   npx prisma migrate dev --name add_push_subscriptions
+
+// Geçiş notu:
+// - src/lib/push-server.ts içindeki Map'i Prisma sorgularına çevir
+// - saveSubscription → prisma.pushSubscription.upsert({ where: { endpoint }, ... })
+// - getSubscribers(category) → prisma.pushSubscription.findMany({
+//     where: { prefs: { some: { category } } },
+//     include: { prefs: true }
+//   })
+// - removeSubscription(endpoint) → prisma.pushSubscription.delete({ where: { endpoint } })
+//   (404/410 hatasından sonra otomatik temizleme zaten yapılıyor)

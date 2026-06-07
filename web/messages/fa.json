@@ -1,0 +1,101 @@
+{
+  "nav": {
+    "home": "خانه",
+    "events": "رویدادها",
+    "api": "API",
+    "admin": "مدیریت",
+    "login": "ورود",
+    "logout": "خروج",
+    "profile": "نمایه"
+  },
+  "home": {
+    "hero_eyebrow": "همه رویدادهای ترکیه در یک جا",
+    "hero_title": "<accent>رویدادهای</accent> شهر خود را از دست ندهید",
+    "hero_subtitle": "کنسرت، فستیوال، تئاتر، ورزش و رویدادهای رایگان شهرداری — همه در یک رابط با ردیابی لحظه‌ای قیمت.",
+    "hero_cta": "کاوش رویدادها",
+    "hero_cta_api": "مشاهده API",
+    "featured_title": "رویدادهای ویژه",
+    "featured_subtitle": "این هفته از دست ندهید",
+    "free_section_title": "رویدادهای رایگان",
+    "free_section_subtitle": "برنامه‌های رایگان شهرداری‌ها و نهادها",
+    "stats_events": "رویداد",
+    "stats_sources": "منبع",
+    "stats_cities": "شهر"
+  },
+  "events": {
+    "title": "همه رویدادها",
+    "result_count": "{count} رویداد یافت شد",
+    "no_results_title": "نتیجه‌ای با این فیلترها پیدا نشد",
+    "no_results_subtitle": "شهر، تاریخ یا دسته‌بندی دیگری را امتحان کنید.",
+    "clear_filters": "پاک کردن فیلترها"
+  },
+  "filters": {
+    "title": "فیلتر",
+    "city": "شهر",
+    "all_cities": "همه شهرها",
+    "category": "دسته‌بندی",
+    "all_categories": "همه دسته‌ها",
+    "source": "منبع",
+    "all_sources": "همه منابع",
+    "free_only": "فقط رایگان",
+    "from_date": "از",
+    "to_date": "تا",
+    "search": "جستجوی رویداد یا هنرمند",
+    "apply": "اعمال",
+    "district": "منطقه",
+    "date": "تاریخ",
+    "date_options": {
+      "all": "همه تاریخ‌ها",
+      "today": "امروز",
+      "tomorrow": "فردا",
+      "weekend": "این آخر هفته",
+      "week": "این هفته",
+      "month": "این ماه"
+    }
+  },
+  "event": {
+    "going_count": "{count} نفر می‌آیند",
+    "interested_count": "{count} نفر علاقه‌مند",
+    "rsvp_going": "می‌آیم",
+    "rsvp_maybe": "شاید",
+    "rsvp_interested": "علاقه‌مندم",
+    "ticket_cta": "خرید بلیت",
+    "share": "اشتراک‌گذاری",
+    "favorite": "علاقه‌مندی‌ها",
+    "price_alert": "هشدار قیمت",
+    "comments_title": "نظرات",
+    "comment_placeholder": "نظر شما درباره این رویداد چیست؟",
+    "comment_send": "ارسال",
+    "attendees_title": "شرکت‌کنندگان",
+    "details_title": "جزئیات"
+  },
+  "categories": {
+    "KONSER": "کنسرت",
+    "FESTIVAL": "فستیوال",
+    "TIYATRO": "تئاتر",
+    "STANDUP": "استندآپ",
+    "SPOR": "ورزش",
+    "SERGI": "نمایشگاه",
+    "ATOLYE": "کارگاه",
+    "COCUK": "کودک",
+    "DIGER": "سایر"
+  },
+  "common": {
+    "loading": "در حال بارگذاری…",
+    "error_title": "مشکلی پیش آمد",
+    "error_retry": "تلاش مجدد",
+    "free": "رایگان",
+    "language": "زبان",
+    "save": "ذخیره",
+    "cancel": "لغو",
+    "back": "بازگشت",
+    "more": "بیشتر"
+  },
+  "footer": {
+    "tagline": "تجمیع‌کننده رویدادهای ترکیه — API باز برای توسعه‌دهندگان.",
+    "made_with": "با ❤ ساخته شد",
+    "explore": "کاوش",
+    "developers": "توسعه‌دهندگان",
+    "company": "شرکت"
+  }
+}

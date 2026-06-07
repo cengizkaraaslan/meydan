@@ -1,0 +1,101 @@
+{
+  "nav": {
+    "home": "الرئيسية",
+    "events": "الفعاليات",
+    "api": "واجهة برمجة التطبيقات",
+    "admin": "الإدارة",
+    "login": "تسجيل الدخول",
+    "logout": "تسجيل الخروج",
+    "profile": "الملف الشخصي"
+  },
+  "home": {
+    "hero_eyebrow": "كل فعاليات تركيا في مكان واحد",
+    "hero_title": "لا تفوّت أي <accent>فعالية</accent> في مدينتك",
+    "hero_subtitle": "حفلات موسيقية، مهرجانات، مسرح، رياضة وفعاليات بلدية مجانية — كلها في واجهة واحدة مع تتبع الأسعار اللحظي.",
+    "hero_cta": "استكشف الفعاليات",
+    "hero_cta_api": "تصفح واجهة البرمجة",
+    "featured_title": "الفعاليات المميزة",
+    "featured_subtitle": "اختياراتنا لهذا الأسبوع",
+    "free_section_title": "فعاليات مجانية",
+    "free_section_subtitle": "برامج مجانية من البلديات والمؤسسات",
+    "stats_events": "فعالية",
+    "stats_sources": "مصدر",
+    "stats_cities": "مدينة"
+  },
+  "events": {
+    "title": "جميع الفعاليات",
+    "result_count": "{count} فعالية",
+    "no_results_title": "لا توجد فعاليات تطابق هذه الفلاتر",
+    "no_results_subtitle": "جرب مدينة أو تاريخًا أو فئة مختلفة.",
+    "clear_filters": "مسح الفلاتر"
+  },
+  "filters": {
+    "title": "تصفية",
+    "city": "المدينة",
+    "all_cities": "كل المدن",
+    "category": "الفئة",
+    "all_categories": "كل الفئات",
+    "source": "المصدر",
+    "all_sources": "كل المصادر",
+    "free_only": "المجانية فقط",
+    "from_date": "من",
+    "to_date": "إلى",
+    "search": "ابحث عن فعالية أو فنان",
+    "apply": "تطبيق",
+    "district": "المنطقة",
+    "date": "التاريخ",
+    "date_options": {
+      "all": "كل التواريخ",
+      "today": "اليوم",
+      "tomorrow": "غدًا",
+      "weekend": "نهاية هذا الأسبوع",
+      "week": "هذا الأسبوع",
+      "month": "هذا الشهر"
+    }
+  },
+  "event": {
+    "going_count": "{count} ذاهبون",
+    "interested_count": "{count} مهتمون",
+    "rsvp_going": "سأذهب",
+    "rsvp_maybe": "ربما",
+    "rsvp_interested": "مهتم",
+    "ticket_cta": "اشترِ التذكرة",
+    "share": "مشاركة",
+    "favorite": "المفضلة",
+    "price_alert": "تنبيه السعر",
+    "comments_title": "التعليقات",
+    "comment_placeholder": "ما رأيك في هذه الفعالية؟",
+    "comment_send": "نشر",
+    "attendees_title": "الحاضرون",
+    "details_title": "تفاصيل الفعالية"
+  },
+  "categories": {
+    "KONSER": "حفلة موسيقية",
+    "FESTIVAL": "مهرجان",
+    "TIYATRO": "مسرح",
+    "STANDUP": "ستاند أب",
+    "SPOR": "رياضة",
+    "SERGI": "معرض",
+    "ATOLYE": "ورشة عمل",
+    "COCUK": "أطفال",
+    "DIGER": "أخرى"
+  },
+  "common": {
+    "loading": "جارٍ التحميل…",
+    "error_title": "حدث خطأ ما",
+    "error_retry": "حاول مجددًا",
+    "free": "مجاني",
+    "language": "اللغة",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "back": "رجوع",
+    "more": "المزيد"
+  },
+  "footer": {
+    "tagline": "مجمّع فعاليات تركيا — واجهة برمجة مفتوحة للمطورين.",
+    "made_with": "صُنع بحب ❤",
+    "explore": "استكشف",
+    "developers": "للمطورين",
+    "company": "الشركة"
+  }
+}

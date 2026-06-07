@@ -1,0 +1,50 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: etkinlikscout:latest
+    container_name: etkinlikscout
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      USE_MOCK_DATA: "false"   # Scraper'lar gerçek HTTP istek atsın; sonuçlar in-memory cache + UI'a yansır
+      # DATABASE_URL: postgresql://etkinlik:etkinlik@postgres:5432/etkinlik
+      # AUTH_SECRET: change-me
+      # AUTH_GOOGLE_ID:
+      # AUTH_GOOGLE_SECRET:
+      # CRON_SECRET:
+      # R2_ENDPOINT:
+      # R2_ACCESS_KEY_ID:
+      # R2_SECRET_ACCESS_KEY:
+      # R2_BUCKET_NAME: etkinlik
+      # R2_PUBLIC_URL:
+      # STORAGE_PROVIDER: R2
+      # NEXT_PUBLIC_VAPID_PUBLIC_KEY:
+      # VAPID_PRIVATE_KEY:
+      # VAPID_SUBJECT: mailto:you@example.com
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+
+  # Postgres'i aktif etmek için aşağıdaki bloğun yorum işaretlerini kaldır
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: etkinlikscout-db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: etkinlik
+  #     POSTGRES_PASSWORD: etkinlik
+  #     POSTGRES_DB: etkinlik
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U etkinlik -d etkinlik"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 10
+
+# volumes:
+#   pgdata:
