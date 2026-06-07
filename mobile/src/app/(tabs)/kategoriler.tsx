@@ -7,11 +7,11 @@ import { AuroraBackground } from "@/components/AuroraBackground";
 import { EventRow } from "@/components/EventCard";
 import { SectionHeader, Loader, EmptyState, Pill } from "@/ui/atoms";
 import { Radius, Type, Space, glow } from "@/theme/aurora";
-import { CATEGORIES, catMeta, CITIES } from "@/lib/categories";
+import { CATEGORIES, catMeta } from "@/lib/categories";
 import { API_BASE, fetchEvents, type ApiEvent } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
-import { useActiveCity } from "@/lib/location";
+import { useActiveCity, ALL_CITIES } from "@/lib/location";
 import { tapH } from "@/lib/haptics";
 
 const PRICE_LABELS: Record<"all" | "free" | "paid" | "student", string> = {
@@ -175,7 +175,7 @@ export default function KategorilerScreen() {
                   setCityOpen(false);
                 }}
               />
-              {CITIES.map((c) => (
+              {ALL_CITIES.map((c) => (
                 <Pill
                   key={c}
                   label={c}
@@ -261,9 +261,8 @@ export default function KategorilerScreen() {
         <View style={styles.grid}>
           {CATEGORIES.map((item, i) => {
             const active = selected.includes(item.key);
-            // Seçim varsa: yalnızca seçili olan(lar) tam parlak; diğerleri soluk.
-            // Hiç seçim yoksa: hepsi normal (tam) görünür.
-            const dimmed = hasSelection && !active;
+            // Seçili tile zaten beyaz çerçeve + ✓ + güçlü glow ile belli oluyor;
+            // diğerlerini KARARTMIYORUZ (eski 0.4 opacity "bozuk/karardı" gibi duruyordu).
             return (
               <Animated.View
                 key={item.key}
@@ -278,7 +277,6 @@ export default function KategorilerScreen() {
                     style={[
                       styles.tile,
                       glow(item.gradient[0], 16, active ? 0.75 : 0.4),
-                      { opacity: dimmed ? 0.4 : 1 },
                       active && styles.tileActive,
                     ]}
                   >

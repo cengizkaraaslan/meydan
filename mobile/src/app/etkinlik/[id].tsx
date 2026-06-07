@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Dimensions, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Dimensions, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -16,20 +16,28 @@ import { API_BASE, fetchEventById, imageFor, type ApiEvent } from "@/lib/api";
 import { getDeviceId } from "@/lib/profileSync";
 import { toggleFavorite, useFavorites } from "@/lib/favorites";
 import { Badge, GradientButton, Loader, Pill } from "@/ui/atoms";
-import { GlassCard } from "@/components/GlassCard";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { isAdmin } from "@/lib/admin";
 import { PEOPLE } from "@/lib/people";
+import { showAuthPrompt } from "@/lib/authPrompt";
 import { tapH, impactH, successH } from "@/lib/haptics";
 import { getEventWeather, type DayWeather } from "@/lib/weather";
 
-const { width } = Dimensions.get("window");
+const { width, height: SCREEN_H } = Dimensions.get("window");
 
 interface Comment {
   id: string;
   name: string;
   text: string;
+  ts: number;
+}
+
+/** Etkinliğe eklenen fotoğraf. `by` = yükleyen kullanıcı id'si (sahiplik/silme için). */
+interface Photo {
+  uri: string;
+  by: string;
   ts: number;
 }
 
@@ -56,7 +64,7 @@ export default function EventDetail() {
   const [rsvp, setRsvp] = useState<Rsvp | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState("");
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<Photo[]>([]);
   const [imgFailed, setImgFailed] = useState(false);
 
   // #18 — hava durumu
@@ -65,6 +73,9 @@ export default function EventDetail() {
   // story paylaşma akışı
   const [storyUri, setStoryUri] = useState<string | null>(null);
   const [storyCaption, setStoryCaption] = useState("");
+
+  // katılacaklar listesi modal'ı
+  const [listOpen, setListOpen] = useState(false);
 
   const eid = String(id);
   const rsvpKey = `meydanfest:rsvp:${eid}`;
@@ -119,7 +130,14 @@ export default function EventDetail() {
           AsyncStorage.setItem(rsvpKey, "going");
         }
         if (c) setComments(JSON.parse(c));
-        if (p) setPhotos(JSON.parse(p));
+        if (p) {
+          // Eski format string[] idi; { uri, by, ts } objesine taşı (by="" = sahibi bilinmeyen eski foto).
+          const arr = JSON.parse(p) as unknown[];
+          const migrated: Photo[] = arr.map((x) =>
+            typeof x === "string" ? { uri: x, by: "", ts: 0 } : (x as Photo),
+          );
+          setPhotos(migrated);
+        }
       } catch {
         /* yok say */
       }
@@ -170,25 +188,67 @@ export default function EventDetail() {
     setDraft("");
   };
 
+  // Oturum açan kullanıcının sahiplik kimliği (foto silme yetkisi için).
+  const ownerId = user?.id ?? user?.email?.toLowerCase() ?? "";
+
   const addPhoto = async () => {
+    // Oturum açmayan foto paylaşamaz → giriş modalı.
+    if (!user) {
+      showAuthPrompt(t("lock_photo_title"));
+      return;
+    }
     impactH();
+    // İzin iste (olustur ekranıyla aynı akış) — yoksa seçici sessizce kapanıyordu (= "buton çalışmıyor").
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.7,
     });
     if (res.canceled || !res.assets?.length) return;
-    const uri = res.assets[0].uri;
+    const photo: Photo = { uri: res.assets[0].uri, by: ownerId, ts: Date.now() };
     setPhotos((prev) => {
-      const next = [...prev, uri];
+      const next = [...prev, photo];
       AsyncStorage.setItem(photosKey, JSON.stringify(next));
       return next;
     });
     successH();
   };
 
+  // Foto silinebilir mi? Sahibi (kendi yüklediği), admin ya da sahibi bilinmeyen eski foto (cihaza ait).
+  const canDeletePhoto = (p: Photo) => !!user && (isAdmin(user) || !p.by || p.by === ownerId);
+
+  const deletePhoto = (index: number) => {
+    const p = photos[index];
+    if (!p || !canDeletePhoto(p)) return;
+    tapH();
+    Alert.alert(t("delete_photo_q"), undefined, [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("delete"),
+        style: "destructive",
+        onPress: () => {
+          setPhotos((prev) => {
+            const next = prev.filter((_, i) => i !== index);
+            AsyncStorage.setItem(photosKey, JSON.stringify(next));
+            return next;
+          });
+          successH();
+        },
+      },
+    ]);
+  };
+
   // story: foto seç → önizleme + caption ekranı aç
   const pickStory = async () => {
+    // Oturum açmayan story yükleyemez → giriş modalı.
+    if (!user) {
+      showAuthPrompt(t("lock_story_title"));
+      return;
+    }
     impactH();
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.7,
@@ -245,9 +305,10 @@ export default function EventDetail() {
   const fav = ids.has(event.id);
   // kırık görsel → kategori fallback (kategori emojili düz blok). imgFailed true ise emoji bloğu göster.
   const heroUri = imageFor(event);
-  // katılacaklar — mock, ilk 6 + kalan rozeti
-  const attendees = PEOPLE.slice(0, 6);
-  const extraAttendees = Math.max(0, 18 - attendees.length);
+  // katılacaklar — mock liste (avatar yığını için ilk 6, modal'da tamamı)
+  const attendeeList = PEOPLE;
+  const attendees = attendeeList.slice(0, 6);
+  const extraAttendees = Math.max(0, attendeeList.length - attendees.length);
 
   const openTicket = () => {
     impactH();
@@ -261,6 +322,21 @@ export default function EventDetail() {
   const share = () => {
     impactH();
     Share.share({ message: `${event.title} — ${fmtLong(event.starts_at)} · ${event.city}\n${event.ticket_url ?? ""}` });
+  };
+  // katılacaklar listesinden bir kişiye mesaj — sohbet için giriş zorunlu (uygulama kuralı)
+  const messagePerson = (pid: string) => {
+    impactH();
+    setListOpen(false);
+    if (!user) {
+      showAuthPrompt(t("lock_chat_title"));
+      return;
+    }
+    router.push(`/sohbet/${pid}`);
+  };
+  const openPerson = (pid: string) => {
+    tapH();
+    setListOpen(false);
+    router.push(`/kisi/${pid}`);
   };
 
   return (
@@ -313,19 +389,17 @@ export default function EventDetail() {
             {event.artist ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="🎤" label={t("artist")} value={event.artist} /></>) : null}
           </Animated.View>
 
-          {/* #18 — Hava durumu (yalnızca veri varsa) */}
+          {/* #18 — Hava durumu (yalnızca veri varsa) — siyah cam yerine sayfayla uyumlu şeffaf yüzey */}
           {weather ? (
-            <Animated.View entering={FadeInDown.duration(450).delay(90)}>
-              <GlassCard glowColor={c.gradient[0]}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-                  <Text style={{ fontSize: 48 }}>{weather.emoji}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[Type.label, { color: T.textFaint, marginBottom: 4 }]}>{t("weather")}</Text>
-                    <Text style={[Type.h2, { color: T.text }]}>{weather.tempMax}° / {weather.tempMin}°</Text>
-                    <Text style={[Type.body, { color: T.textDim, marginTop: 2 }]}>{weather.label}</Text>
-                  </View>
+            <Animated.View entering={FadeInDown.duration(450).delay(90)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                <Text style={{ fontSize: 48 }}>{weather.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[Type.label, { color: T.textFaint, marginBottom: 4 }]}>{t("weather")}</Text>
+                  <Text style={[Type.h2, { color: T.text }]}>{weather.tempMax}° / {weather.tempMin}°</Text>
+                  <Text style={[Type.body, { color: T.textDim, marginTop: 2 }]}>{weather.label}</Text>
                 </View>
-              </GlassCard>
+              </View>
             </Animated.View>
           ) : null}
 
@@ -387,38 +461,36 @@ export default function EventDetail() {
             )}
           </Animated.View>
 
-          {/* #14 — Katılacaklar */}
-          <Animated.View entering={FadeInDown.duration(450).delay(200)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
-            <Text style={[Type.label, { color: T.textFaint, marginBottom: 12 }]}>{t("attendees")}</Text>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              {attendees.map((p, i) => (
-                /* #19b — avatara dokun → /kisi/[id] (profil + Mesaj at) */
-                <Pressable
-                  key={p.id}
-                  onPress={() => { tapH(); router.push(`/kisi/${p.id}`); }}
-                  style={{ marginLeft: i === 0 ? 0 : -12 }}
-                >
+          {/* #14 — Etkinliğe katılacaklar (dokun → liste + her satırda "Mesaj at") */}
+          <Animated.View entering={FadeInDown.duration(450).delay(200)}>
+            <Pressable
+              onPress={() => { tapH(); setListOpen(true); }}
+              style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <Text style={[Type.label, { color: T.textFaint }]}>👥 {t("attendees")}</Text>
+                <Text style={[Type.label, { color: T.primary }]}>{attendeeList.length} →</Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                {attendees.map((p, i) => (
                   <Image
+                    key={p.id}
                     source={{ uri: p.avatar }}
-                    style={[styles.avatar, { borderColor: T.bg }]}
+                    style={[styles.avatar, { borderColor: T.bg, marginLeft: i === 0 ? 0 : -12 }]}
                     contentFit="cover"
                     transition={200}
                   />
-                </Pressable>
-              ))}
-              {extraAttendees > 0 ? (
-                <View style={[styles.avatar, styles.avatarMore, { marginLeft: -12, borderColor: T.bg, backgroundColor: T.surfaceStrong }]}>
-                  <Text style={[Type.label, { color: T.textDim }]}>+{extraAttendees}</Text>
-                </View>
-              ) : null}
-            </View>
-            {/* #19b — görünür ipucu: avatara dokun → profil + mesaj at */}
-            <Pressable
-              onPress={() => { tapH(); if (attendees[0]) router.push(`/kisi/${attendees[0].id}`); }}
-              style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 6 }}
-            >
-              <Text style={{ fontSize: 13 }}>💬</Text>
-              <Text style={[Type.label, { color: T.primary }]}>{t("message_attendee")} →</Text>
+                ))}
+                {extraAttendees > 0 ? (
+                  <View style={[styles.avatar, styles.avatarMore, { marginLeft: -12, borderColor: T.bg, backgroundColor: T.surfaceStrong }]}>
+                    <Text style={[Type.label, { color: T.textDim }]}>+{extraAttendees}</Text>
+                  </View>
+                ) : null}
+              </View>
+              <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={{ fontSize: 13 }}>💬</Text>
+                <Text style={[Type.label, { color: T.primary }]}>{t("message_attendee")} →</Text>
+              </View>
             </Pressable>
           </Animated.View>
 
@@ -471,8 +543,15 @@ export default function EventDetail() {
             </View>
             {photos.length ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                {photos.map((uri, i) => (
-                  <Image key={`${uri}-${i}`} source={{ uri }} style={styles.photo} contentFit="cover" transition={200} />
+                {photos.map((p, i) => (
+                  <View key={`${p.uri}-${i}`}>
+                    <Image source={{ uri: p.uri }} style={styles.photo} contentFit="cover" transition={200} />
+                    {canDeletePhoto(p) ? (
+                      <Pressable onPress={() => deletePhoto(i)} hitSlop={8} style={styles.photoDel}>
+                        <Text style={{ fontSize: 13 }}>🗑️</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
                 ))}
               </ScrollView>
             ) : null}
@@ -481,6 +560,42 @@ export default function EventDetail() {
           {guest ? <View style={{ height: 2 }} /> : null}
         </View>
       </ScrollView>
+
+      {/* Katılacaklar listesi — bottom-sheet; her satırda "Mesaj at" */}
+      <Modal visible={listOpen} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setListOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setListOpen(false)} />
+        <View style={[styles.sheet, { backgroundColor: T.bgElevated, paddingBottom: insets.bottom + 16 }]}>
+          <View style={[styles.sheetHandle, { backgroundColor: T.hairline }]} />
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <Text style={[Type.h2, { color: T.text }]}>👥 {t("attendees")} · {attendeeList.length}</Text>
+            <Pressable onPress={() => { tapH(); setListOpen(false); }} hitSlop={10}>
+              <Text style={{ color: T.textDim, fontSize: 22 }}>✕</Text>
+            </Pressable>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: SCREEN_H * 0.6 }} contentContainerStyle={{ gap: 10, paddingBottom: 8 }}>
+            {attendeeList.map((p) => (
+              <View key={p.id} style={[styles.attRow, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+                <Pressable onPress={() => openPerson(p.id)} style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
+                  <View>
+                    <Image source={{ uri: p.avatar }} style={[styles.attAvatar, { borderColor: T.bg }]} contentFit="cover" transition={200} />
+                    {p.online ? <View style={[styles.onlineDot, { backgroundColor: T.success, borderColor: T.bgElevated }]} /> : null}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>{p.name}, {p.age}</Text>
+                    <Text style={[Type.label, { color: T.textFaint }]} numberOfLines={1}>📍 {p.city} · {p.distanceKm} km</Text>
+                  </View>
+                </Pressable>
+                <Pressable onPress={() => messagePerson(p.id)} style={{ borderRadius: Radius.pill, overflow: "hidden" }}>
+                  <LinearGradient colors={c.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.attMsgBtn}>
+                    <Text style={{ fontSize: 13 }}>💬</Text>
+                    <Text style={[Type.label, { color: "#fff" }]}>{t("message_attendee")}</Text>
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -510,9 +625,20 @@ const styles = StyleSheet.create({
   storyPreview: { width: "100%", height: 200, borderRadius: Radius.md },
   avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2 },
   avatarMore: { alignItems: "center", justifyContent: "center" },
+  backdrop: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.6)" },
+  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, paddingHorizontal: 16, paddingTop: 10 },
+  sheetHandle: { alignSelf: "center", width: 40, height: 5, borderRadius: 3, marginBottom: 14 },
+  attRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2 },
+  attAvatar: { width: 50, height: 50, borderRadius: 25, borderWidth: 2 },
+  onlineDot: { position: "absolute", right: 0, bottom: 0, width: 13, height: 13, borderRadius: 7, borderWidth: 2 },
+  attMsgBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 9 },
   bubble: { borderRadius: Radius.md, padding: 12, borderWidth: StyleSheet.hairlineWidth * 2 },
   input: { flex: 1, borderRadius: Radius.pill, paddingHorizontal: 16, paddingVertical: 10, borderWidth: StyleSheet.hairlineWidth * 2, fontSize: 14 },
   sendBtn: { paddingHorizontal: 16, paddingVertical: 11, alignItems: "center", justifyContent: "center" },
   addPhoto: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
   photo: { width: 100, height: 100, borderRadius: Radius.md },
+  photoDel: {
+    position: "absolute", top: 6, right: 6, width: 28, height: 28, borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center",
+  },
 });

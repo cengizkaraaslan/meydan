@@ -95,7 +95,7 @@ export function EventRow({ event }: { event: ApiEvent }) {
   const [imgErr, setImgErr] = useState(false);
   const categoryFallback = imageFor({ ...event, image_url: null });
   return (
-    <Pressable onPress={() => open(event)} style={[styles.row, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+    <Pressable onPress={() => open(event)} style={[styles.row, { backgroundColor: T.surface }]}>
       <View style={styles.rowImgWrap}>
         <Image
           source={{ uri: imgErr ? categoryFallback : imageFor(event) }}
@@ -137,7 +137,6 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row", gap: 12, alignItems: "center", padding: 10,
     borderRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth * 2,
   },
   rowImgWrap: { width: 78, height: 78, borderRadius: Radius.md, overflow: "hidden" },
   rowImg: { width: "100%", height: "100%" },
