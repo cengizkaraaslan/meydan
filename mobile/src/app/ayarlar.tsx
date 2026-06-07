@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Switch, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as WebBrowser from "expo-web-browser";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,6 +13,8 @@ import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { CITIES, CATEGORIES } from "@/lib/categories";
 import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { ALL_CITIES, districtsFor } from "@/lib/location";
+import { usePrefs, replayTour } from "@/lib/prefs";
 import {
   useTheme,
   themeForGender,
@@ -46,6 +49,30 @@ function ThemeCard({ name, label, active, T, onPress }: { name: ThemeName; label
         {active ? <Text style={styles.themeCheck}>✓</Text> : null}
       </LinearGradient>
       <Text style={[Type.label, { color: active ? T.text : T.textDim }]} numberOfLines={1}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** Anahtarlı ayar satırı (ses/titreşim/animasyon). */
+function ToggleRow({ label, help, value, onValueChange, T, accent }: { label: string; help?: string; value: boolean; onValueChange: (v: boolean) => void; T: Palette; accent: string }) {
+  return (
+    <View style={styles.toggleRow}>
+      <View style={{ flex: 1, paddingRight: Space.md }}>
+        <Text style={[Type.title, { color: T.text }]}>{label}</Text>
+        {help ? <Text style={[Type.label, { color: T.textFaint, marginTop: 2 }]}>{help}</Text> : null}
+      </View>
+      <Switch value={value} onValueChange={onValueChange} trackColor={{ true: accent, false: T.hairline }} thumbColor="#fff" />
+    </View>
+  );
+}
+
+/** Dokunmatik bağlantı/aksiyon satırı (yasal & destek). */
+function LinkRow({ icon, label, onPress, T, danger }: { icon: string; label: string; onPress: () => void; T: Palette; danger?: boolean }) {
+  return (
+    <Pressable onPress={onPress} style={styles.linkRow}>
+      <Text style={{ fontSize: 16 }}>{icon}</Text>
+      <Text style={[Type.title, { color: danger ? T.pink : T.text, flex: 1 }]}>{label}</Text>
+      <Text style={[Type.h2, { color: T.textFaint }]}>›</Text>
     </Pressable>
   );
 }
@@ -89,38 +116,77 @@ export default function SettingsScreen() {
   const { t: T, name, setTheme, mode, setMode, gender, setGender } = useTheme();
   const { t, lang, setLang } = useT();
   const { city, setCity } = useActiveCity();
+  const prefs = usePrefs();
 
   // Akordeon: aynı anda tek bölüm açık (varsayılan hepsi kapalı → sade görünüm).
   const [open, setOpen] = useState<string | null>(null);
   const toggle = (key: string) => { tapH(); setOpen((o) => (o === key ? null : key)); };
-  const [prefs, setPrefs] = useState<NotifPrefs>({ mode: "all", cities: [], categories: [] });
+  const [notif, setNotif] = useState<NotifPrefs>({ mode: "all", cities: [], categories: [] });
   const [savedAt, setSavedAt] = useState(0);
+
+  // İlçe seçimi (şehre bağlı) — cihazda saklanır + best-effort DB'ye senkron.
+  const [district, setDistrictState] = useState<string | null>(null);
+  const [districts, setDistricts] = useState<string[]>([]);
+
+  useEffect(() => {
+    AsyncStorage.getItem("meydanfest:district").then((d) => setDistrictState(d));
+  }, []);
+
+  // Seçili şehrin ilçeleri: API → boşsa yerel yedek. Şehir yoksa boş.
+  useEffect(() => {
+    if (!city) { setDistricts([]); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/districts?city=${encodeURIComponent(city)}`);
+        const json = (await res.json()) as { districts?: string[] };
+        const apiList = Array.isArray(json.districts) ? json.districts : [];
+        if (alive) setDistricts(apiList.length ? apiList : districtsFor(city));
+      } catch {
+        if (alive) setDistricts(districtsFor(city));
+      }
+    })();
+    return () => { alive = false; };
+  }, [city]);
+
+  const pickDistrict = (d: string) => {
+    tapH();
+    // d boş ("Tüm ilçeler") → temizle; aynı ilçeye tekrar dokun → temizle; aksi → seç.
+    const next = d && district !== d ? d : null;
+    setDistrictState(next);
+    if (next) AsyncStorage.setItem("meydanfest:district", next);
+    else AsyncStorage.removeItem("meydanfest:district");
+    syncProfile({ city, district: next });
+  };
 
   useEffect(() => {
     let alive = true;
-    getNotifPrefs().then((p) => { if (alive) setPrefs(p); });
+    getNotifPrefs().then((p) => { if (alive) setNotif(p); });
     return () => { alive = false; };
   }, []);
 
   const persistPrefs = (next: NotifPrefs) => {
-    setPrefs(next);
+    setNotif(next);
     setNotifPrefs(next);
     setSavedAt(Date.now());
     impactH();
   };
-  const setNotifMode = (m: NotifPrefs["mode"]) => persistPrefs({ ...prefs, mode: m });
+  const setNotifMode = (m: NotifPrefs["mode"]) => persistPrefs({ ...notif, mode: m });
   const toggleNotifCity = (c: string) => {
-    const has = prefs.cities.includes(c);
-    persistPrefs({ ...prefs, cities: has ? prefs.cities.filter((x) => x !== c) : [...prefs.cities, c] });
+    const has = notif.cities.includes(c);
+    persistPrefs({ ...notif, cities: has ? notif.cities.filter((x) => x !== c) : [...notif.cities, c] });
   };
   const toggleNotifCat = (key: string) => {
-    const has = prefs.categories.includes(key);
-    persistPrefs({ ...prefs, categories: has ? prefs.categories.filter((x) => x !== key) : [...prefs.categories, key] });
+    const has = notif.categories.includes(key);
+    persistPrefs({ ...notif, categories: has ? notif.categories.filter((x) => x !== key) : [...notif.categories, key] });
   };
   const pickCity = (c: string) => {
     const next = city === c ? null : c;
     setCity(next);
-    syncProfile({ city: next });
+    syncProfile({ city: next, district: null });
+    // Şehir değişince ilçe sıfırlanır.
+    setDistrictState(null);
+    AsyncStorage.removeItem("meydanfest:district");
   };
   const pickGender = (g: Gender) => {
     setGender(g);
@@ -128,6 +194,29 @@ export default function SettingsScreen() {
     syncProfile({ gender: g });
   };
   const openSite = () => WebBrowser.openBrowserAsync(API_BASE);
+
+  // ── Yasal & Destek aksiyonları ──
+  const PKG = "app.meydanfest";
+  const PLAY_URL = `https://play.google.com/store/apps/details?id=${PKG}`;
+  const openPrivacy = () => WebBrowser.openBrowserAsync(`${API_BASE}/privacy`);
+  const openTerms = () => WebBrowser.openBrowserAsync(`${API_BASE}/terms`);
+  const reportBug = () => Linking.openURL(`mailto:cengiz7karaaslan@gmail.com?subject=${encodeURIComponent("MeydanFest — Hata/İletişim")}`).catch(() => {});
+  const shareApp = () => Share.share({ message: `${t("share_app_msg")}\n${PLAY_URL}` }).catch(() => {});
+  const rateApp = () => Linking.openURL(`market://details?id=${PKG}`).catch(() => WebBrowser.openBrowserAsync(PLAY_URL));
+  const wipeAll = async () => {
+    const keys = await AsyncStorage.getAllKeys();
+    const mine = keys.filter((k) => k.startsWith("meydanfest:"));
+    await AsyncStorage.multiRemove(mine);
+    signOut();
+    router.back();
+  };
+  const confirmDelete = () => {
+    Alert.alert(t("delete_account_q"), t("delete_account_body"), [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("delete_account"), style: "destructive", onPress: () => { wipeAll(); } },
+    ]);
+  };
+  const doReplayTour = () => { impactH(); replayTour(); router.back(); };
 
   return (
     <View style={[styles.root, { backgroundColor: T.bg }]}>
@@ -142,13 +231,32 @@ export default function SettingsScreen() {
           <View style={{ width: 40 }} />
         </View>
 
-        {/* Şehir */}
-        <Section title={`${t("detected_city")}  📍 ${city ?? "—"}`} accent={T.blue} openKey="city" current={open} onToggle={toggle}>
+        {/* Şehir + İlçe — tüm 81 il + şehre bağlı ilçeler (cihazda + DB'de tutulur) */}
+        <Section
+          title={`${t("detected_city")}  📍 ${city ?? "—"}${district ? " · " + district : ""}`}
+          accent={T.blue}
+          openKey="city"
+          current={open}
+          onToggle={toggle}
+        >
+          <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>{t("select_city")}</Text>
           <View style={styles.pillWrap}>
-            {CITIES.map((c) => (
+            {ALL_CITIES.map((c) => (
               <Pill key={c} label={c} active={city === c} gradient={T.primarySoft} onPress={() => pickCity(c)} />
             ))}
           </View>
+          {city && districts.length > 0 ? (
+            <>
+              <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
+              <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>{t("district")}</Text>
+              <View style={styles.pillWrap}>
+                <Pill label={t("all_districts")} active={district === null} onPress={() => pickDistrict("")} />
+                {districts.map((d) => (
+                  <Pill key={d} label={d} active={district === d} gradient={T.primarySoft} onPress={() => pickDistrict(d)} />
+                ))}
+              </View>
+            </>
+          ) : null}
         </Section>
 
         {/* Görünüm: mode + tema + dil + cinsiyet */}
@@ -190,29 +298,42 @@ export default function SettingsScreen() {
           </GlassCard>
         </Section>
 
+        {/* Ses & Erişilebilirlik */}
+        <Section title={t("settings_sound_access")} accent={T.indigo} openKey="sound" current={open} onToggle={toggle} delay={60}>
+          <GlassCard padded>
+            <ToggleRow label={t("sound_fx")} value={prefs.sound} onValueChange={(v) => { tapH(); prefs.setSound(v); }} T={T} accent={T.primary} />
+            <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.sm }]} />
+            <ToggleRow label={t("haptics_fx")} value={prefs.haptics} onValueChange={(v) => { prefs.setHaptics(v); tapH(); }} T={T} accent={T.primary} />
+            <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.sm }]} />
+            <ToggleRow label={t("reduce_motion")} help={t("reduce_motion_help")} value={prefs.reduceMotion} onValueChange={(v) => { tapH(); prefs.setReduceMotion(v); }} T={T} accent={T.primary} />
+            <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.sm }]} />
+            <LinkRow icon="🎬" label={t("replay_tour")} onPress={doReplayTour} T={T} />
+          </GlassCard>
+        </Section>
+
         {/* Bildirim tercihleri */}
         <Section title={t("notif_prefs")} accent={T.cyan} openKey="notif" current={open} onToggle={toggle} delay={80}>
           <GlassCard padded>
                 <Text style={[Type.body, { color: T.textDim, marginBottom: Space.md }]}>{t("notif_help")}</Text>
                 <View style={styles.pillWrap}>
-                  <Pill label={t("notif_all")} active={prefs.mode === "all"} onPress={() => setNotifMode("all")} />
-                  <Pill label={t("notif_custom")} active={prefs.mode === "custom"} gradient={T.primarySoft} onPress={() => setNotifMode("custom")} />
-                  <Pill label={t("notif_off")} active={prefs.mode === "off"} onPress={() => setNotifMode("off")} />
+                  <Pill label={t("notif_all")} active={notif.mode === "all"} onPress={() => setNotifMode("all")} />
+                  <Pill label={t("notif_custom")} active={notif.mode === "custom"} gradient={T.primarySoft} onPress={() => setNotifMode("custom")} />
+                  <Pill label={t("notif_off")} active={notif.mode === "off"} onPress={() => setNotifMode("off")} />
                 </View>
-                {prefs.mode === "custom" && (
+                {notif.mode === "custom" && (
                   <Animated.View entering={FadeInDown.duration(260)}>
                     <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
                     <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>{t("notif_pick_cities")}</Text>
                     <View style={styles.pillWrap}>
                       {CITIES.map((c) => (
-                        <Pill key={c} label={c} active={prefs.cities.includes(c)} gradient={T.primarySoft} onPress={() => toggleNotifCity(c)} />
+                        <Pill key={c} label={c} active={notif.cities.includes(c)} gradient={T.primarySoft} onPress={() => toggleNotifCity(c)} />
                       ))}
                     </View>
                     <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
                     <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>{t("notif_pick_cats")}</Text>
                     <View style={styles.pillWrap}>
                       {CATEGORIES.map((c) => (
-                        <Pill key={c.key} label={`${c.emoji} ${c.label}`} active={prefs.categories.includes(c.key)} gradient={c.gradient} onPress={() => toggleNotifCat(c.key)} />
+                        <Pill key={c.key} label={`${c.emoji} ${c.label}`} active={notif.categories.includes(c.key)} gradient={c.gradient} onPress={() => toggleNotifCat(c.key)} />
                       ))}
                     </View>
                   </Animated.View>
@@ -235,6 +356,23 @@ export default function SettingsScreen() {
               <View style={[styles.hairline, { backgroundColor: T.hairline }]} />
               <GradientButton label={t("feedback")} icon="💬" gradient={T.primarySoft} onPress={openSite} />
             </View>
+          </GlassCard>
+        </Section>
+
+        {/* Yasal & Destek */}
+        <Section title={t("legal_support")} accent={T.gold} openKey="legal" current={open} onToggle={toggle} delay={140}>
+          <GlassCard padded>
+            <LinkRow icon="🔒" label={t("privacy_policy")} onPress={openPrivacy} T={T} />
+            <View style={[styles.hairline, { backgroundColor: T.hairline }]} />
+            <LinkRow icon="📜" label={t("terms_of_use")} onPress={openTerms} T={T} />
+            <View style={[styles.hairline, { backgroundColor: T.hairline }]} />
+            <LinkRow icon="🐞" label={t("report_bug")} onPress={reportBug} T={T} />
+            <View style={[styles.hairline, { backgroundColor: T.hairline }]} />
+            <LinkRow icon="↗" label={t("share_app")} onPress={shareApp} T={T} />
+            <View style={[styles.hairline, { backgroundColor: T.hairline }]} />
+            <LinkRow icon="★" label={t("rate_app")} onPress={rateApp} T={T} />
+            <View style={[styles.hairline, { backgroundColor: T.hairline }]} />
+            <LinkRow icon="🗑️" label={t("delete_account")} onPress={confirmDelete} T={T} danger />
           </GlassCard>
         </Section>
 
@@ -270,5 +408,7 @@ const styles = StyleSheet.create({
   themeDot: { width: 34, height: 34, borderRadius: Radius.pill, alignItems: "center", justifyContent: "center" },
   themeCheck: { color: "#fff", fontSize: 16, fontWeight: "800" },
   hairline: { height: StyleSheet.hairlineWidth * 2 },
+  toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: Space.sm },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: Space.md, paddingVertical: Space.md },
   signOut: { marginTop: Space.lg, paddingVertical: 14, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center" },
 });

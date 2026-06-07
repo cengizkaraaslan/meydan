@@ -325,6 +325,10 @@ model MobileProfile {
   deviceId   String   @unique
   gender     Gender?
   city       String?
+  /// Şehre bağlı ilçe (mobil ayarlar > konum).
+  district   String?
+  /// Kullanıcının seçtiği profil fotoğrafı URL'i (Google foto override'ı).
+  avatar     String?  @db.Text
   lang       String?
   /// Tanışma (dating) alanları — mobil swipe/eşleşme akışı için.
   bio        String?  @db.Text

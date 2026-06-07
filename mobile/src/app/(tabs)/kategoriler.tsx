@@ -6,12 +6,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { EventRow } from "@/components/EventCard";
 import { SectionHeader, Loader, EmptyState, Pill } from "@/ui/atoms";
-import { Radius, Type, Space, glow } from "@/theme/aurora";
+import { Radius, Type, Space } from "@/theme/aurora";
 import { CATEGORIES, catMeta } from "@/lib/categories";
 import { API_BASE, fetchEvents, type ApiEvent } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
-import { useActiveCity, ALL_CITIES } from "@/lib/location";
+import { useActiveCity, ALL_CITIES, districtsFor } from "@/lib/location";
 import { tapH } from "@/lib/haptics";
 
 const PRICE_LABELS: Record<"all" | "free" | "paid" | "student", string> = {
@@ -67,9 +67,11 @@ export default function KategorilerScreen() {
       try {
         const res = await fetch(`${API_BASE}/api/districts?city=${encodeURIComponent(cityFilter)}`);
         const json = (await res.json()) as { districts?: string[] };
-        if (alive) setDistricts(Array.isArray(json.districts) ? json.districts : []);
+        const apiList = Array.isArray(json.districts) ? json.districts : [];
+        // API boş dönerse yerel yedek listeyi kullan → ilçe filtresi hep görünür.
+        if (alive) setDistricts(apiList.length ? apiList : districtsFor(cityFilter));
       } catch {
-        if (alive) setDistricts([]);
+        if (alive) setDistricts(districtsFor(cityFilter));
       }
     })();
     return () => {
@@ -277,7 +279,6 @@ export default function KategorilerScreen() {
                     end={{ x: 1, y: 1 }}
                     style={[
                       styles.tile,
-                      glow(item.gradient[0], 16, active ? 0.75 : 0.4),
                       active && styles.tileActive,
                     ]}
                   >

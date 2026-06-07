@@ -35,11 +35,21 @@ function normalizeLookingFor(value: unknown): LookingFor | null {
 interface ProfileBody {
   deviceId?: string;
   gender?: string;
-  city?: string;
+  city?: string | null;
+  district?: string | null;
   lang?: string;
   bio?: string;
   lookingFor?: string;
   photos?: string;
+  avatar?: string | null;
+  name?: string;
+}
+
+/** Boş/whitespace string'i null'a indirger (alan temizleme için). */
+function strOrNull(v: unknown): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s.length ? s : null;
 }
 
 export async function POST(request: NextRequest) {
@@ -62,20 +72,44 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "deviceId zorunlu" }, { status: 400 });
   }
 
-  const gender = normalizeGender(body.gender);
-  const city = body.city ?? null;
-  const lang = body.lang ?? null;
-  const bio = body.bio ?? null;
-  const lookingFor = normalizeLookingFor(body.lookingFor);
-  const photos = body.photos ?? null;
+  // Yalnızca gövdede AÇIKÇA gönderilen alanları yaz — kısmi senkron (örn. sadece
+  // {city,district}) diğer kolonları (gender/avatar/bio…) null'a ÇEKMESİN.
+  const data: Record<string, unknown> = {};
+  if ("gender" in body) data.gender = normalizeGender(body.gender);
+  if ("city" in body) data.city = strOrNull(body.city);
+  if ("district" in body) data.district = strOrNull(body.district);
+  if ("lang" in body) data.lang = strOrNull(body.lang);
+  if ("bio" in body) data.bio = strOrNull(body.bio);
+  if ("lookingFor" in body) data.lookingFor = normalizeLookingFor(body.lookingFor);
+  if ("photos" in body) data.photos = strOrNull(body.photos);
+  if ("avatar" in body) data.avatar = strOrNull(body.avatar);
 
-  const profile = await db.mobileProfile.upsert({
-    where: { deviceId },
-    create: { deviceId, gender, city, lang, bio, lookingFor, photos },
-    update: { gender, city, lang, bio, lookingFor, photos },
-  });
+  // district/avatar yeni kolonlar — `prisma generate` (Vercel build) sonrası tipler
+  // güncellenir; yerel stale client'ta derlensin diye unknown üzerinden cast.
+  type UpsertArgs = Parameters<typeof db.mobileProfile.upsert>[0];
+  const run = (d: Record<string, unknown>) =>
+    db.mobileProfile.upsert({
+      where: { deviceId },
+      create: { deviceId, ...d } as unknown as UpsertArgs["create"],
+      update: d as unknown as UpsertArgs["update"],
+    });
 
-  return NextResponse.json({ ok: true, profile });
+  try {
+    const profile = await run(data);
+    return NextResponse.json({ ok: true, profile });
+  } catch {
+    // district/avatar kolonları henüz DB'de yoksa (db push öncesi) onları atıp tekrar dene
+    // → diğer alanlar (gender/city/lang…) çalışmaya devam eder, prod bozulmaz.
+    const rest = { ...data };
+    delete rest.district;
+    delete rest.avatar;
+    try {
+      const profile = await run(rest);
+      return NextResponse.json({ ok: true, profile });
+    } catch {
+      return NextResponse.json({ ok: false });
+    }
+  }
 }
 
 export async function GET(request: NextRequest) {

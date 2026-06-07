@@ -14,6 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { IntroAnimation } from "@/components/IntroAnimation";
 import { Walkthrough } from "@/components/Walkthrough";
 import { GlobalSignInPrompt } from "@/components/SignInPrompt";
+import { onReplayTour } from "@/lib/prefs";
 import { initNotifications, scheduleNearbyTeaser, useNearbyNotificationNav } from "@/lib/notify";
 
 // Native splash'ı biz kontrol edelim (yoksa üstte takılı kalabiliyor).
@@ -92,9 +93,17 @@ export default function RootLayout() {
 
   useEffect(() => {
     const t = setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 120);
-    AsyncStorage.getItem("meydanfest:seenIntro").then((v) => setSeenIntro(v === "1"));
+    AsyncStorage.multiGet(["meydanfest:seenIntro", "meydanfest:reduceMotion"]).then((entries) => {
+      const map = Object.fromEntries(entries);
+      setSeenIntro(map["meydanfest:seenIntro"] === "1");
+      // "Animasyonları azalt" açıksa açılış intro animasyonunu atla.
+      if (map["meydanfest:reduceMotion"] === "1") setShowIntro(false);
+    });
     return () => clearTimeout(t);
   }, []);
+
+  // Ayarlardan "Tanıtım turunu tekrar göster" → turu hemen yeniden aç.
+  useEffect(() => onReplayTour(() => { setShowIntro(false); setSeenIntro(false); }), []);
 
   const finishWalkthrough = () => {
     setSeenIntro(true);

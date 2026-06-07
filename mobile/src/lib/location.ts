@@ -36,6 +36,34 @@ const TR_CITIES = [
 /** Türkiye'nin 81 ili (alfabetik) — combobox/şehir seçimi için. */
 export const ALL_CITIES = TR_CITIES;
 
+/**
+ * Büyük şehirlerin ilçeleri — `/api/districts` boş/erişilemez olduğunda
+ * yerel yedek (kategori ekranındaki ilçe filtresi hep görünsün diye).
+ */
+export const DISTRICTS_BY_CITY: Record<string, string[]> = {
+  "İstanbul": ["Kadıköy", "Beşiktaş", "Şişli", "Beyoğlu", "Üsküdar", "Bakırköy", "Fatih", "Maltepe", "Ataşehir", "Kartal", "Pendik", "Sarıyer", "Bahçelievler", "Esenyurt", "Ümraniye", "Beylikdüzü", "Zeytinburnu", "Eyüpsultan", "Kağıthane", "Avcılar"],
+  "Ankara": ["Çankaya", "Keçiören", "Yenimahalle", "Mamak", "Etimesgut", "Sincan", "Altındağ", "Pursaklar", "Gölbaşı", "Polatlı"],
+  "İzmir": ["Konak", "Karşıyaka", "Bornova", "Buca", "Bayraklı", "Çiğli", "Gaziemir", "Karabağlar", "Balçova", "Narlıdere", "Urla", "Çeşme"],
+  "Bursa": ["Osmangazi", "Nilüfer", "Yıldırım", "Mudanya", "Gemlik", "İnegöl", "Gürsu"],
+  "Antalya": ["Muratpaşa", "Kepez", "Konyaaltı", "Alanya", "Manavgat", "Serik", "Kemer"],
+  "Adana": ["Seyhan", "Çukurova", "Yüreğir", "Sarıçam", "Ceyhan"],
+  "Konya": ["Selçuklu", "Meram", "Karatay"],
+  "Kayseri": ["Melikgazi", "Kocasinan", "Talas"],
+  "Mersin": ["Yenişehir", "Mezitli", "Toroslar", "Akdeniz", "Tarsus", "Erdemli"],
+  "Eskişehir": ["Tepebaşı", "Odunpazarı"],
+  "Gaziantep": ["Şahinbey", "Şehitkamil", "Oğuzeli"],
+  "Kocaeli": ["İzmit", "Gebze", "Darıca", "Körfez", "Gölcük"],
+  "Samsun": ["İlkadım", "Atakum", "Canik", "Tekkeköy"],
+  "Trabzon": ["Ortahisar", "Akçaabat", "Yomra"],
+  "Diyarbakır": ["Bağlar", "Kayapınar", "Yenişehir", "Sur"],
+};
+
+/** Verilen şehrin (varsa) yerel ilçe listesini döner; yoksa boş dizi. */
+export function districtsFor(city: string | null): string[] {
+  if (!city) return [];
+  return DISTRICTS_BY_CITY[city] ?? [];
+}
+
 /** Türkçe karakterleri sadeleştirip karşılaştırma anahtarı üretir. */
 function norm(s: string): string {
   return s

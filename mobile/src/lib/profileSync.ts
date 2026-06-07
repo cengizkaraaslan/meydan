@@ -23,7 +23,14 @@ export async function getDeviceId(): Promise<string> {
   return id;
 }
 
-export async function syncProfile(data: { gender?: Gender; city?: string | null; lang?: string }): Promise<void> {
+export async function syncProfile(data: {
+  gender?: Gender;
+  city?: string | null;
+  district?: string | null;
+  lang?: string;
+  avatar?: string | null;
+  name?: string;
+}): Promise<void> {
   try {
     const deviceId = await getDeviceId();
     await fetch(`${API_BASE}/api/v1/profile`, {

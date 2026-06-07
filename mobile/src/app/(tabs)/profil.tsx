@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -19,6 +20,7 @@ import { isAdmin } from "@/lib/admin";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { showAuthPrompt } from "@/lib/authPrompt";
+import { syncProfile } from "@/lib/profileSync";
 import { tapH, impactH, successH } from "@/lib/haptics";
 
 function Stat({ value, label, color, T }: { value: string; label: string; color: string; T: Palette }) {
@@ -51,6 +53,26 @@ export default function ProfileScreen() {
   const { upcoming, past } = useAttending();
   const { stories, remove, reload } = useStories();
   const [viewer, setViewer] = useState<Story | null>(null);
+
+  // Profil fotoğrafı — kullanıcı kendi seçtiği görseli ayarlayabilir (yerelde + DB'ye senkron).
+  const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
+  useEffect(() => {
+    AsyncStorage.getItem("meydanfest:avatar").then(setAvatarOverride);
+  }, []);
+  const photoUri = avatarOverride ?? user?.photo;
+
+  const changePhoto = async () => {
+    impactH();
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, allowsEditing: true, aspect: [1, 1] });
+    if (res.canceled || !res.assets?.length) return;
+    const uri = res.assets[0].uri;
+    setAvatarOverride(uri);
+    AsyncStorage.setItem("meydanfest:avatar", uri);
+    syncProfile({ avatar: uri });
+    successH();
+  };
 
   // Story paylaş — oturum + medya izni gerekir.
   const shareStory = async () => {
@@ -88,13 +110,19 @@ export default function ProfileScreen() {
 
         {/* Profil başlığı */}
         <Animated.View entering={FadeInDown.duration(450)} style={styles.header}>
-          {user?.photo ? (
-            <Image source={{ uri: user.photo }} style={[styles.avatar, glow(T.primary, 24, 0.6)]} contentFit="cover" />
-          ) : (
-            <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.avatar, glow(T.primary, 24, 0.6)]}>
-              <Text style={styles.avatarMark}>{user ? user.name.charAt(0).toUpperCase() : "✦"}</Text>
-            </LinearGradient>
-          )}
+          <Pressable onPress={changePhoto} style={styles.avatarWrap}>
+            {photoUri ? (
+              <Image source={{ uri: photoUri }} style={[styles.avatar, glow(T.primary, 24, 0.6)]} contentFit="cover" />
+            ) : (
+              <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.avatar, glow(T.primary, 24, 0.6)]}>
+                <Text style={styles.avatarMark}>{user ? user.name.charAt(0).toUpperCase() : "✦"}</Text>
+              </LinearGradient>
+            )}
+            {/* Düzenle rozeti — fotoğrafı değiştir */}
+            <View style={[styles.avatarEdit, { backgroundColor: T.primary, borderColor: T.bg }]}>
+              <Text style={{ fontSize: 13 }}>📷</Text>
+            </View>
+          </Pressable>
           <Text style={[Type.h1, { color: T.text, marginTop: Space.md }]}>{user ? user.name : t("guest")}</Text>
           <Text style={[Type.label, { color: T.textFaint, marginTop: 4 }]}>{user?.email || t("exploring")}</Text>
         </Animated.View>
@@ -217,8 +245,10 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: Space.md },
   circleBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2 },
   header: { alignItems: "center", marginBottom: Space.xl },
+  avatarWrap: { width: 86, height: 86 },
   avatar: { width: 86, height: 86, borderRadius: Radius.pill, alignItems: "center", justifyContent: "center" },
   avatarMark: { fontSize: 34, color: "#fff", fontWeight: "800" },
+  avatarEdit: { position: "absolute", right: -2, bottom: -2, width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   storyItem: { alignItems: "center", gap: 6, width: 72 },
   storyAdd: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 3 },
   storyRing: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", padding: 2 },
