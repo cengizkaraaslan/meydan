@@ -90,6 +90,8 @@ export default function EventDetail() {
   const [listOpen, setListOpen] = useState(false);
   // story halkası olan kişiye dokununca story izleyici (yoksa profil açılır)
   const [viewStory, setViewStory] = useState<Person | null>(null);
+  // avatara dokun/basılı tut → fotoğrafı büyütme modal'ı (uri)
+  const [photoView, setPhotoView] = useState<string | null>(null);
 
   const eid = String(id);
   const rsvpKey = `meydanfest:rsvp:${eid}`;
@@ -680,20 +682,25 @@ export default function EventDetail() {
               const isMe = p.id === "__me";
               return (
                 <View key={p.id} style={[styles.attRow, { backgroundColor: T.surface, borderColor: isMe ? T.primary : T.hairline }]}>
+                  {/* Avatar: dokun → story varsa story, yoksa fotoğrafı büyüt; basılı tut → fotoğrafı büyüt */}
                   <Pressable
                     onPress={() => {
-                      if (isMe) return;
-                      // Story halkası varsa story izle; yoksa profili aç.
-                      if (p.hasStory) { tapH(); setListOpen(false); setViewStory(p); }
-                      else openPerson(p.id);
+                      tapH();
+                      if (!isMe && p.hasStory) { setListOpen(false); setViewStory(p); }
+                      else setPhotoView(p.avatar);
                     }}
-                    style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}
+                    onLongPress={() => { tapH(); setPhotoView(p.avatar); }}
+                    delayLongPress={250}
                   >
                     <StoryAvatar uri={p.avatar} name={p.name} size={50} hasStory={p.hasStory} online={p.online} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>{isMe ? `${p.name} · ${t("you") }` : `${p.name}, ${p.age}`}</Text>
-                      <Text style={[Type.label, { color: T.textFaint }]} numberOfLines={1}>{isMe ? `✓ ${t("rsvp_going")}` : `📍 ${p.city} · ${p.distanceKm} km`}</Text>
-                    </View>
+                  </Pressable>
+                  {/* İsim/şehir: profili aç */}
+                  <Pressable
+                    onPress={() => { if (!isMe) openPerson(p.id); }}
+                    style={{ flex: 1 }}
+                  >
+                    <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>{isMe ? `${p.name} · ${t("you") }` : `${p.name}, ${p.age}`}</Text>
+                    <Text style={[Type.label, { color: T.textFaint }]} numberOfLines={1}>{isMe ? `✓ ${t("rsvp_going")}` : `📍 ${p.city} · ${p.distanceKm} km`}</Text>
                   </Pressable>
                   {!isMe ? (
                     <Pressable onPress={() => messagePerson(p.id)} style={{ borderRadius: Radius.pill, overflow: "hidden" }}>
@@ -721,10 +728,14 @@ export default function EventDetail() {
                 <View style={[styles.storyProgress, { backgroundColor: T.primary }]} />
               </View>
               <Image source={{ uri: viewStory.avatar }} style={styles.storyViewerImg} contentFit="cover" transition={200} />
-              <View style={[styles.storyViewerInfo, { top: insets.top + 22 }]}>
+              <Pressable
+                onPress={() => { const id = viewStory.id; setViewStory(null); router.push(`/kisi/${id}`); }}
+                style={[styles.storyViewerInfo, { top: insets.top + 22 }]}
+                hitSlop={8}
+              >
                 <StoryAvatar uri={viewStory.avatar} name={viewStory.name} size={38} online={viewStory.online} />
                 <Text style={[Type.title, { color: "#fff" }]}>{viewStory.name}</Text>
-              </View>
+              </Pressable>
               <Pressable
                 onPress={() => { const id = viewStory.id; setViewStory(null); router.push(`/kisi/${id}`); }}
                 style={[styles.storyProfileBtn, { bottom: insets.bottom + 28 }]}
@@ -734,6 +745,13 @@ export default function EventDetail() {
             </>
           ) : null}
         </Animated.View>
+      </Modal>
+
+      {/* Avatar fotoğrafını büyütme modal'ı (dokun/basılı tut) */}
+      <Modal visible={!!photoView} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPhotoView(null)}>
+        <Pressable style={styles.photoModalBg} onPress={() => setPhotoView(null)}>
+          {photoView ? <Image source={{ uri: photoView }} style={styles.photoModalImg} contentFit="contain" transition={150} /> : null}
+        </Pressable>
       </Modal>
     </View>
   );
@@ -783,6 +801,8 @@ const styles = StyleSheet.create({
   storyProgress: { position: "absolute", left: 0, top: 0, bottom: 0, width: "100%", borderRadius: 2 },
   storyViewerInfo: { position: "absolute", left: 14, flexDirection: "row", alignItems: "center", gap: 10 },
   storyProfileBtn: { position: "absolute", alignSelf: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: StyleSheet.hairlineWidth * 2, borderColor: "rgba(255,255,255,0.3)", paddingHorizontal: 18, paddingVertical: 12, borderRadius: Radius.pill },
+  photoModalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center", padding: 16 },
+  photoModalImg: { width: "94%", height: "78%", borderRadius: Radius.lg },
   photoDel: {
     position: "absolute", top: 6, right: 6, width: 28, height: 28, borderRadius: 14,
     backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center",

@@ -8,7 +8,6 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,6 +18,8 @@ import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { tapH, impactH } from "@/lib/haptics";
 import { scheduleProximityPing } from "@/lib/notify";
+import { StoryAvatar } from "@/components/StoryAvatar";
+import { StoryViewer } from "@/components/StoryViewer";
 
 /**
  * Deterministik "canlı presence": gerçek backend yok. Dakikaya bağlı bir tohum ile
@@ -67,8 +68,13 @@ function PulseDot({ color, border, size = 16 }: { color: string; border: string;
   );
 }
 
-function PersonCard({ person, online }: { person: Person; online: boolean }) {
+function PersonCard({ person, online, onOpenStory }: { person: Person; online: boolean; onOpenStory: (p: Person) => void }) {
   const { t: T } = useTheme();
+  const openAvatar = () => {
+    tapH();
+    if (person.hasStory) onOpenStory(person);
+    else router.push(`/kisi/${person.id}`);
+  };
   return (
     <Pressable
       onPress={() => {
@@ -78,13 +84,12 @@ function PersonCard({ person, online }: { person: Person; online: boolean }) {
       style={[styles.card, { backgroundColor: T.surface, borderColor: T.hairline }]}
     >
       <View>
-        <Image
-          source={{ uri: person.avatar }}
-          style={styles.avatar}
-          contentFit="cover"
-          transition={200}
-          recyclingKey={person.id}
-          cachePolicy="memory-disk"
+        <StoryAvatar
+          uri={person.avatar}
+          name={person.name}
+          size={60}
+          hasStory={person.hasStory}
+          onPress={openAvatar}
         />
         {online && (
           <View style={styles.onlineSlot}>
@@ -117,7 +122,7 @@ function PersonCard({ person, online }: { person: Person; online: boolean }) {
   );
 }
 
-function OnlineBubble({ person, success, bg, text }: { person: Person; success: string; bg: string; text: string }) {
+function OnlineBubble({ person, success, bg, text, onOpenStory }: { person: Person; success: string; bg: string; text: string; onOpenStory: (p: Person) => void }) {
   return (
     <Pressable
       onPress={() => {
@@ -127,13 +132,16 @@ function OnlineBubble({ person, success, bg, text }: { person: Person; success: 
       style={styles.bubble}
     >
       <View>
-        <Image
-          source={{ uri: person.avatar }}
-          style={styles.bubbleAvatar}
-          contentFit="cover"
-          transition={200}
-          recyclingKey={`on-${person.id}`}
-          cachePolicy="memory-disk"
+        <StoryAvatar
+          uri={person.avatar}
+          name={person.name}
+          size={52}
+          hasStory={person.hasStory}
+          onPress={() => {
+            tapH();
+            if (person.hasStory) onOpenStory(person);
+            else router.push(`/kisi/${person.id}`);
+          }}
         />
         <View style={styles.bubbleDotSlot}>
           <PulseDot color={success} border={bg} size={14} />
@@ -160,6 +168,8 @@ export default function NearbyScreen() {
 
   const [btDismissed, setBtDismissed] = useState(false);
   const [onlyOnline, setOnlyOnline] = useState(false);
+  // Story halkalı kişiye dokununca açılan tam ekran izleyici.
+  const [viewStory, setViewStory] = useState<Person | null>(null);
   const veryClose = PEOPLE.find((p) => p.distanceKm <= 1);
 
   // Her kişi için canlı online durumu (id -> boolean).
@@ -272,7 +282,7 @@ export default function NearbyScreen() {
                   contentContainerStyle={{ gap: 14, paddingVertical: 2, paddingRight: 8 }}
                 >
                   {onlinePeople.map((p) => (
-                    <OnlineBubble key={p.id} person={p} success={T.success} bg={T.bg} text={T.text} />
+                    <OnlineBubble key={p.id} person={p} success={T.success} bg={T.bg} text={T.text} onOpenStory={setViewStory} />
                   ))}
                 </ScrollView>
               </Animated.View>
@@ -311,10 +321,12 @@ export default function NearbyScreen() {
         }
         renderItem={({ item, index }) => (
           <Animated.View entering={FadeInDown.delay(Math.min(index, 8) * 55).duration(420)}>
-            <PersonCard person={item} online={!!onlineMap[item.id]} />
+            <PersonCard person={item} online={!!onlineMap[item.id]} onOpenStory={setViewStory} />
           </Animated.View>
         )}
       />
+      {/* Story izleyici — halkalı avatara dokununca; sol üst avatardan profile gidilir. */}
+      <StoryViewer person={viewStory} onClose={() => setViewStory(null)} />
     </View>
   );
 }
