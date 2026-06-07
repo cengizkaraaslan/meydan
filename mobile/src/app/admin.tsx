@@ -12,9 +12,34 @@ import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { PEOPLE } from "@/lib/people";
 import { useAuth } from "@/lib/auth";
 import { isAdmin, ADMIN_EMAIL, KEY_EXTRA_ADMINS } from "@/lib/admin";
-import { useTheme } from "@/lib/theme";
+import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { tapH } from "@/lib/haptics";
+
+function StatLine({ T, icon, label, value }: { T: Palette; icon: string; label: string; value: string }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 }}>
+      <Text style={{ fontSize: 16 }}>{icon}</Text>
+      <Text style={[Type.label, { color: T.textDim, flex: 1 }]}>{label}</Text>
+      <Text style={[Type.title, { color: T.text }]}>{value}</Text>
+    </View>
+  );
+}
+
+/** Deterministik placeholder istatistik (id'den). Postgres bağlanınca gerçek API ile değişecek. */
+function hashNum(s: string, mod: number): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h % mod;
+}
+function statsFor(id: string): { joined: Date; stories: number; photos: number } {
+  const daysAgo = 7 + hashNum(id + "j", 400);
+  return {
+    joined: new Date(Date.now() - daysAgo * 86400000),
+    stories: hashNum(id + "s", 14),
+    photos: hashNum(id + "p", 28),
+  };
+}
 
 export default function AdminScreen() {
   const insets = useSafeAreaInsets();
@@ -22,6 +47,7 @@ export default function AdminScreen() {
   const { t: T } = useTheme();
   const { t } = useT();
   const [admins, setAdmins] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   // Cihazdaki ek admin id'lerini yükle.
   useEffect(() => {
@@ -102,14 +128,20 @@ export default function AdminScreen() {
               <Animated.View key={p.id} entering={FadeInDown.duration(420).delay(100 + i * 35)}>
                 <GlassCard padded glowColor={on ? T.primary : undefined}>
                   <View style={styles.userRow}>
-                    <Image source={{ uri: p.avatar }} style={[styles.avatar, glow(T.primary, 10, 0.4)]} contentFit="cover" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[Type.title, { color: T.text }]}>{p.name}</Text>
-                      <Text style={[Type.label, { color: T.textFaint, marginTop: 2 }]}>
-                        {p.city}
-                        {on ? ` · ${t("admin_badge")}` : ""}
-                      </Text>
-                    </View>
+                    <Pressable
+                      onPress={() => { tapH(); setExpanded((e) => (e === p.id ? null : p.id)); }}
+                      style={{ flexDirection: "row", alignItems: "center", gap: Space.md, flex: 1 }}
+                    >
+                      <Image source={{ uri: p.avatar }} style={[styles.avatar, glow(T.primary, 10, 0.4)]} contentFit="cover" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[Type.title, { color: T.text }]}>{p.name}</Text>
+                        <Text style={[Type.label, { color: T.textFaint, marginTop: 2 }]}>
+                          {p.city}
+                          {on ? ` · ${t("admin_badge")}` : ""}
+                        </Text>
+                      </View>
+                      <Text style={[Type.h2, { color: T.textFaint }]}>{expanded === p.id ? "▾" : "▸"}</Text>
+                    </Pressable>
 
                     <Pressable onPress={() => toggle(p.id)} style={{ borderRadius: Radius.pill, overflow: "hidden" }}>
                       {on ? (
@@ -128,6 +160,14 @@ export default function AdminScreen() {
                       )}
                     </Pressable>
                   </View>
+
+                  {expanded === p.id ? (
+                    <Animated.View entering={FadeInDown.duration(260)} style={[styles.expand, { borderTopColor: T.hairline }]}>
+                      <StatLine T={T} icon="🗓️" label={t("member_since")} value={statsFor(p.id).joined.toLocaleDateString()} />
+                      <StatLine T={T} icon="📸" label={t("stories_shared")} value={String(statsFor(p.id).stories)} />
+                      <StatLine T={T} icon="🖼️" label={t("photos_shared")} value={String(statsFor(p.id).photos)} />
+                    </Animated.View>
+                  ) : null}
                 </GlassCard>
               </Animated.View>
             );
@@ -159,4 +199,5 @@ const styles = StyleSheet.create({
   userRow: { flexDirection: "row", alignItems: "center", gap: Space.md },
   avatar: { width: 46, height: 46, borderRadius: 23 },
   toggle: { paddingHorizontal: 14, paddingVertical: 9, alignItems: "center", justifyContent: "center" },
+  expand: { marginTop: Space.md, paddingTop: Space.md, borderTopWidth: StyleSheet.hairlineWidth * 2 },
 });
