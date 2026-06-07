@@ -63,6 +63,9 @@ function RootNavigator() {
         animation: "fade",
       }}
     >
+      {/* Google köprüsü dönüşü (meydanfest://auth) — guard'sız, her durumda erişilir. */}
+      <Stack.Screen name="auth" />
+
       <Stack.Protected guard={showAuthFlow}>
         <Stack.Screen name="giris" />
       </Stack.Protected>
