@@ -34,7 +34,12 @@ interface Comment {
   name: string;
   text: string;
   ts: number;
+  by?: string; // yükleyen kullanıcı id'si (düzenle/sil yetkisi); eski yorumlarda yok
+  editedTs?: number; // düzenlendiyse zaman damgası
 }
+
+// Yorum düzenleme penceresi: 2 dakika.
+const EDIT_WINDOW_MS = 2 * 60 * 1000;
 
 /** Etkinliğe eklenen fotoğraf. `by` = yükleyen kullanıcı id'si (sahiplik/silme için). */
 interface Photo {
@@ -66,6 +71,10 @@ export default function EventDetail() {
   const [rsvp, setRsvp] = useState<Rsvp | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  // Oturum açan kullanıcının sahiplik kimliği (foto/yorum düzenle-sil yetkisi).
+  const ownerId = user?.id ?? user?.email?.toLowerCase() ?? "";
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -177,15 +186,50 @@ export default function EventDetail() {
     }
   };
 
+  const persistComments = (next: Comment[]) => {
+    setComments(next);
+    AsyncStorage.setItem(commentsKey, JSON.stringify(next));
+  };
+
+  const canEditComment = (cm: Comment) =>
+    !!user && cm.by === ownerId && Date.now() - cm.ts < EDIT_WINDOW_MS;
+  const canDeleteComment = (cm: Comment) =>
+    !!user && (isAdmin(user) || cm.by === ownerId);
+
+  const startEditComment = (cm: Comment) => {
+    tapH();
+    setEditingId(cm.id);
+    setEditDraft(cm.text);
+  };
+  const saveEditComment = () => {
+    const text = editDraft.trim();
+    if (!editingId || !text) { setEditingId(null); setEditDraft(""); return; }
+    persistComments(comments.map((c) => (c.id === editingId ? { ...c, text, editedTs: Date.now() } : c)));
+    setEditingId(null);
+    setEditDraft("");
+    successH();
+  };
+  const deleteComment = (cm: Comment) => {
+    if (!canDeleteComment(cm)) return;
+    tapH();
+    Alert.alert(t("delete_comment_q"), undefined, [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("delete"), style: "destructive", onPress: () => { persistComments(comments.filter((c) => c.id !== cm.id)); successH(); } },
+    ]);
+  };
+
   const sendComment = () => {
+    // Oturum açmayan yorum yazamaz → giriş modalı.
+    if (!user) { showAuthPrompt(t("login_required")); return; }
     const text = draft.trim();
     if (!text) return;
     tapH();
     const c: Comment = {
       id: `c${Date.now()}`,
-      name: user?.name ?? "Misafir",
+      name: user.name,
       text,
       ts: Date.now(),
+      by: ownerId,
     };
     setComments((prev) => {
       const next = [...prev, c];
@@ -194,9 +238,6 @@ export default function EventDetail() {
     });
     setDraft("");
   };
-
-  // Oturum açan kullanıcının sahiplik kimliği (foto silme yetkisi için).
-  const ownerId = user?.id ?? user?.email?.toLowerCase() ?? "";
 
   const addPhoto = async () => {
     // Oturum açmayan foto paylaşamaz → giriş modalı.
@@ -364,7 +405,12 @@ export default function EventDetail() {
             <View style={{ flexDirection: "row", gap: 10 }}>
               <Pressable onPress={share} style={[styles.circleBtn, { borderColor: T.hairline }]}><Text style={styles.circleTxt}>↗</Text></Pressable>
               <Pressable
-                onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await toggleFavorite(event); }}
+                onPress={async () => {
+                  // Oturum açmayan favori ekleyemez → giriş modalı.
+                  if (!user) { showAuthPrompt(t("login_required_fav")); return; }
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  await toggleFavorite(event);
+                }}
                 style={[styles.circleBtn, { borderColor: T.hairline }]}
               >
                 <Text style={{ fontSize: 17 }}>{fav ? "❤️" : "🤍"}</Text>
@@ -385,7 +431,15 @@ export default function EventDetail() {
             <View style={[styles.sep, { backgroundColor: T.hairline }]} />
             <InfoRow T={T} icon="📍" label={t("venue")} value={event.venue || event.city || t("not_specified")} onPress={openMap} actionLabel={t("see_on_map")} />
             <View style={[styles.sep, { backgroundColor: T.hairline }]} />
-            <InfoRow T={T} icon="🎟️" label={t("ticket")} value={fmtPrice(event)} valueColor={event.is_free ? T.success : T.gold} />
+            <InfoRow
+              T={T}
+              icon="🎟️"
+              label={t("ticket")}
+              value={fmtPrice(event)}
+              valueColor={event.is_free ? T.success : T.gold}
+              onPress={event.ticket_url ? openTicket : undefined}
+              actionLabel={event.ticket_url ? (event.is_free ? t("go_detail") : t("buy_ticket")) : undefined}
+            />
             {event.artist ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="🎤" label={t("artist")} value={event.artist} /></>) : null}
           </Animated.View>
 
@@ -409,17 +463,6 @@ export default function EventDetail() {
               </View>
             </Animated.View>
           ) : null}
-
-          <View style={{ height: 4 }} />
-          {event.ticket_url ? (
-            <Animated.View entering={FadeInDown.duration(450).delay(120)}>
-              <GradientButton label={event.is_free ? t("go_detail") : t("buy_ticket")} icon="✦" gradient={c.gradient} onPress={openTicket} />
-            </Animated.View>
-          ) : (
-            <Animated.View entering={FadeInDown.duration(450).delay(120)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline, alignItems: "center" }]}>
-              <Text style={[Type.body, { color: T.textFaint }]}>{t("no_ticket")}</Text>
-            </Animated.View>
-          )}
 
           {/* #14 — RSVP (katılım durumu) segment */}
           <Animated.View entering={FadeInDown.duration(450).delay(160)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
@@ -501,12 +544,52 @@ export default function EventDetail() {
               <Text style={[Type.body, { color: T.textFaint, marginBottom: 14 }]}>{t("no_comments")}</Text>
             ) : (
               <View style={{ gap: 10, marginBottom: 14 }}>
-                {comments.map((cm) => (
-                  <View key={cm.id} style={[styles.bubble, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-                    <Text style={[Type.label, { color: T.primary, marginBottom: 3 }]}>{cm.name}</Text>
-                    <Text style={[Type.body, { color: T.text, lineHeight: 20 }]}>{cm.text}</Text>
-                  </View>
-                ))}
+                {comments.map((cm) => {
+                  const editing = editingId === cm.id;
+                  const initial = (cm.name?.charAt(0) || "?").toUpperCase();
+                  return (
+                    <View key={cm.id} style={[styles.bubble, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                        <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cmAvatar}>
+                          <Text style={{ color: "#fff", fontSize: 12, fontWeight: "800" }}>{initial}</Text>
+                        </LinearGradient>
+                        <Text style={[Type.label, { color: T.text, flex: 1 }]} numberOfLines={1}>{cm.name}</Text>
+                        {cm.editedTs ? <Text style={[Type.micro, { color: T.textFaint }]}>{t("edited")}</Text> : null}
+                      </View>
+                      {editing ? (
+                        <View style={{ gap: 8 }}>
+                          <TextInput
+                            value={editDraft}
+                            onChangeText={setEditDraft}
+                            placeholderTextColor={T.textFaint}
+                            multiline
+                            style={[styles.input, { color: T.text, backgroundColor: T.bgElevated, borderColor: T.hairline, minHeight: 42, textAlignVertical: "top" }]}
+                          />
+                          <View style={{ flexDirection: "row", gap: 8, justifyContent: "flex-end" }}>
+                            <Pill label={t("cancel")} onPress={() => { setEditingId(null); setEditDraft(""); }} />
+                            <Pill label={t("save")} gradient={c.gradient} onPress={saveEditComment} />
+                          </View>
+                        </View>
+                      ) : (
+                        <Text style={[Type.body, { color: T.text, lineHeight: 20 }]}>{cm.text}</Text>
+                      )}
+                      {!editing && (canEditComment(cm) || canDeleteComment(cm)) ? (
+                        <View style={{ flexDirection: "row", gap: 16, marginTop: 8 }}>
+                          {canEditComment(cm) ? (
+                            <Pressable onPress={() => startEditComment(cm)} hitSlop={6}>
+                              <Text style={[Type.micro, { color: T.primary }]}>✏️ {t("edit")}</Text>
+                            </Pressable>
+                          ) : null}
+                          {canDeleteComment(cm) ? (
+                            <Pressable onPress={() => deleteComment(cm)} hitSlop={6}>
+                              <Text style={[Type.micro, { color: T.pink }]}>🗑️ {t("delete")}</Text>
+                            </Pressable>
+                          ) : null}
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })}
               </View>
             )}
             <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
@@ -633,6 +716,7 @@ const styles = StyleSheet.create({
   onlineDot: { position: "absolute", right: 0, bottom: 0, width: 13, height: 13, borderRadius: 7, borderWidth: 2 },
   attMsgBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 9 },
   bubble: { borderRadius: Radius.md, padding: 12, borderWidth: StyleSheet.hairlineWidth * 2 },
+  cmAvatar: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   input: { flex: 1, borderRadius: Radius.pill, paddingHorizontal: 16, paddingVertical: 10, borderWidth: StyleSheet.hairlineWidth * 2, fontSize: 14 },
   sendBtn: { paddingHorizontal: 16, paddingVertical: 11, alignItems: "center", justifyContent: "center" },
   addPhoto: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },

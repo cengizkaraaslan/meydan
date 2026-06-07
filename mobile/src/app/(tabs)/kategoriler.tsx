@@ -31,8 +31,9 @@ export default function KategorilerScreen() {
   const { t: T } = useTheme();
   const { t } = useT();
   const { city: activeCity } = useActiveCity();
-  // Çoklu seçim: artık tek string yerine seçili kategori anahtarları dizisi.
-  const [selected, setSelected] = useState<string[]>([]);
+  // Çoklu seçim: varsayılan olarak TÜM kategoriler seçili gelir (boş değil) →
+  // sayfa açılır açılmaz (kendi şehrinde) etkinlikler listelenir.
+  const [selected, setSelected] = useState<string[]>(() => CATEGORIES.map((c) => c.key));
   const [cityFilter, setCityFilter] = useState<string | null>(null);
   const [cityInit, setCityInit] = useState(false);
   const [cityOpen, setCityOpen] = useState(false);

@@ -68,7 +68,13 @@ export async function detectCity(): Promise<string | null> {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") return null;
-    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
+    // Önce son bilinen konum (anında döner); yoksa taze konum al. Low accuracy bazı
+    // cihazlarda ilk açılışta takılıp null dönüyordu → Balanced + lastKnown fallback.
+    let pos = await Location.getLastKnownPositionAsync();
+    if (!pos) {
+      pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    }
+    if (!pos) return null;
     const geo = await Location.reverseGeocodeAsync({
       latitude: pos.coords.latitude,
       longitude: pos.coords.longitude,
