@@ -223,6 +223,25 @@ const TR: Dict = {
   email_addr: "E-posta adresin",
   email_go: "Devam et",
   or: "veya",
+  // #25 bildirim tercihleri
+  notif_prefs: "Bildirim tercihleri",
+  notif_all: "Tüm etkinlikler",
+  notif_custom: "Özel seç",
+  notif_off: "Kapalı",
+  notif_help: "Yeni etkinlik eklendiğinde haber ver. İstersen şehir ve kategori seç — örn. Ankara'daki spor ve konser etkinlikleri 🎯",
+  notif_pick_cities: "Şehirler (boş = hepsi)",
+  notif_pick_cats: "Kategoriler (boş = hepsi)",
+  notif_saved: "Tercihler kaydedildi ✓",
+  // RSVP + story + ilçe + online
+  rsvp_going: "Katılacağım",
+  rsvp_maybe: "Belki",
+  rsvp_interested: "İlgileniyorum",
+  share_story: "Story paylaş",
+  story_shared: "Story paylaşıldı ✓",
+  all_districts: "Tüm ilçeler",
+  district: "İlçe",
+  online_now: "Çevrimiçi",
+  online_count: "{count} kişi çevrimiçi",
 };
 
 const EN: Dict = {
@@ -413,6 +432,23 @@ const EN: Dict = {
   email_addr: "Your email",
   email_go: "Continue",
   or: "or",
+  notif_prefs: "Notification preferences",
+  notif_all: "All events",
+  notif_custom: "Custom",
+  notif_off: "Off",
+  notif_help: "Get notified when a new event is added. Optionally pick cities & categories — e.g. sports and concerts in Ankara 🎯",
+  notif_pick_cities: "Cities (empty = all)",
+  notif_pick_cats: "Categories (empty = all)",
+  notif_saved: "Preferences saved ✓",
+  rsvp_going: "Going",
+  rsvp_maybe: "Maybe",
+  rsvp_interested: "Interested",
+  share_story: "Share story",
+  story_shared: "Story shared ✓",
+  all_districts: "All districts",
+  district: "District",
+  online_now: "Online",
+  online_count: "{count} online",
 };
 
 const DICTS: Record<Lang, Dict> = { tr: TR, en: EN };

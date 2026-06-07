@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -8,7 +8,7 @@ import { EventRow } from "@/components/EventCard";
 import { SectionHeader, Loader, EmptyState, Pill } from "@/ui/atoms";
 import { Radius, Type, Space, glow } from "@/theme/aurora";
 import { CATEGORIES, catMeta, CITIES } from "@/lib/categories";
-import { fetchEvents, type ApiEvent } from "@/lib/api";
+import { API_BASE, fetchEvents, type ApiEvent } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useActiveCity } from "@/lib/location";
@@ -38,7 +38,9 @@ export default function KategorilerScreen() {
   const [cityOpen, setCityOpen] = useState(false);
   const [advOpen, setAdvOpen] = useState(false);
   const [priceFilter, setPriceFilter] = useState<"all" | "free" | "paid" | "student">("all");
-  const [district, setDistrict] = useState("");
+  // İlçe filtresi (#C2): seçili şehrin gerçek ilçeleri API'den çekilir; null = tüm ilçeler.
+  const [district, setDistrict] = useState<string | null>(null);
+  const [districts, setDistricts] = useState<string[]>([]);
   const [events, setEvents] = useState<ApiEvent[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -51,6 +53,28 @@ export default function KategorilerScreen() {
       setCityInit(true);
     }
   }, [activeCity, cityInit]);
+
+  // Seçili şehrin gerçek ilçelerini çek (#C2). "Tüm şehirler" (null) → ilçe filtresi yok.
+  useEffect(() => {
+    setDistrict(null);
+    if (!cityFilter) {
+      setDistricts([]);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/districts?city=${encodeURIComponent(cityFilter)}`);
+        const json = (await res.json()) as { districts?: string[] };
+        if (alive) setDistricts(Array.isArray(json.districts) ? json.districts : []);
+      } catch {
+        if (alive) setDistricts([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [cityFilter]);
 
   // Etkinlikleri çek. Şehir + fiyat (free) filtresi sunucu tarafında uygulanır.
   // Kategori dizisi `selected` değiştiğinde (string'e çevrilerek) yeniden tetiklenir.
@@ -92,10 +116,11 @@ export default function KategorilerScreen() {
     };
   }, [selectedKey, cityFilter, priceFilter]);
 
-  // İlçe/semt metin filtresi (#21): veride district alanı yok → venue/title içinde ara.
+  // İlçe filtresi (#C2): seçili ilçe (null = tümü). Veride district alanı yok →
+  // venue/title içinde ilçe adı geçenleri göster.
   const visibleEvents = useMemo(() => {
-    const q = lower(district.trim());
-    if (!q) return events;
+    if (!district) return events;
+    const q = lower(district);
     return events.filter((e) => lower(e.venue || "").includes(q) || lower(e.title || "").includes(q));
   }, [events, district]);
 
@@ -199,17 +224,36 @@ export default function KategorilerScreen() {
                   />
                 ))}
               </View>
-              {/* İlçe/semt metin filtresi (#21): mekan/etkinlik adı içinde arar. */}
-              <TextInput
-                value={district}
-                onChangeText={setDistrict}
-                placeholder={`${t("f_district")} / semt ara`}
-                placeholderTextColor={T.textFaint}
-                style={[
-                  styles.districtInput,
-                  { backgroundColor: T.surfaceStrong, borderColor: T.hairline, color: T.text },
-                ]}
-              />
+              {/* İlçe filtresi (#C2): seçili şehrin gerçek ilçeleri. "Tüm şehirler"de veya
+                  ilçe verisi yoksa gizli. */}
+              {cityFilter && districts.length > 0 ? (
+                <>
+                  <Text style={[Type.label, { color: T.textDim, marginTop: Space.md, marginBottom: Space.sm }]}>
+                    {t("district")}
+                  </Text>
+                  <View style={styles.cityChips}>
+                    <Pill
+                      label={t("all_districts")}
+                      active={district === null}
+                      onPress={() => {
+                        tapH();
+                        setDistrict(null);
+                      }}
+                    />
+                    {districts.map((d) => (
+                      <Pill
+                        key={d}
+                        label={d}
+                        active={district === d}
+                        onPress={() => {
+                          tapH();
+                          setDistrict(district === d ? null : d);
+                        }}
+                      />
+                    ))}
+                  </View>
+                </>
+              ) : null}
             </Animated.View>
           ) : null}
         </Animated.View>
@@ -308,14 +352,6 @@ const styles = StyleSheet.create({
     marginTop: Space.md,
   },
   advBody: { marginTop: 0 },
-  districtInput: {
-    marginTop: Space.md,
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
-    ...Type.body,
-  },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",

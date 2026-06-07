@@ -384,6 +384,17 @@ model EventCommentMobile {
   @@index([eventSlug])
 }
 
+/// Mobil bildirim tercihi (#25). deviceId bazlı, cihaz başına tekil.
+/// mode: "all" | "none" | "filtered". cities/categories virgülle ayrık (filtered modunda eşleşme için).
+model NotifPref {
+  id         String   @id @default(cuid())
+  deviceId   String   @unique
+  mode       String   @default("all")
+  cities     String?
+  categories String?
+  updatedAt  DateTime @updatedAt
+}
+
 model Event {
   id            String        @id @default(cuid())
   // Scraper'lar onlarca dinamik kaynak üretir (UNI_HACETTEPE, BUGECE, MUNI_BURSA...)

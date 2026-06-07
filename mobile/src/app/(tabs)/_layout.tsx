@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
 
 interface TabRoute { key: string; name: string }
 interface TabBarProps {
@@ -31,14 +32,17 @@ function AuroraTabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const { t: T } = useTheme();
   const { t } = useT();
+  const { user } = useAuth();
+  // Oturum yoksa (misafir/girişsiz) favori sekmesini bar'dan gizle; ekran kayıtlı kalır.
+  const routes = state.routes.filter((r) => !(r.name === "favoriler" && !user));
   return (
     <View style={[styles.wrap, { paddingBottom: insets.bottom ? insets.bottom : 14 }]} pointerEvents="box-none">
       <View style={[styles.bar, glow(T.primary, 22, 0.4)]}>
         <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
         <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(15,13,24,0.55)", borderRadius: Radius.xl, borderWidth: StyleSheet.hairlineWidth * 2, borderColor: T.hairline }]} />
-        {state.routes.map((route, i) => {
+        {routes.map((route) => {
           const meta = TABS[route.name] ?? { labelKey: route.name, icon: "•" as IoniconName };
-          const focused = state.index === i;
+          const focused = state.routes[state.index]?.key === route.key;
           return (
             <Pressable
               key={route.key}
@@ -82,8 +86,8 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   wrap: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, alignItems: "center" },
-  bar: { flexDirection: "row", borderRadius: Radius.xl, overflow: "hidden", paddingVertical: 10, paddingHorizontal: 8, width: "100%" },
-  item: { flex: 1, alignItems: "center", gap: 4 },
+  bar: { flexDirection: "row", borderRadius: Radius.xl, overflow: "hidden", paddingVertical: 14, paddingHorizontal: 8, width: "100%" },
+  item: { flex: 1, alignItems: "center", gap: 6, paddingVertical: 2 },
   activeIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   idleIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
 });

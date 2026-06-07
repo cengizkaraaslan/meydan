@@ -4,6 +4,53 @@ import * as Notifications from "expo-notifications";
 import { useEffect } from "react";
 import { PEOPLE } from "./people";
 import { fmtDistance } from "./format";
+import { API_BASE } from "./api";
+import { getDeviceId } from "./profileSync";
+
+/** Kullanıcının bildirim tercihleri. mode "custom" iken cities/categories boşsa = hepsi. */
+export interface NotifPrefs {
+  mode: "all" | "custom" | "off";
+  cities: string[];
+  categories: string[];
+}
+
+const NOTIF_PREFS_KEY = "meydanfest:notifprefs";
+const DEFAULT_PREFS: NotifPrefs = { mode: "all", cities: [], categories: [] };
+
+/** Kayıtlı bildirim tercihlerini oku (yoksa varsayılan: tümü açık). */
+export async function getNotifPrefs(): Promise<NotifPrefs> {
+  try {
+    const raw = await AsyncStorage.getItem(NOTIF_PREFS_KEY);
+    if (!raw) return { ...DEFAULT_PREFS };
+    const parsed = JSON.parse(raw) as Partial<NotifPrefs>;
+    return {
+      mode: parsed.mode === "custom" || parsed.mode === "off" ? parsed.mode : "all",
+      cities: Array.isArray(parsed.cities) ? parsed.cities : [],
+      categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+    };
+  } catch {
+    return { ...DEFAULT_PREFS };
+  }
+}
+
+/** Tercihleri yerelde sakla + best-effort backend'e ilet (deviceId ile). */
+export async function setNotifPrefs(p: NotifPrefs): Promise<void> {
+  try {
+    await AsyncStorage.setItem(NOTIF_PREFS_KEY, JSON.stringify(p));
+  } catch {
+    // yerel kayıt başarısız olursa sessizce yut
+  }
+  try {
+    const deviceId = await getDeviceId();
+    await fetch(`${API_BASE}/api/v1/notify-prefs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId, ...p }),
+    });
+  } catch {
+    // backend erişilemezse sessizce yut — yerel kayıt yeterli
+  }
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({

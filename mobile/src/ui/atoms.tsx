@@ -116,11 +116,11 @@ export function Badge({ text, color, style }: { text: string; color?: string; st
   return (
     <View
       style={[
-        { backgroundColor: "rgba(0,0,0,0.45)", borderRadius: Radius.pill, paddingHorizontal: 10, paddingVertical: 5, borderWidth: StyleSheet.hairlineWidth * 2, borderColor: c },
+        { backgroundColor: "rgba(0,0,0,0.6)", borderRadius: Radius.pill, paddingHorizontal: 10, paddingVertical: 5, borderWidth: StyleSheet.hairlineWidth * 2, borderColor: c },
         style,
       ]}
     >
-      <Text style={[Type.micro, { color: c }]}>{text.toUpperCase()}</Text>
+      <Text style={[Type.micro, { color: "#fff" }]}>{text.toUpperCase()}</Text>
     </View>
   );
 }

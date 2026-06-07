@@ -12,9 +12,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { catMeta } from "@/lib/categories";
 import { fmtLong, fmtPrice } from "@/lib/format";
-import { fetchEventById, imageFor, type ApiEvent } from "@/lib/api";
+import { API_BASE, fetchEventById, imageFor, type ApiEvent } from "@/lib/api";
+import { getDeviceId } from "@/lib/profileSync";
 import { toggleFavorite, useFavorites } from "@/lib/favorites";
-import { Badge, GradientButton, Loader } from "@/ui/atoms";
+import { Badge, GradientButton, Loader, Pill } from "@/ui/atoms";
 import { GlassCard } from "@/components/GlassCard";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
@@ -32,8 +33,17 @@ interface Comment {
   ts: number;
 }
 
+type Rsvp = "going" | "maybe" | "interested";
+
+interface Story {
+  uri: string;
+  caption: string;
+  eventSlug: string;
+  ts: number;
+}
+
 export default function EventDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, data } = useLocalSearchParams<{ id: string; data?: string }>();
   const insets = useSafeAreaInsets();
   const { ids } = useFavorites();
   const { t: T } = useTheme();
@@ -43,7 +53,7 @@ export default function EventDetail() {
   const [loading, setLoading] = useState(true);
 
   // #14 — katılım / yorum / fotoğraf durumu
-  const [going, setGoing] = useState(false);
+  const [rsvp, setRsvp] = useState<Rsvp | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
@@ -52,17 +62,31 @@ export default function EventDetail() {
   // #18 — hava durumu
   const [weather, setWeather] = useState<DayWeather | null>(null);
 
+  // story paylaşma akışı
+  const [storyUri, setStoryUri] = useState<string | null>(null);
+  const [storyCaption, setStoryCaption] = useState("");
+
   const eid = String(id);
-  const goingKey = `meydanfest:going:${eid}`;
+  const rsvpKey = `meydanfest:rsvp:${eid}`;
   const commentsKey = `meydanfest:comments:${eid}`;
   const photosKey = `meydanfest:photos:${eid}`;
 
   useEffect(() => {
+    // Önce parametreyle gelen etkinlik verisini kullan (anında, "bulunamadı" sorununu çözer).
+    if (data) {
+      try {
+        setEvent(JSON.parse(data) as ApiEvent);
+        setLoading(false);
+        return;
+      } catch {
+        /* parse başarısızsa fetch'e düş */
+      }
+    }
     fetchEventById(eid).then((e) => {
       setEvent(e);
       setLoading(false);
     });
-  }, [eid]);
+  }, [eid, data]);
 
   // #18 — event yüklenince hava durumunu çek (varsa kart göster)
   useEffect(() => {
@@ -79,13 +103,21 @@ export default function EventDetail() {
     let alive = true;
     (async () => {
       try {
-        const [g, c, p] = await Promise.all([
-          AsyncStorage.getItem(goingKey),
+        // eski "going" anahtarıyla uyumluluk: varsa rsvp'ye taşı
+        const legacyGoingKey = `meydanfest:going:${eid}`;
+        const [r, legacy, c, p] = await Promise.all([
+          AsyncStorage.getItem(rsvpKey),
+          AsyncStorage.getItem(legacyGoingKey),
           AsyncStorage.getItem(commentsKey),
           AsyncStorage.getItem(photosKey),
         ]);
         if (!alive) return;
-        setGoing(g === "1");
+        if (r === "going" || r === "maybe" || r === "interested") {
+          setRsvp(r);
+        } else if (legacy === "1") {
+          setRsvp("going");
+          AsyncStorage.setItem(rsvpKey, "going");
+        }
         if (c) setComments(JSON.parse(c));
         if (p) setPhotos(JSON.parse(p));
       } catch {
@@ -93,15 +125,31 @@ export default function EventDetail() {
       }
     })();
     return () => { alive = false; };
-  }, [goingKey, commentsKey, photosKey]);
+  }, [eid, rsvpKey, commentsKey, photosKey]);
 
-  const toggleGoing = () => {
+  const chooseRsvp = (choice: Rsvp) => {
     impactH();
-    setGoing((prev) => {
-      const next = !prev;
-      AsyncStorage.setItem(goingKey, next ? "1" : "0");
+    setRsvp((prev) => {
+      const next = prev === choice ? null : choice;
+      if (next) AsyncStorage.setItem(rsvpKey, next);
+      else AsyncStorage.removeItem(rsvpKey);
       return next;
     });
+    // best-effort API (join sinyali)
+    if (event) {
+      (async () => {
+        try {
+          const deviceId = await getDeviceId();
+          await fetch(`${API_BASE}/api/v1/event-social`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-api-key": "meydanfest-app" },
+            body: JSON.stringify({ action: "join", deviceId, eventSlug: event.slug }),
+          });
+        } catch {
+          /* yok say */
+        }
+      })();
+    }
   };
 
   const sendComment = () => {
@@ -136,6 +184,51 @@ export default function EventDetail() {
       return next;
     });
     successH();
+  };
+
+  // story: foto seç → önizleme + caption ekranı aç
+  const pickStory = async () => {
+    impactH();
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.7,
+    });
+    if (res.canceled || !res.assets?.length) return;
+    setStoryUri(res.assets[0].uri);
+    setStoryCaption("");
+  };
+
+  // story: paylaş → local liste + best-effort API
+  const shareStory = async () => {
+    if (!storyUri || !event) return;
+    const story: Story = {
+      uri: storyUri,
+      caption: storyCaption.trim(),
+      eventSlug: event.slug,
+      ts: Date.now(),
+    };
+    try {
+      const raw = await AsyncStorage.getItem("meydanfest:stories");
+      const list: Story[] = raw ? JSON.parse(raw) : [];
+      list.unshift(story);
+      await AsyncStorage.setItem("meydanfest:stories", JSON.stringify(list));
+    } catch {
+      /* yok say */
+    }
+    // best-effort API (varsa /api/stories; yoksa sadece local kalır)
+    try {
+      const deviceId = await getDeviceId();
+      await fetch(`${API_BASE}/api/stories`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": "meydanfest-app" },
+        body: JSON.stringify({ deviceId, eventSlug: event.slug, caption: story.caption }),
+      });
+    } catch {
+      /* yok say */
+    }
+    successH();
+    setStoryUri(null);
+    setStoryCaption("");
   };
 
   if (loading) return <View style={{ flex: 1, backgroundColor: T.bg }}><Loader /></View>;
@@ -254,20 +347,44 @@ export default function EventDetail() {
             </Animated.View>
           )}
 
-          {/* #14 — KATIL butonu */}
-          <Animated.View entering={FadeInDown.duration(450).delay(160)}>
-            <Pressable onPress={toggleGoing} style={{ borderRadius: Radius.pill, overflow: "hidden" }}>
-              {going ? (
-                <View style={[styles.joinBtn, { backgroundColor: T.surfaceStrong, borderWidth: StyleSheet.hairlineWidth * 2, borderColor: T.success }]}>
-                  <Text style={[Type.title, { color: T.success }]}>{t("joined_event")}</Text>
+          {/* #14 — RSVP (katılım durumu) segment */}
+          <Animated.View entering={FadeInDown.duration(450).delay(160)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+            <Text style={[Type.label, { color: T.textFaint, marginBottom: 12 }]}>🙋 {t("join_event")}</Text>
+            <View style={styles.rsvpRow}>
+              <Pill label={t("rsvp_going")} active={rsvp === "going"} gradient={c.gradient} onPress={() => chooseRsvp("going")} />
+              <Pill label={t("rsvp_maybe")} active={rsvp === "maybe"} gradient={c.gradient} onPress={() => chooseRsvp("maybe")} />
+              <Pill label={t("rsvp_interested")} active={rsvp === "interested"} gradient={c.gradient} onPress={() => chooseRsvp("interested")} />
+            </View>
+          </Animated.View>
+
+          {/* Story paylaş (#C web stories gibi) */}
+          <Animated.View entering={FadeInDown.duration(450).delay(180)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+            {storyUri ? (
+              <View style={{ gap: 12 }}>
+                <Image source={{ uri: storyUri }} style={styles.storyPreview} contentFit="cover" transition={200} />
+                <TextInput
+                  value={storyCaption}
+                  onChangeText={setStoryCaption}
+                  placeholder={t("write_comment")}
+                  placeholderTextColor={T.textFaint}
+                  style={[styles.input, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+                  returnKeyType="done"
+                />
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <Pressable
+                    onPress={() => { tapH(); setStoryUri(null); setStoryCaption(""); }}
+                    style={[styles.addPhoto, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}
+                  >
+                    <Text style={[Type.label, { color: T.textDim }]}>{t("back")}</Text>
+                  </Pressable>
+                  <View style={{ flex: 1 }}>
+                    <GradientButton label={t("send")} icon="✦" gradient={c.gradient} onPress={shareStory} />
+                  </View>
                 </View>
-              ) : (
-                <LinearGradient colors={c.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.joinBtn}>
-                  <Text style={{ fontSize: 15 }}>🙋</Text>
-                  <Text style={[Type.title, { color: "#fff" }]}>{t("join_event")}</Text>
-                </LinearGradient>
-              )}
-            </Pressable>
+              </View>
+            ) : (
+              <GradientButton label={`📸 ${t("share_story")}`} gradient={c.gradient} onPress={pickStory} />
+            )}
           </Animated.View>
 
           {/* #14 — Katılacaklar */}
@@ -389,7 +506,8 @@ const styles = StyleSheet.create({
   infoCard: { borderRadius: Radius.lg, padding: 16, borderWidth: StyleSheet.hairlineWidth * 2, ...glow("#000", 10, 0.2) },
   infoRow: { flexDirection: "row", gap: 14, alignItems: "center", paddingVertical: 6 },
   sep: { height: StyleSheet.hairlineWidth * 2, marginVertical: 6 },
-  joinBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: 22, paddingVertical: 14 },
+  rsvpRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  storyPreview: { width: "100%", height: 200, borderRadius: Radius.md },
   avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2 },
   avatarMore: { alignItems: "center", justifyContent: "center" },
   bubble: { borderRadius: Radius.md, padding: 12, borderWidth: StyleSheet.hairlineWidth * 2 },

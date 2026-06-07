@@ -13,6 +13,7 @@ import { I18nProvider } from "@/lib/i18n";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { IntroAnimation } from "@/components/IntroAnimation";
 import { Walkthrough } from "@/components/Walkthrough";
+import { GlobalSignInPrompt } from "@/components/SignInPrompt";
 import { initNotifications, scheduleNearbyTeaser, useNearbyNotificationNav } from "@/lib/notify";
 
 const navTheme = {
@@ -100,6 +101,7 @@ export default function RootLayout() {
             <PaletteProvider>
               <AuthProvider>
                 <RootNavigator />
+                <GlobalSignInPrompt />
               </AuthProvider>
             </PaletteProvider>
           </I18nProvider>

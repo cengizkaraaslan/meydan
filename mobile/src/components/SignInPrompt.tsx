@@ -10,6 +10,7 @@ import { useAuth } from "../lib/auth";
 import { impactH, tapH } from "../lib/haptics";
 import { EmailSignInSheet } from "./EmailSignInSheet";
 import { useState } from "react";
+import { useAuthPromptState, hideAuthPrompt } from "../lib/authPrompt";
 
 /**
  * Cezbedici premium giriş modalı (Alert yerine). Google girişine teşvik eder.
@@ -69,6 +70,12 @@ export function SignInPrompt({
       </Animated.View>
     </Modal>
   );
+}
+
+/** Kökte TEK kez mount edilir; showAuthPrompt() ile tetiklenir (per-kart Modal yok). */
+export function GlobalSignInPrompt() {
+  const s = useAuthPromptState();
+  return <SignInPrompt visible={s.visible} title={s.title} onClose={hideAuthPrompt} />;
 }
 
 const styles = StyleSheet.create({

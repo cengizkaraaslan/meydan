@@ -41,9 +41,12 @@
           "backgroundColor": "#08070D",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 120,
-          "dark": { "backgroundColor": "#08070D" }
+          "dark": {
+            "backgroundColor": "#08070D"
+          }
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

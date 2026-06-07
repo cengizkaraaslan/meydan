@@ -95,7 +95,7 @@ export default function DiscoverScreen() {
     <View style={{ flex: 1 }}>
       <AuroraBackground />
       <ScrollView
-        contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: 130 }}
+        contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(cat, city); }} tintColor={T.primary} />
@@ -204,7 +204,7 @@ export default function DiscoverScreen() {
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setCityModal(false)}>
           <Pressable
-            style={[styles.modalSheet, { backgroundColor: T.surfaceStrong, borderColor: T.hairline, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}
+            style={[styles.modalSheet, { backgroundColor: T.bgElevated, borderColor: T.hairline, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}
             onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.modalHeader}>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -75,11 +75,46 @@ export default function CreateEventScreen() {
   const [cityQuery, setCityQuery] = useState("");
   const [locating, setLocating] = useState(false);
 
+  // İlçe seçimi (#B4): seçili şehrin gerçek ilçeleri API'den çekilir.
+  const [district, setDistrict] = useState<string | null>(null);
+  const [districts, setDistricts] = useState<string[]>([]);
+  const [districtModal, setDistrictModal] = useState(false);
+  const [districtQuery, setDistrictQuery] = useState("");
+
   const filteredCities = useMemo(() => {
     const q = cityQuery.trim().toLocaleLowerCase("tr-TR");
     if (!q) return ALL_CITIES;
     return ALL_CITIES.filter((c) => c.toLocaleLowerCase("tr-TR").includes(q));
   }, [cityQuery]);
+
+  // Şehir değişince o şehrin ilçelerini çek. Boş dönerse ilçe alanı gizlenir/pasif olur.
+  useEffect(() => {
+    if (!city) {
+      setDistricts([]);
+      setDistrict(null);
+      return;
+    }
+    let alive = true;
+    setDistrict(null);
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/districts?city=${encodeURIComponent(city)}`);
+        const json = (await res.json()) as { districts?: string[] };
+        if (alive) setDistricts(Array.isArray(json.districts) ? json.districts : []);
+      } catch {
+        if (alive) setDistricts([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [city]);
+
+  const filteredDistricts = useMemo(() => {
+    const q = districtQuery.trim().toLocaleLowerCase("tr-TR");
+    if (!q) return districts;
+    return districts.filter((d) => d.toLocaleLowerCase("tr-TR").includes(q));
+  }, [districts, districtQuery]);
 
   const canPublish = title.trim().length > 0 && !!category;
 
@@ -103,6 +138,13 @@ export default function CreateEventScreen() {
     setCity(c);
     setCityModal(false);
     setCityQuery("");
+  }
+
+  function selectDistrict(d: string | null) {
+    tapH();
+    setDistrict(d);
+    setDistrictModal(false);
+    setDistrictQuery("");
   }
 
   async function pickImage() {
@@ -131,6 +173,7 @@ export default function CreateEventScreen() {
           category,
           venue: venue.trim(),
           city: city ?? "",
+          district: district ?? "",
           startsAt: new Date().toISOString(),
           description: desc.trim(),
           website: website.trim(),
@@ -310,6 +353,22 @@ export default function CreateEventScreen() {
             </View>
           </Animated.View>
 
+          {/* İlçe (#B4) — yalnızca şehir seçili ve ilçe verisi varsa görünür */}
+          {city && districts.length > 0 ? (
+            <Animated.View entering={FadeInDown.duration(450).delay(180)}>
+              <Text style={[Type.label, { color: T.textDim, marginBottom: 10 }]}>{t("district")}</Text>
+              <Pressable
+                onPress={() => { tapH(); setDistrictModal(true); }}
+                style={[styles.citySelect, { backgroundColor: T.surfaceStrong, borderColor: district ? T.primary : T.hairline }]}
+              >
+                <Text style={[Type.body, { color: district ? T.text : T.textFaint, flex: 1 }]} numberOfLines={1}>
+                  {district ?? t("all_districts")}
+                </Text>
+                <Text style={{ fontSize: 12, color: T.textDim }}>▾</Text>
+              </Pressable>
+            </Animated.View>
+          ) : null}
+
           {/* Kategori */}
           <Animated.View entering={FadeInDown.duration(450).delay(200)}>
             <Text style={[Type.label, { color: T.textDim, marginBottom: 10 }]}>{t("ev_category")}</Text>
@@ -409,6 +468,71 @@ export default function CreateEventScreen() {
                 );
               })}
               {filteredCities.length === 0 ? (
+                <Text style={[Type.label, { color: T.textFaint, textAlign: "center", paddingVertical: 24 }]}>
+                  {t("search_empty")}
+                </Text>
+              ) : null}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* İlçe seçimi modalı — arama kutulu combobox */}
+      <Modal
+        visible={districtModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => { setDistrictModal(false); setDistrictQuery(""); }}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => { setDistrictModal(false); setDistrictQuery(""); }}
+        >
+          <Pressable
+            style={[
+              styles.modalSheet,
+              { backgroundColor: T.bg, borderColor: T.hairline, paddingBottom: insets.bottom + 16, maxHeight: "78%" },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.modalHandle} />
+            <Text style={[Type.h2, { color: T.text, marginBottom: 12 }]}>{t("district")}</Text>
+
+            <View style={[styles.inputWrap, { backgroundColor: T.surfaceStrong, borderColor: T.hairline, alignItems: "center", marginBottom: 14 }]}>
+              <Text style={{ fontSize: 16 }}>🔍</Text>
+              <TextInput
+                value={districtQuery}
+                onChangeText={setDistrictQuery}
+                placeholder={t("district")}
+                placeholderTextColor={T.textFaint}
+                autoFocus
+                style={[Type.body, { flex: 1, color: T.text, paddingVertical: 0 }]}
+              />
+            </View>
+
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              {/* Tüm ilçeler = ilçe seçilmedi */}
+              <Pressable
+                onPress={() => selectDistrict(null)}
+                style={[styles.cityRow, { borderBottomColor: T.hairline }]}
+              >
+                <Text style={[Type.body, { color: district === null ? T.primary : T.text, flex: 1 }]}>{t("all_districts")}</Text>
+                {district === null ? <Text style={{ fontSize: 14, color: T.primary }}>✓</Text> : null}
+              </Pressable>
+              {filteredDistricts.map((d) => {
+                const active = district === d;
+                return (
+                  <Pressable
+                    key={d}
+                    onPress={() => selectDistrict(d)}
+                    style={[styles.cityRow, { borderBottomColor: T.hairline }]}
+                  >
+                    <Text style={[Type.body, { color: active ? T.primary : T.text, flex: 1 }]}>{d}</Text>
+                    {active ? <Text style={{ fontSize: 14, color: T.primary }}>✓</Text> : null}
+                  </Pressable>
+                );
+              })}
+              {filteredDistricts.length === 0 ? (
                 <Text style={[Type.label, { color: T.textFaint, textAlign: "center", paddingVertical: 24 }]}>
                   {t("search_empty")}
                 </Text>

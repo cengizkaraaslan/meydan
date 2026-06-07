@@ -13,6 +13,7 @@ import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { SignInPrompt } from "@/components/SignInPrompt";
 import { tapH, impactH, successH } from "@/lib/haptics";
+import { sndMatch } from "@/lib/sound";
 
 export default function MatchScreen() {
   const insets = useSafeAreaInsets();
@@ -42,7 +43,7 @@ export default function MatchScreen() {
     impactH();
     const isMatch = Math.random() < 0.4;
     if (isMatch && current) {
-      successH();
+      sndMatch();
       setMatched(current);
     } else {
       next();

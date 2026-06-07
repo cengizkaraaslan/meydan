@@ -13,41 +13,37 @@ import { fmtDay, fmtPrice } from "../lib/format";
 import { imageFor, type ApiEvent } from "../lib/api";
 import { toggleFavorite, useFavorites } from "../lib/favorites";
 import { Badge } from "../ui/atoms";
-import { SignInPrompt } from "@/components/SignInPrompt";
+import { showAuthPrompt } from "../lib/authPrompt";
 
 function Heart({ event }: { event: ApiEvent }) {
   const { ids } = useFavorites();
   const { user } = useAuth();
   const { t } = useT();
   const [on, setOn] = useState(false);
-  const [prompt, setPrompt] = useState(false);
   useEffect(() => setOn(ids.has(event.id)), [ids, event.id]);
   return (
-    <>
-      <Pressable
-        hitSlop={10}
-        onPress={async () => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          // #10/#17: Favoriler gerçek kullanıcıya özel. Misafir (guest) de user değildir;
-          // user yoksa favori EKLEME, cezbedici giriş modalını göster.
-          if (!user) {
-            setPrompt(true);
-            return;
-          }
-          setOn(await toggleFavorite(event));
-        }}
-        style={styles.heart}
-      >
-        <Text style={{ fontSize: 16 }}>{on ? "❤️" : "🤍"}</Text>
-      </Pressable>
-      <SignInPrompt visible={prompt} title={t("lock_fav_title")} onClose={() => setPrompt(false)} />
-    </>
+    <Pressable
+      hitSlop={10}
+      onPress={async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        // #10/#17: Favoriler gerçek kullanıcıya özel. user yoksa global giriş prompt'u (per-kart Modal YOK).
+        if (!user) {
+          showAuthPrompt(t("lock_fav_title"));
+          return;
+        }
+        setOn(await toggleFavorite(event));
+      }}
+      style={styles.heart}
+    >
+      <Text style={{ fontSize: 16 }}>{on ? "❤️" : "🤍"}</Text>
+    </Pressable>
   );
 }
 
 function open(e: ApiEvent) {
   Haptics.selectionAsync();
-  router.push(`/etkinlik/${e.id}`);
+  // Etkinliği parametre olarak geçir → detay refetch'e bağlı kalmaz ("bulunamadı" sorunu çözülür).
+  router.push({ pathname: "/etkinlik/[id]", params: { id: e.id, data: JSON.stringify(e) } });
 }
 
 /** Büyük öne çıkan kart (carousel). */
@@ -68,7 +64,7 @@ export function HeroCard({ event, width }: { event: ApiEvent; width: number }) {
           contentFit="cover"
           transition={300}
         />
-        <LinearGradient colors={["transparent", "rgba(8,7,13,0.35)", "rgba(8,7,13,0.96)"]} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={["transparent", "rgba(8,7,13,0.55)", "rgba(8,7,13,0.97)"]} locations={[0, 0.4, 0.82]} style={StyleSheet.absoluteFill} />
         <View style={styles.heroTop}>
           <Badge text={c.label} color={c.gradient[0]} />
           <Heart event={event} />

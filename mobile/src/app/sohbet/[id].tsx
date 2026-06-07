@@ -13,6 +13,7 @@ import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { SignInPrompt } from "@/components/SignInPrompt";
 import { tapH } from "@/lib/haptics";
+import { sndSend } from "@/lib/sound";
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -62,6 +63,7 @@ export default function ChatScreen() {
   const onSend = () => {
     if (!text.trim()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    sndSend();
     send(text);
     setText("");
   };

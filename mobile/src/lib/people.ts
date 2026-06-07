@@ -16,7 +16,10 @@ export interface Person {
 }
 
 const P = (id: string, name: string, age: number, city: string, distanceKm: number, online: boolean, sex: "men" | "women", n: number, bio: string, interests: string[]): Person => ({
-  id, name, age, city, distanceKm, online, avatar: `https://randomuser.me/api/portraits/${sex}/${n}.jpg`, bio, interests,
+  id, name, age, city, distanceKm, online,
+  // Yüksek çözünürlüklü portreler (randomuser 128px çok bulanıktı → pravatar 600px).
+  avatar: `https://i.pravatar.cc/600?img=${(n % 70) + 1}`,
+  bio, interests,
   gender: sex === "men" ? "male" : "female",
 });
 
