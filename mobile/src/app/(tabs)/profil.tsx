@@ -10,7 +10,8 @@ import { router } from "expo-router";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { GlassCard } from "@/components/GlassCard";
 import { EventRow } from "@/components/EventCard";
-import { ImageCropper } from "@/components/ImageCropper";
+import { ImageEditor } from "@/components/ImageEditor";
+import { deleteLocalFile } from "@/lib/fileStore";
 import { StoryAvatar } from "@/components/StoryAvatar";
 import { Pill, SectionHeader } from "@/ui/atoms";
 import { Radius, Space, Type, glow } from "@/theme/aurora";
@@ -74,12 +75,14 @@ export default function ProfileScreen() {
     setCropUri(res.assets[0].uri);
   };
 
-  // Kırpma onayı → kaydet (yerel + DB senkron).
+  // Düzenleme onayı → kaydet (yerel + DB senkron) + ÖNCEKİ avatar dosyasını sil (şişmesin).
   const saveAvatar = (uri: string) => {
+    const prev = avatarOverride;
     setCropUri(null);
     setAvatarOverride(uri);
     AsyncStorage.setItem("meydanfest:avatar", uri);
     syncProfile({ avatar: uri });
+    if (prev && prev !== uri) deleteLocalFile(prev); // file:// değilse (Google foto) dokunmaz
   };
 
   // Story paylaş — oturum + medya izni gerekir.
@@ -241,7 +244,7 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* Profil fotoğrafı kırpma ekranı (kare) */}
-      <ImageCropper uri={cropUri} aspect={1} outWidth={512} title="Profil fotoğrafı" onDone={saveAvatar} onCancel={() => setCropUri(null)} />
+      <ImageEditor uri={cropUri} aspect={1} outWidth={512} title="Profil fotoğrafı" onDone={saveAvatar} onCancel={() => setCropUri(null)} />
     </View>
   );
 }

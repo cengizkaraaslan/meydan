@@ -19,7 +19,7 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { GlassCard } from "@/components/GlassCard";
-import { ImageCropper } from "@/components/ImageCropper";
+import { ImageEditor } from "@/components/ImageEditor";
 import { Pill, GradientButton } from "@/ui/atoms";
 import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { CATEGORIES } from "@/lib/categories";
@@ -530,7 +530,7 @@ export default function CreateEventScreen() {
       </Modal>
 
       {/* Etkinlik görseli kırpma ekranı (4:5 dikey afiş) */}
-      <ImageCropper uri={cropUri} aspect={4 / 5} outWidth={1080} title={t("ev_add_image")} onDone={onCropped} onCancel={() => setCropUri(null)} />
+      <ImageEditor uri={cropUri} aspect={4 / 5} outWidth={1080} title={t("ev_add_image")} onDone={onCropped} onCancel={() => setCropUri(null)} />
     </View>
   );
 }

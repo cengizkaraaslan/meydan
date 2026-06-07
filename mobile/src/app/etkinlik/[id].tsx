@@ -7,7 +7,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { catMeta } from "@/lib/categories";
@@ -88,6 +88,8 @@ export default function EventDetail() {
 
   // katılacaklar listesi modal'ı
   const [listOpen, setListOpen] = useState(false);
+  // story halkası olan kişiye dokununca story izleyici (yoksa profil açılır)
+  const [viewStory, setViewStory] = useState<Person | null>(null);
 
   const eid = String(id);
   const rsvpKey = `meydanfest:rsvp:${eid}`;
@@ -678,7 +680,15 @@ export default function EventDetail() {
               const isMe = p.id === "__me";
               return (
                 <View key={p.id} style={[styles.attRow, { backgroundColor: T.surface, borderColor: isMe ? T.primary : T.hairline }]}>
-                  <Pressable onPress={() => { if (!isMe) openPerson(p.id); }} style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
+                  <Pressable
+                    onPress={() => {
+                      if (isMe) return;
+                      // Story halkası varsa story izle; yoksa profili aç.
+                      if (p.hasStory) { tapH(); setListOpen(false); setViewStory(p); }
+                      else openPerson(p.id);
+                    }}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}
+                  >
                     <StoryAvatar uri={p.avatar} name={p.name} size={50} hasStory={p.hasStory} online={p.online} />
                     <View style={{ flex: 1 }}>
                       <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>{isMe ? `${p.name} · ${t("you") }` : `${p.name}, ${p.age}`}</Text>
@@ -698,6 +708,32 @@ export default function EventDetail() {
             })}
           </ScrollView>
         </View>
+      </Modal>
+
+      {/* Story izleyici — story halkası olan kişiye dokununca. Mock kişilerde gerçek
+          story medyası yok → avatar tam ekran gösterilir; gerçek story'ler DB ile gelecek. */}
+      <Modal visible={!!viewStory} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setViewStory(null)}>
+        <Animated.View entering={FadeIn.duration(160)} style={styles.storyViewer}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setViewStory(null)} />
+          {viewStory ? (
+            <>
+              <View style={[styles.storyBarTop, { top: insets.top + 8 }]}>
+                <View style={[styles.storyProgress, { backgroundColor: T.primary }]} />
+              </View>
+              <Image source={{ uri: viewStory.avatar }} style={styles.storyViewerImg} contentFit="cover" transition={200} />
+              <View style={[styles.storyViewerInfo, { top: insets.top + 22 }]}>
+                <StoryAvatar uri={viewStory.avatar} name={viewStory.name} size={38} online={viewStory.online} />
+                <Text style={[Type.title, { color: "#fff" }]}>{viewStory.name}</Text>
+              </View>
+              <Pressable
+                onPress={() => { const id = viewStory.id; setViewStory(null); router.push(`/kisi/${id}`); }}
+                style={[styles.storyProfileBtn, { bottom: insets.bottom + 28 }]}
+              >
+                <Text style={[Type.title, { color: "#fff" }]}>👤 {viewStory.name} · {t("person_about")} →</Text>
+              </Pressable>
+            </>
+          ) : null}
+        </Animated.View>
       </Modal>
     </View>
   );
@@ -741,6 +777,12 @@ const styles = StyleSheet.create({
   sendBtn: { paddingHorizontal: 16, paddingVertical: 11, alignItems: "center", justifyContent: "center" },
   addPhoto: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
   photo: { width: 100, height: 100, borderRadius: Radius.md },
+  storyViewer: { flex: 1, backgroundColor: "#000", alignItems: "center", justifyContent: "center" },
+  storyViewerImg: { width: "100%", height: "100%" },
+  storyBarTop: { position: "absolute", left: 12, right: 12, height: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.25)", overflow: "hidden" },
+  storyProgress: { position: "absolute", left: 0, top: 0, bottom: 0, width: "100%", borderRadius: 2 },
+  storyViewerInfo: { position: "absolute", left: 14, flexDirection: "row", alignItems: "center", gap: 10 },
+  storyProfileBtn: { position: "absolute", alignSelf: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: StyleSheet.hairlineWidth * 2, borderColor: "rgba(255,255,255,0.3)", paddingHorizontal: 18, paddingVertical: 12, borderRadius: Radius.pill },
   photoDel: {
     position: "absolute", top: 6, right: 6, width: 28, height: 28, borderRadius: 14,
     backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center",
