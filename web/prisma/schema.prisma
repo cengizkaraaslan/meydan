@@ -399,6 +399,36 @@ model NotifPref {
   updatedAt  DateTime @updatedAt
 }
 
+/// Mobil tanışma eşleşmesi (Meydate). Her satır BİR cihazın bir partnerle eşleşmesidir
+/// (gerçek karşılıklı eşleşmede iki satır aynı matchKey'i paylaşır; mock partnerde tek satır).
+/// partnerId mock profil id'si ("f3") ya da başka bir deviceId olabilir → User/MobileProfile FK yok.
+model MobileMatch {
+  id            String   @id @default(cuid())
+  deviceId      String
+  partnerId     String
+  partnerName   String?
+  partnerAvatar String?  @db.Text
+  matchKey      String
+  createdAt     DateTime @default(now())
+
+  @@unique([deviceId, partnerId])
+  @@index([deviceId])
+  @@index([matchKey])
+}
+
+/// Mobil tanışma sohbeti mesajı. matchKey konuşma odasıdır; senderDeviceId gönderen cihaz
+/// (mock bot cevaplarında partnerId gönderici olarak yazılır). readAt null = okunmamış.
+model MobileMessage {
+  id             String    @id @default(cuid())
+  matchKey       String
+  senderDeviceId String
+  text           String    @db.Text
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([matchKey, createdAt])
+}
+
 model Event {
   id            String        @id @default(cuid())
   // Scraper'lar onlarca dinamik kaynak üretir (UNI_HACETTEPE, BUGECE, MUNI_BURSA...)

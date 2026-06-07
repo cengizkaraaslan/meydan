@@ -16,10 +16,10 @@ import { Image } from "expo-image";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
-import * as ImageManipulator from "expo-image-manipulator";
 import { router } from "expo-router";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { GlassCard } from "@/components/GlassCard";
+import { ImageCropper } from "@/components/ImageCropper";
 import { Pill, GradientButton } from "@/ui/atoms";
 import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { CATEGORIES } from "@/lib/categories";
@@ -31,26 +31,6 @@ import { API_BASE } from "@/lib/api";
 import { tapH, impactH, successH } from "@/lib/haptics";
 
 /** Görseli 1200px genişliğe sığdırıp JPEG olarak sıkıştırır (SDK56 context API + fallback). */
-async function processImage(uri: string): Promise<string> {
-  try {
-    const ctx = ImageManipulator.ImageManipulator.manipulate(uri).resize({ width: 1200 });
-    const ref = await ctx.renderAsync();
-    const out = await ref.saveAsync({ compress: 0.8, format: ImageManipulator.SaveFormat.JPEG });
-    return out.uri;
-  } catch {
-    // Eski API'ye düş (manipulateAsync deprecate ama çalışıyor)
-    try {
-      const out = await ImageManipulator.manipulateAsync(uri, [{ resize: { width: 1200 } }], {
-        compress: 0.8,
-        format: ImageManipulator.SaveFormat.JPEG,
-      });
-      return out.uri;
-    } catch {
-      return uri; // işlenemezse orijinali kullan
-    }
-  }
-}
-
 export default function CreateEventScreen() {
   const insets = useSafeAreaInsets();
   const { t: T } = useTheme();
@@ -58,6 +38,7 @@ export default function CreateEventScreen() {
   const { user } = useAuth();
 
   const [image, setImage] = useState<string | null>(null);
+  const [cropUri, setCropUri] = useState<string | null>(null); // kırpma ekranına gidecek ham görsel
   const [title, setTitle] = useState("");
   const [venue, setVenue] = useState("");
   const [city, setCity] = useState<string | null>(null);
@@ -153,11 +134,17 @@ export default function CreateEventScreen() {
     if (!perm.granted) return;
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
-      quality: 0.8,
+      quality: 1,
     });
     if (res.canceled || !res.assets?.length) return;
-    const processed = await processImage(res.assets[0].uri);
-    setImage(processed);
+    // Native crop yerine kendi kırpma ekranımızı aç (profil avatarıyla aynı bileşen).
+    setCropUri(res.assets[0].uri);
+  }
+
+  // Kırpma onayı → görseli ayarla (ImageCropper zaten yeniden boyutlandırıp sıkıştırır).
+  function onCropped(uri: string) {
+    setCropUri(null);
+    setImage(uri);
   }
 
   async function publish() {
@@ -541,6 +528,9 @@ export default function CreateEventScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Etkinlik görseli kırpma ekranı (4:5 dikey afiş) */}
+      <ImageCropper uri={cropUri} aspect={4 / 5} outWidth={1080} title={t("ev_add_image")} onDone={onCropped} onCancel={() => setCropUri(null)} />
     </View>
   );
 }

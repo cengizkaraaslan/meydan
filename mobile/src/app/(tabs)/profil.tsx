@@ -10,6 +10,8 @@ import { router } from "expo-router";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { GlassCard } from "@/components/GlassCard";
 import { EventRow } from "@/components/EventCard";
+import { ImageCropper } from "@/components/ImageCropper";
+import { StoryAvatar } from "@/components/StoryAvatar";
 import { Pill, SectionHeader } from "@/ui/atoms";
 import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { useFavorites } from "@/lib/favorites";
@@ -56,22 +58,28 @@ export default function ProfileScreen() {
 
   // Profil fotoğrafı — kullanıcı kendi seçtiği görseli ayarlayabilir (yerelde + DB'ye senkron).
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
+  const [cropUri, setCropUri] = useState<string | null>(null); // kırpma ekranına gidecek ham görsel
   useEffect(() => {
     AsyncStorage.getItem("meydanfest:avatar").then(setAvatarOverride);
   }, []);
   const photoUri = avatarOverride ?? user?.photo;
 
+  // Galeriden seç → kırpma ekranını aç (native crop değil, kendi ImageCropper'ımız).
   const changePhoto = async () => {
     impactH();
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return;
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, allowsEditing: true, aspect: [1, 1] });
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1 });
     if (res.canceled || !res.assets?.length) return;
-    const uri = res.assets[0].uri;
+    setCropUri(res.assets[0].uri);
+  };
+
+  // Kırpma onayı → kaydet (yerel + DB senkron).
+  const saveAvatar = (uri: string) => {
+    setCropUri(null);
     setAvatarOverride(uri);
     AsyncStorage.setItem("meydanfest:avatar", uri);
     syncProfile({ avatar: uri });
-    successH();
   };
 
   // Story paylaş — oturum + medya izni gerekir.
@@ -111,13 +119,8 @@ export default function ProfileScreen() {
         {/* Profil başlığı */}
         <Animated.View entering={FadeInDown.duration(450)} style={styles.header}>
           <Pressable onPress={changePhoto} style={styles.avatarWrap}>
-            {photoUri ? (
-              <Image source={{ uri: photoUri }} style={[styles.avatar, glow(T.primary, 24, 0.6)]} contentFit="cover" />
-            ) : (
-              <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.avatar, glow(T.primary, 24, 0.6)]}>
-                <Text style={styles.avatarMark}>{user ? user.name.charAt(0).toUpperCase() : "✦"}</Text>
-              </LinearGradient>
-            )}
+            {/* Story yüklediyse avatarda Instagram-tarzı halka (StoryAvatar) */}
+            <StoryAvatar uri={photoUri} name={user?.name ?? "✦"} size={84} hasStory={stories.length > 0} />
             {/* Düzenle rozeti — fotoğrafı değiştir */}
             <View style={[styles.avatarEdit, { backgroundColor: T.primary, borderColor: T.bg }]}>
               <Text style={{ fontSize: 13 }}>📷</Text>
@@ -236,6 +239,9 @@ export default function ProfileScreen() {
           ) : null}
         </Animated.View>
       </Modal>
+
+      {/* Profil fotoğrafı kırpma ekranı (kare) */}
+      <ImageCropper uri={cropUri} aspect={1} outWidth={512} title="Profil fotoğrafı" onDone={saveAvatar} onCancel={() => setCropUri(null)} />
     </View>
   );
 }
@@ -245,7 +251,7 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: Space.md },
   circleBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2 },
   header: { alignItems: "center", marginBottom: Space.xl },
-  avatarWrap: { width: 86, height: 86 },
+  avatarWrap: { alignItems: "center", justifyContent: "center" },
   avatar: { width: 86, height: 86, borderRadius: Radius.pill, alignItems: "center", justifyContent: "center" },
   avatarMark: { fontSize: 34, color: "#fff", fontWeight: "800" },
   avatarEdit: { position: "absolute", right: -2, bottom: -2, width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 2 },

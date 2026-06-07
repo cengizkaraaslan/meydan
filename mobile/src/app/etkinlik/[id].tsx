@@ -22,7 +22,8 @@ import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
-import { PEOPLE } from "@/lib/people";
+import { PEOPLE, type Person } from "@/lib/people";
+import { StoryAvatar } from "@/components/StoryAvatar";
 import { showAuthPrompt } from "@/lib/authPrompt";
 import { tapH, impactH, successH } from "@/lib/haptics";
 import { getEventWeather, type DayWeather } from "@/lib/weather";
@@ -346,8 +347,25 @@ export default function EventDetail() {
   const fav = ids.has(event.id);
   // kırık görsel → kategori fallback (kategori emojili düz blok). imgFailed true ise emoji bloğu göster.
   const heroUri = imageFor(event);
-  // katılacaklar — mock liste (avatar yığını için ilk 6, modal'da tamamı)
-  const attendeeList = PEOPLE;
+  // katılacaklar — "katılacağım" diyen kullanıcı listenin BAŞINDA görünür (yerel).
+  // NOT: gerçek çapraz-cihaz katılımcılar (android↔web) Postgres + eventAttendance ile
+  // gelecek; şimdilik kendi RSVP'n anında görünür.
+  const meAttendee: Person | null =
+    rsvp === "going" && user
+      ? {
+          id: "__me",
+          name: user.name,
+          age: 0,
+          city: event.city,
+          distanceKm: 0,
+          online: true,
+          avatar: user.photo || "https://i.pravatar.cc/600?img=12",
+          bio: "",
+          interests: [],
+          gender: "male",
+        }
+      : null;
+  const attendeeList = meAttendee ? [meAttendee, ...PEOPLE] : PEOPLE;
   const attendees = attendeeList.slice(0, 6);
   const extraAttendees = Math.max(0, attendeeList.length - attendees.length);
 
@@ -656,26 +674,28 @@ export default function EventDetail() {
             </Pressable>
           </View>
           <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: SCREEN_H * 0.6 }} contentContainerStyle={{ gap: 10, paddingBottom: 8 }}>
-            {attendeeList.map((p) => (
-              <View key={p.id} style={[styles.attRow, { backgroundColor: T.surface, borderColor: T.hairline }]}>
-                <Pressable onPress={() => openPerson(p.id)} style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
-                  <View>
-                    <Image source={{ uri: p.avatar }} style={[styles.attAvatar, { borderColor: T.bg }]} contentFit="cover" transition={200} />
-                    {p.online ? <View style={[styles.onlineDot, { backgroundColor: T.success, borderColor: T.bgElevated }]} /> : null}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>{p.name}, {p.age}</Text>
-                    <Text style={[Type.label, { color: T.textFaint }]} numberOfLines={1}>📍 {p.city} · {p.distanceKm} km</Text>
-                  </View>
-                </Pressable>
-                <Pressable onPress={() => messagePerson(p.id)} style={{ borderRadius: Radius.pill, overflow: "hidden" }}>
-                  <LinearGradient colors={c.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.attMsgBtn}>
-                    <Text style={{ fontSize: 13 }}>💬</Text>
-                    <Text style={[Type.label, { color: "#fff" }]}>{t("message_attendee")}</Text>
-                  </LinearGradient>
-                </Pressable>
-              </View>
-            ))}
+            {attendeeList.map((p) => {
+              const isMe = p.id === "__me";
+              return (
+                <View key={p.id} style={[styles.attRow, { backgroundColor: T.surface, borderColor: isMe ? T.primary : T.hairline }]}>
+                  <Pressable onPress={() => { if (!isMe) openPerson(p.id); }} style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
+                    <StoryAvatar uri={p.avatar} name={p.name} size={50} hasStory={p.hasStory} online={p.online} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>{isMe ? `${p.name} · ${t("you") }` : `${p.name}, ${p.age}`}</Text>
+                      <Text style={[Type.label, { color: T.textFaint }]} numberOfLines={1}>{isMe ? `✓ ${t("rsvp_going")}` : `📍 ${p.city} · ${p.distanceKm} km`}</Text>
+                    </View>
+                  </Pressable>
+                  {!isMe ? (
+                    <Pressable onPress={() => messagePerson(p.id)} style={{ borderRadius: Radius.pill, overflow: "hidden" }}>
+                      <LinearGradient colors={c.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.attMsgBtn}>
+                        <Text style={{ fontSize: 13 }}>💬</Text>
+                        <Text style={[Type.label, { color: "#fff" }]}>{t("message_attendee")}</Text>
+                      </LinearGradient>
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+            })}
           </ScrollView>
         </View>
       </Modal>

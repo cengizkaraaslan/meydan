@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Switch, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Switch, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as WebBrowser from "expo-web-browser";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -123,6 +123,19 @@ export default function SettingsScreen() {
   const toggle = (key: string) => { tapH(); setOpen((o) => (o === key ? null : key)); };
   const [notif, setNotif] = useState<NotifPrefs>({ mode: "all", cities: [], categories: [] });
   const [savedAt, setSavedAt] = useState(0);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  // Çıkış — kısa da olsa loading göster (AsyncStorage temizliği + state güncellemesi).
+  const doSignOut = async () => {
+    if (loggingOut) return;
+    impactH();
+    setLoggingOut(true);
+    try {
+      await signOut();
+    } finally {
+      router.back();
+    }
+  };
 
   // İlçe seçimi (şehre bağlı) — cihazda saklanır + best-effort DB'ye senkron.
   const [district, setDistrictState] = useState<string | null>(null);
@@ -388,8 +401,12 @@ export default function SettingsScreen() {
         {/* Çıkış — her zaman erişilebilir (akordeon dışında) */}
         {user ? (
           <Animated.View entering={FadeInDown.duration(450).delay(200)}>
-            <Pressable onPress={() => { impactH(); signOut(); router.back(); }} style={[styles.signOut, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-              <Text style={[Type.title, { color: T.pink }]}>{t("sign_out")}</Text>
+            <Pressable onPress={doSignOut} disabled={loggingOut} style={[styles.signOut, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }, loggingOut && { opacity: 0.7 }]}>
+              {loggingOut ? (
+                <ActivityIndicator color={T.pink} />
+              ) : (
+                <Text style={[Type.title, { color: T.pink }]}>{t("sign_out")}</Text>
+              )}
             </Pressable>
           </Animated.View>
         ) : null}

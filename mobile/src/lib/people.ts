@@ -13,7 +13,11 @@ export interface Person {
   bio: string;
   interests: string[]; // kategori etiketleri
   gender: "male" | "female"; // dating eşleştirme için
+  hasStory?: boolean; // aktif story → avatarda Instagram-tarzı halka
 }
+
+/** Şu an story'si olan (mock) kişiler — listelerde halka gösterilir. */
+const STORY_IDS = new Set(["u1", "u3", "u5", "u7", "u9", "u12", "u13"]);
 
 const P = (id: string, name: string, age: number, city: string, distanceKm: number, online: boolean, sex: "men" | "women", n: number, bio: string, interests: string[]): Person => ({
   id, name, age, city, distanceKm, online,
@@ -38,7 +42,7 @@ export const PEOPLE: Person[] = [
   P("u12", "Tolga", 34, "İstanbul", 6.1, true, "men", 41, "Festival fotoğrafçısı 📷", ["Festival"]),
   P("u13", "Naz", 27, "İstanbul", 0.9, true, "women", 57, "Caz, şarap, sergi açılışları.", ["Konser", "Sergi"]),
   P("u14", "Oğuz", 26, "Antalya", 4.2, false, "men", 3, "Yazlık festivaller ve sahil partileri.", ["Festival", "Konser"]),
-];
+].map((p) => ({ ...p, hasStory: STORY_IDS.has(p.id) }));
 
 export function getPerson(id: string): Person | undefined {
   return PEOPLE.find((p) => p.id === id);
