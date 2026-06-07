@@ -112,8 +112,8 @@ export default function DiscoverScreen() {
             </Text>
           </Pressable>
           <View style={{ flexDirection: "row", gap: 10 }}>
-            <Pressable onPress={() => { tapH(); router.push("/olustur"); }} style={[styles.searchBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-              <Text style={{ fontSize: 22, color: T.primary, marginTop: -2 }}>＋</Text>
+            <Pressable onPress={() => { tapH(); router.push("/ayarlar"); }} style={[styles.searchBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+              <Text style={{ fontSize: 18 }}>⚙️</Text>
             </Pressable>
             <Pressable onPress={() => { tapH(); router.push("/ara"); }} style={[styles.searchBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
               <Text style={{ fontSize: 18 }}>🔍</Text>

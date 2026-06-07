@@ -15,6 +15,8 @@ import { fmtLong, fmtPrice } from "@/lib/format";
 import { API_BASE, fetchEventById, imageFor, type ApiEvent } from "@/lib/api";
 import { getDeviceId } from "@/lib/profileSync";
 import { toggleFavorite, useFavorites } from "@/lib/favorites";
+import { setAttending } from "@/lib/attending";
+import { addStory } from "@/lib/stories";
 import { Badge, GradientButton, Loader, Pill } from "@/ui/atoms";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
@@ -147,12 +149,12 @@ export default function EventDetail() {
 
   const chooseRsvp = (choice: Rsvp) => {
     impactH();
-    setRsvp((prev) => {
-      const next = prev === choice ? null : choice;
-      if (next) AsyncStorage.setItem(rsvpKey, next);
-      else AsyncStorage.removeItem(rsvpKey);
-      return next;
-    });
+    const next = rsvp === choice ? null : choice;
+    setRsvp(next);
+    if (next) AsyncStorage.setItem(rsvpKey, next);
+    else AsyncStorage.removeItem(rsvpKey);
+    // Profil "Katılacağım / Katıldığım" listeleri için tam etkinlik objesini sakla.
+    if (event) setAttending(event, next);
     // best-effort API (join sinyali)
     if (event) {
       (async () => {
@@ -267,14 +269,7 @@ export default function EventDetail() {
       eventSlug: event.slug,
       ts: Date.now(),
     };
-    try {
-      const raw = await AsyncStorage.getItem("meydanfest:stories");
-      const list: Story[] = raw ? JSON.parse(raw) : [];
-      list.unshift(story);
-      await AsyncStorage.setItem("meydanfest:stories", JSON.stringify(list));
-    } catch {
-      /* yok say */
-    }
+    await addStory(story);
     // best-effort API (varsa /api/stories; yoksa sadece local kalır)
     try {
       const deviceId = await getDeviceId();
