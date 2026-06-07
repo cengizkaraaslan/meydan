@@ -37,6 +37,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
+      // Her girişte hesap seçici göster (mobil köprüde birden çok hesap için).
+      authorization: { params: { prompt: "select_account" } },
     }),
   ],
   session: { strategy: useDatabase ? "database" : "jwt" },

@@ -50,6 +50,39 @@ function ThemeCard({ name, label, active, T, onPress }: { name: ThemeName; label
   );
 }
 
+/** Açılır/kapanır ayar bölümü — başlığa dokun, sadece istediğini genişlet. */
+function Section({
+  title,
+  accent,
+  openKey,
+  current,
+  onToggle,
+  children,
+  delay = 0,
+}: {
+  title: string;
+  accent: string;
+  openKey: string;
+  current: string | null;
+  onToggle: (k: string) => void;
+  children: React.ReactNode;
+  delay?: number;
+}) {
+  const isOpen = current === openKey;
+  return (
+    <Animated.View entering={FadeInDown.duration(450).delay(delay)}>
+      <Pressable onPress={() => onToggle(openKey)}>
+        <SectionHeader title={title} accent={accent} action={<Text style={[Type.h2, { color: accent }]}>{isOpen ? "▾" : "▸"}</Text>} />
+      </Pressable>
+      {isOpen ? (
+        <Animated.View entering={FadeInDown.duration(280)} style={{ marginBottom: Space.xl }}>
+          {children}
+        </Animated.View>
+      ) : null}
+    </Animated.View>
+  );
+}
+
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { user, signOut } = useAuth();
@@ -57,7 +90,9 @@ export default function SettingsScreen() {
   const { t, lang, setLang } = useT();
   const { city, setCity } = useActiveCity();
 
-  const [notifOpen, setNotifOpen] = useState(false);
+  // Akordeon: aynı anda tek bölüm açık (varsayılan hepsi kapalı → sade görünüm).
+  const [open, setOpen] = useState<string | null>(null);
+  const toggle = (key: string) => { tapH(); setOpen((o) => (o === key ? null : key)); };
   const [prefs, setPrefs] = useState<NotifPrefs>({ mode: "all", cities: [], categories: [] });
   const [savedAt, setSavedAt] = useState(0);
 
@@ -108,19 +143,17 @@ export default function SettingsScreen() {
         </View>
 
         {/* Şehir */}
-        <Animated.View entering={FadeInDown.duration(450)}>
-          <SectionHeader title={`${t("detected_city")}  📍 ${city ?? "—"}`} accent={T.blue} />
-          <View style={[styles.pillWrap, { marginBottom: Space.xl }]}>
+        <Section title={`${t("detected_city")}  📍 ${city ?? "—"}`} accent={T.blue} openKey="city" current={open} onToggle={toggle}>
+          <View style={styles.pillWrap}>
             {CITIES.map((c) => (
               <Pill key={c} label={c} active={city === c} gradient={T.primarySoft} onPress={() => pickCity(c)} />
             ))}
           </View>
-        </Animated.View>
+        </Section>
 
         {/* Görünüm: mode + tema + dil + cinsiyet */}
-        <Animated.View entering={FadeInDown.duration(450).delay(60)}>
-          <SectionHeader title={t("appearance")} accent={T.primary} />
-          <GlassCard padded style={{ marginBottom: Space.xl }}>
+        <Section title={t("appearance")} accent={T.primary} openKey="appearance" current={open} onToggle={toggle} delay={40}>
+          <GlassCard padded>
             <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>{t("mode")}</Text>
             <View style={styles.pillWrap}>
               {MODES.map((m) => (
@@ -155,16 +188,11 @@ export default function SettingsScreen() {
               <Pill label={t("other")} active={gender === "other"} onPress={() => pickGender("other")} />
             </View>
           </GlassCard>
-        </Animated.View>
+        </Section>
 
         {/* Bildirim tercihleri */}
-        <Animated.View entering={FadeInDown.duration(450).delay(120)}>
-          <Pressable onPress={() => { tapH(); setNotifOpen((o) => !o); }}>
-            <SectionHeader title={t("notif_prefs")} accent={T.cyan} action={<Text style={[Type.h2, { color: T.cyan }]}>{notifOpen ? "▾" : "▸"}</Text>} />
-          </Pressable>
-          {notifOpen && (
-            <Animated.View entering={FadeInDown.duration(300)}>
-              <GlassCard padded style={{ marginBottom: Space.xl }}>
+        <Section title={t("notif_prefs")} accent={T.cyan} openKey="notif" current={open} onToggle={toggle} delay={80}>
+          <GlassCard padded>
                 <Text style={[Type.body, { color: T.textDim, marginBottom: Space.md }]}>{t("notif_help")}</Text>
                 <View style={styles.pillWrap}>
                   <Pill label={t("notif_all")} active={prefs.mode === "all"} onPress={() => setNotifMode("all")} />
@@ -194,15 +222,12 @@ export default function SettingsScreen() {
                     {t("notif_saved")}
                   </Animated.Text>
                 )}
-              </GlassCard>
-            </Animated.View>
-          )}
-        </Animated.View>
+          </GlassCard>
+        </Section>
 
         {/* Bağlantılar */}
-        <Animated.View entering={FadeInDown.duration(450).delay(160)}>
-          <SectionHeader title={t("discover_links")} accent={T.pink} />
-          <GlassCard padded style={{ marginBottom: Space.xl }}>
+        <Section title={t("discover_links")} accent={T.pink} openKey="links" current={open} onToggle={toggle} delay={120}>
+          <GlassCard padded>
             <View style={{ gap: Space.md }}>
               <GradientButton label={t("open_site")} icon="🌐" gradient={T.primarySoft} onPress={openSite} />
               <View style={[styles.hairline, { backgroundColor: T.hairline }]} />
@@ -211,22 +236,25 @@ export default function SettingsScreen() {
               <GradientButton label={t("feedback")} icon="💬" gradient={T.primarySoft} onPress={openSite} />
             </View>
           </GlassCard>
-        </Animated.View>
+        </Section>
 
-        {/* Hakkında + çıkış */}
-        <Animated.View entering={FadeInDown.duration(450).delay(200)}>
-          <SectionHeader title={t("about")} accent={T.gold} />
-          <View style={{ paddingHorizontal: 2, paddingBottom: Space.sm }}>
+        {/* Hakkında */}
+        <Section title={t("about")} accent={T.gold} openKey="about" current={open} onToggle={toggle} delay={160}>
+          <View style={{ paddingHorizontal: 2 }}>
             <Text style={[Type.body, { color: T.textDim }]}>{t("about_text")}</Text>
             <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
             <Text style={[Type.label, { color: T.textFaint }]}>{t("version")}</Text>
           </View>
-          {user ? (
+        </Section>
+
+        {/* Çıkış — her zaman erişilebilir (akordeon dışında) */}
+        {user ? (
+          <Animated.View entering={FadeInDown.duration(450).delay(200)}>
             <Pressable onPress={() => { impactH(); signOut(); router.back(); }} style={[styles.signOut, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
               <Text style={[Type.title, { color: T.pink }]}>{t("sign_out")}</Text>
             </Pressable>
-          ) : null}
-        </Animated.View>
+          </Animated.View>
+        ) : null}
       </ScrollView>
     </View>
   );

@@ -148,6 +148,11 @@ export default function EventDetail() {
   }, [eid, rsvpKey, commentsKey, photosKey]);
 
   const chooseRsvp = (choice: Rsvp) => {
+    // Oturum açmayan katılım (katılacağım/belki/ilgileniyorum) yapamaz → giriş modalı.
+    if (!user) {
+      showAuthPrompt(t("login_required"));
+      return;
+    }
     impactH();
     const next = rsvp === choice ? null : choice;
     setRsvp(next);

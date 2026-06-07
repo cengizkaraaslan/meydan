@@ -25,7 +25,19 @@ function Stat({ value, label, color, T }: { value: string; label: string; color:
   return (
     <View style={styles.stat}>
       <Text style={[Type.h1, { color }]}>{value}</Text>
-      <Text style={[Type.label, { color: T.textFaint, marginTop: 4 }]}>{label}</Text>
+      <Text style={[Type.label, { color: T.textFaint, marginTop: 6, textAlign: "center" }]} numberOfLines={2}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/** Boş bölüm yer tutucusu — düz metin yerine sade kart (tasarımı toparlar). */
+function EmptyMini({ emoji, text, T }: { emoji: string; text: string; T: Palette }) {
+  return (
+    <View style={[styles.emptyCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+      <Text style={{ fontSize: 24 }}>{emoji}</Text>
+      <Text style={[Type.body, { color: T.textFaint, textAlign: "center" }]}>{text}</Text>
     </View>
   );
 }
@@ -162,7 +174,7 @@ export default function ProfileScreen() {
             {upcoming.length ? (
               upcoming.map((it) => <EventRow key={it.event.id} event={it.event} />)
             ) : (
-              <Text style={[Type.body, { color: T.textFaint, paddingVertical: Space.sm }]}>{t("no_events_yet")}</Text>
+              <EmptyMini emoji="🗓️" text={t("no_events_yet")} T={T} />
             )}
           </View>
         </Animated.View>
@@ -174,7 +186,7 @@ export default function ProfileScreen() {
             {past.length ? (
               past.map((it) => <EventRow key={it.event.id} event={it.event} />)
             ) : (
-              <Text style={[Type.body, { color: T.textFaint, paddingVertical: Space.sm }]}>{t("no_events_yet")}</Text>
+              <EmptyMini emoji="🎟️" text={t("no_events_yet")} T={T} />
             )}
           </View>
         </Animated.View>
@@ -211,9 +223,10 @@ const styles = StyleSheet.create({
   storyAdd: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 3 },
   storyRing: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", padding: 2 },
   storyThumb: { width: "100%", height: "100%", borderRadius: 30, borderWidth: 2 },
-  statsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-around" },
-  stat: { flex: 1, alignItems: "center" },
-  vline: { width: StyleSheet.hairlineWidth * 2, height: 38 },
+  statsRow: { flexDirection: "row", alignItems: "stretch", justifyContent: "space-around", paddingVertical: 2 },
+  stat: { flex: 1, alignItems: "center", justifyContent: "flex-start", paddingHorizontal: 4, minHeight: 62 },
+  vline: { width: StyleSheet.hairlineWidth * 2, alignSelf: "stretch", marginVertical: 4 },
+  emptyCard: { alignItems: "center", gap: 8, paddingVertical: Space.xl, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2 },
   adminRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   adminIcon: { width: 44, height: 44, borderRadius: Radius.md, alignItems: "center", justifyContent: "center" },
   googleBtn: { flexDirection: "row", gap: 10, alignItems: "center", justifyContent: "center", paddingVertical: 15, borderRadius: Radius.pill, backgroundColor: "#fff", ...glow("#fff", 18, 0.18) },
