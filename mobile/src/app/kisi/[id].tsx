@@ -5,16 +5,33 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GlassCard } from "@/components/GlassCard";
 import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { getPerson } from "@/lib/people";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useCanSeeAges } from "@/lib/dprofile";
 import { tapH, impactH } from "@/lib/haptics";
+import { fetchFollowing, followUser, unfollowUser, followIdForPerson } from "@/lib/social";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 const HERO_H = Math.round(SCREEN_H * 0.58);
+
+/** Kişi id'sinden deterministik (her açılışta aynı) istatistik sayıları üret. */
+function hashStr(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function personStats(id: string): { storyCount: number; eventCount: number } {
+  const h = hashStr(id);
+  return {
+    storyCount: h % 13, // 0-12
+    eventCount: (h >>> 8) % 41, // 0-40
+  };
+}
 
 export default function PersonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -23,6 +40,39 @@ export default function PersonScreen() {
   const { t } = useT();
   const canSeeAges = useCanSeeAges();
   const person = getPerson(String(id));
+
+  const stats = React.useMemo(() => personStats(String(id)), [id]);
+  const followId = React.useMemo(() => followIdForPerson(String(id)), [id]);
+
+  const [isFollowing, setIsFollowing] = React.useState(false);
+  const [followBusy, setFollowBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      const following = await fetchFollowing();
+      if (alive) setIsFollowing(following.includes(followId));
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [followId]);
+
+  const toggleFollow = React.useCallback(async () => {
+    if (followBusy) return;
+    impactH();
+    setFollowBusy(true);
+    const next = !isFollowing;
+    setIsFollowing(next); // iyimser
+    try {
+      if (next) await followUser(followId, person?.name);
+      else await unfollowUser(followId);
+    } catch {
+      setIsFollowing(!next); // geri al
+    } finally {
+      setFollowBusy(false);
+    }
+  }, [followBusy, isFollowing, followId, person?.name]);
 
   if (!person) {
     return (
@@ -90,6 +140,10 @@ export default function PersonScreen() {
                 ? `📍 ${person.distanceKm} km · ${t("person_nearby")}`
                 : `📍 ${person.distanceKm} km ${t("away")}`}
             </Text>
+            {/* Sayaçlar — sadece gösterim, tıklanmaz */}
+            <Text style={[Type.body, { color: T.textDim, marginTop: 6, fontWeight: "600" }]}>
+              {`📸 ${stats.storyCount} story · 🎟️ ${stats.eventCount} etkinlik`}
+            </Text>
           </Animated.View>
         </View>
 
@@ -97,17 +151,17 @@ export default function PersonScreen() {
         <View style={{ paddingHorizontal: 16, gap: 14, marginTop: 6 }}>
           {/* Hakkında */}
           <Animated.View entering={FadeInDown.delay(160).duration(460)}>
-            <GlassCard glowColor={T.primary}>
+            <View style={[styles.card, { backgroundColor: T.surface, borderColor: T.hairline }]}>
               <Text style={[Type.label, { color: T.textFaint, marginBottom: 8, letterSpacing: 0.6 }]}>
                 {t("person_about").toUpperCase()}
               </Text>
               <Text style={[Type.body, { color: T.text, lineHeight: 21 }]}>{person.bio}</Text>
-            </GlassCard>
+            </View>
           </Animated.View>
 
           {/* İlgi alanları */}
           <Animated.View entering={FadeInDown.delay(230).duration(460)}>
-            <GlassCard>
+            <View style={[styles.card, { backgroundColor: T.surface, borderColor: T.hairline }]}>
               <Text style={[Type.label, { color: T.textFaint, marginBottom: 10, letterSpacing: 0.6 }]}>
                 {t("person_interests").toUpperCase()}
               </Text>
@@ -121,11 +175,42 @@ export default function PersonScreen() {
                   </View>
                 ))}
               </View>
-            </GlassCard>
+            </View>
+          </Animated.View>
+
+          {/* Takip et / Takip ediliyor */}
+          <Animated.View entering={FadeInDown.delay(285).duration(460)} style={{ marginTop: 8 }}>
+            <Pressable
+              onPress={toggleFollow}
+              disabled={followBusy}
+              style={{ borderRadius: Radius.pill, overflow: "hidden", opacity: followBusy ? 0.7 : 1 }}
+            >
+              {isFollowing ? (
+                <View
+                  style={[
+                    styles.followBtn,
+                    { backgroundColor: T.surface, borderColor: T.hairline, borderWidth: StyleSheet.hairlineWidth * 2 },
+                  ]}
+                >
+                  <Text style={{ fontSize: 16 }}>✓</Text>
+                  <Text style={[Type.title, { color: T.text, fontSize: 16 }]}>Takip ediliyor</Text>
+                </View>
+              ) : (
+                <LinearGradient
+                  colors={T.primaryGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.followBtn, glow(T.primary, 18, 0.45)]}
+                >
+                  <Text style={{ fontSize: 16 }}>＋</Text>
+                  <Text style={[Type.title, { color: "#fff", fontSize: 16 }]}>Takip et</Text>
+                </LinearGradient>
+              )}
+            </Pressable>
           </Animated.View>
 
           {/* Mesaj Gönder */}
-          <Animated.View entering={FadeInDown.delay(300).duration(460)} style={{ marginTop: 8 }}>
+          <Animated.View entering={FadeInDown.delay(340).duration(460)}>
             <Pressable
               onPress={() => { impactH(); router.push(`/sohbet/${person.id}`); }}
               style={{ borderRadius: Radius.pill, overflow: "hidden" }}
@@ -175,6 +260,18 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     bottom: Space.lg,
+  },
+  card: {
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    padding: 16,
+  },
+  followBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
   },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {

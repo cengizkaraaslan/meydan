@@ -21,6 +21,8 @@ interface TabBarProps {
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 const TABS: Record<string, { labelKey: string; icon: IoniconName }> = {
   index: { labelKey: "tab_discover", icon: "compass" },
+  // i18n'e dokunmadan: t() bilinmeyen anahtarda anahtarın kendisini döndürür → "Meydan".
+  meydan: { labelKey: "Meydan", icon: "newspaper" },
   kategoriler: { labelKey: "tab_categories", icon: "grid" },
   yakinimda: { labelKey: "tab_nearby", icon: "location" },
   favoriler: { labelKey: "tab_favorites", icon: "heart" },
@@ -97,6 +99,7 @@ export default function TabsLayout() {
   return (
     <Tabs screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: "transparent" } }} tabBar={(p) => <AuroraTabBar {...p} />}>
       <Tabs.Screen name="index" />
+      <Tabs.Screen name="meydan" />
       <Tabs.Screen name="kategoriler" />
       <Tabs.Screen name="yakinimda" />
       <Tabs.Screen name="favoriler" />

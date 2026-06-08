@@ -5,7 +5,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming } from "react-native-reanimated";
+import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
@@ -40,7 +40,20 @@ export default function ChatScreen() {
   const [text, setText] = useState("");
   const [editing, setEditing] = useState<Msg | null>(null);
   const [tipVisible, setTipVisible] = useState(false);
+  // Yalnızca yeni gönderdiğim balona giriş animasyonu uygulamak için son gönderim zamanını tutuyoruz.
+  const [lastSentAt, setLastSentAt] = useState(0);
   const listRef = useRef<FlatList<Msg>>(null);
+
+  // Gönder (↑) butonunun "pulse/uçuş" efekti (sadece sohbet ekranında).
+  const sendScale = useSharedValue(1);
+  const sendBtnStyle = useAnimatedStyle(() => ({ transform: [{ scale: sendScale.value }] }));
+  const pulseSendBtn = useCallback(() => {
+    sendScale.value = withSequence(
+      withTiming(0.82, { duration: 90, easing: Easing.out(Easing.quad) }),
+      withTiming(1.12, { duration: 130, easing: Easing.out(Easing.back(2)) }),
+      withTiming(1, { duration: 110, easing: Easing.inOut(Easing.ease) }),
+    );
+  }, [sendScale]);
 
   // Karşı taraftan gelen en son mesajın zamanı → benim ondan ÖNCEKİ mesajlarım "okundu" (mavi tik).
   const lastIncomingAt = useMemo(
@@ -94,6 +107,9 @@ export default function ChatScreen() {
     if (!trimmed) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     sndSend();
+    pulseSendBtn();
+    // Bu gönderimle eklenecek balona giriş animasyonu uygula (sadece yeni gönderilen).
+    setLastSentAt(Date.now());
     if (editing) {
       const target = editing;
       setEditing(null);
@@ -202,7 +218,16 @@ export default function ChatScreen() {
           keyExtractor={(m) => m.id}
           contentContainerStyle={{ padding: 16, gap: 8, paddingBottom: 16 }}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => <Bubble T={T} m={item} read={item.fromMe && !item.pending && item.at < lastIncomingAt} onLongPress={() => onLongPressMsg(item)} />}
+          renderItem={({ item, index }) => (
+            <Bubble
+              T={T}
+              m={item}
+              read={item.fromMe && !item.pending && item.at < lastIncomingAt}
+              // Yalnızca en sondaki KENDİ balonum, üstelik az önce gönderilmişse "pop" girişi yapar.
+              justSent={item.fromMe && index === messages.length - 1 && item.at >= lastSentAt && lastSentAt > 0}
+              onLongPress={() => onLongPressMsg(item)}
+            />
+          )}
           ListFooterComponent={typing ? <TypingBubble T={T} /> : null}
         />
 
@@ -233,9 +258,11 @@ export default function ChatScreen() {
             onSubmitEditing={onSend}
           />
           <Pressable onPress={onSend}>
-            <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.send}>
-              <Text style={{ fontSize: 18, color: "#fff" }}>↑</Text>
-            </LinearGradient>
+            <Animated.View style={sendBtnStyle}>
+              <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.send}>
+                <Text style={{ fontSize: 18, color: "#fff" }}>↑</Text>
+              </LinearGradient>
+            </Animated.View>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -266,23 +293,29 @@ function Ticks({ read, pending }: { read: boolean; pending?: boolean }) {
   );
 }
 
-function Bubble({ T, m, read, onLongPress }: { T: Palette; m: Msg; read: boolean; onLongPress?: () => void }) {
+function Bubble({ T, m, read, justSent, onLongPress }: { T: Palette; m: Msg; read: boolean; justSent?: boolean; onLongPress?: () => void }) {
   const isImage = !!m.imageUri;
   if (m.fromMe) {
     return (
-      <Pressable onLongPress={onLongPress} delayLongPress={300} style={{ alignSelf: "flex-end", maxWidth: "82%" }}>
-        <LinearGradient colors={T.primarySoft} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.bubble, styles.mine, isImage && styles.imgBubble]}>
-          {isImage ? (
-            <Image source={{ uri: m.imageUri }} style={styles.img} contentFit="cover" transition={150} />
-          ) : (
-            <Text style={[Type.body, { color: "#fff" }]}>{m.text}</Text>
-          )}
-          <View style={styles.metaRow}>
-            <Text style={[styles.meta, { color: "rgba(255,255,255,0.7)" }]}>{hhmm(m.at)}</Text>
-            <Ticks read={read} pending={m.pending} />
-          </View>
-        </LinearGradient>
-      </Pressable>
+      // Facebook Messenger tarzı gönderim: yeni balon aşağıdan yukarı + hafif scale/opaklık ile "pop".
+      <Animated.View
+        entering={justSent ? FadeInDown.springify().damping(15).stiffness(180).mass(0.6) : undefined}
+        style={{ alignSelf: "flex-end", maxWidth: "82%" }}
+      >
+        <Pressable onLongPress={onLongPress} delayLongPress={300}>
+          <LinearGradient colors={T.primarySoft} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.bubble, styles.mine, isImage && styles.imgBubble]}>
+            {isImage ? (
+              <Image source={{ uri: m.imageUri }} style={styles.img} contentFit="cover" transition={150} />
+            ) : (
+              <Text style={[Type.body, { color: "#fff" }]}>{m.text}</Text>
+            )}
+            <View style={styles.metaRow}>
+              <Text style={[styles.meta, { color: "rgba(255,255,255,0.7)" }]}>{hhmm(m.at)}</Text>
+              <Ticks read={read} pending={m.pending} />
+            </View>
+          </LinearGradient>
+        </Pressable>
+      </Animated.View>
     );
   }
   return (
