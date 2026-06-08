@@ -4,6 +4,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraBackground } from "@/components/AuroraBackground";
+import { ChatBubble } from "@/components/ChatBubble";
 import { EventRow, HeroCard } from "@/components/EventCard";
 import { Loader, Pill, SectionHeader, EmptyState } from "@/ui/atoms";
 import { Radius, Type, Space } from "@/theme/aurora";
@@ -232,6 +233,9 @@ export default function DiscoverScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Sürüklenebilir sohbet balonu — geçmiş sohbetlere hızlı erişim */}
+      <ChatBubble />
     </View>
   );
 }

@@ -163,6 +163,8 @@ const TR: Dict = {
   ob_continue: "Devam et",
   // kişi profili + bildirim
   person_message: "Mesaj Gönder",
+  chats_title: "Sohbetler",
+  no_chats: "Henüz kimseyle sohbet etmedin. Bir kişinin profilinden mesaj göndererek başla.",
   person_about: "Hakkında",
   person_interests: "İlgi alanları",
   person_nearby: "yakınında",
@@ -437,6 +439,8 @@ const EN: Dict = {
   ob_gender_q: "Let's get to know you for a tailored experience",
   ob_continue: "Continue",
   person_message: "Send Message",
+  chats_title: "Chats",
+  no_chats: "You haven't chatted with anyone yet. Start by messaging someone from their profile.",
   person_about: "About",
   person_interests: "Interests",
   person_nearby: "nearby",
