@@ -23,7 +23,7 @@ import { ImageEditor } from "@/components/ImageEditor";
 import { Pill, GradientButton } from "@/ui/atoms";
 import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { CATEGORIES } from "@/lib/categories";
-import { ALL_CITIES, detectCity } from "@/lib/location";
+import { ALL_CITIES, detectCity, districtsFor } from "@/lib/location";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -68,7 +68,7 @@ export default function CreateEventScreen() {
     return ALL_CITIES.filter((c) => c.toLocaleLowerCase("tr-TR").includes(q));
   }, [cityQuery]);
 
-  // Şehir değişince o şehrin ilçelerini çek. Boş dönerse ilçe alanı gizlenir/pasif olur.
+  // Şehir değişince o şehrin ilçelerini çek (API). API boş/erişilemezse yerel yedeğe düş.
   useEffect(() => {
     if (!city) {
       setDistricts([]);
@@ -77,13 +77,16 @@ export default function CreateEventScreen() {
     }
     let alive = true;
     setDistrict(null);
+    // Önce yerel veriyle anında doldur (büyük şehirler), sonra API ile güncelle.
+    setDistricts(districtsFor(city));
     (async () => {
       try {
         const res = await fetch(`${API_BASE}/api/districts?city=${encodeURIComponent(city)}`);
         const json = (await res.json()) as { districts?: string[] };
-        if (alive) setDistricts(Array.isArray(json.districts) ? json.districts : []);
+        const apiList = Array.isArray(json.districts) ? json.districts : [];
+        if (alive) setDistricts(apiList.length > 0 ? apiList : districtsFor(city));
       } catch {
-        if (alive) setDistricts([]);
+        if (alive) setDistricts(districtsFor(city));
       }
     })();
     return () => {

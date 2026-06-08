@@ -13,7 +13,7 @@ interface Props {
   visible: boolean;
   title: string; // örn. "👥 Katılacaklar"
   people: Person[];
-  gradient: readonly [string, string, string];
+  gradient: readonly [string, string];
   bottomInset: number;
   /** "Sen" satırı için ipucu metni (kullanıcı bu kategoriyi seçtiyse). */
   meLabel?: string | null;

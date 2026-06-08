@@ -7,7 +7,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { catMeta } from "@/lib/categories";
@@ -16,7 +16,7 @@ import { API_BASE, fetchEventById, imageFor, type ApiEvent } from "@/lib/api";
 import { getDeviceId } from "@/lib/profileSync";
 import { toggleFavorite, useFavorites } from "@/lib/favorites";
 import { setAttending, mockAttendeesFor } from "@/lib/attending";
-import { addStory } from "@/lib/stories";
+import { addStory, useStories } from "@/lib/stories";
 import { Badge, GradientButton, Loader, Pill } from "@/ui/atoms";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
@@ -25,6 +25,8 @@ import { isAdmin } from "@/lib/admin";
 import { PEOPLE, type Person } from "@/lib/people";
 import { StoryAvatar } from "@/components/StoryAvatar";
 import { AttendeeListModal } from "@/components/AttendeeListModal";
+import { EventStoryStrip, mockStoryContributors, personToGroup } from "@/components/EventStoryStrip";
+import { EventStoryViewer, type StoryGroup } from "@/components/EventStoryViewer";
 import { showAuthPrompt } from "@/lib/authPrompt";
 import { tapH, impactH, successH } from "@/lib/haptics";
 import { getEventWeather, type DayWeather } from "@/lib/weather";
@@ -91,10 +93,15 @@ export default function EventDetail() {
   const [listOpen, setListOpen] = useState(false);
   // RSVP kategorisi başına kişi listesi modal'ı (going/maybe/interested); null = kapalı
   const [catOpen, setCatOpen] = useState<Rsvp | null>(null);
-  // story halkası olan kişiye dokununca story izleyici (yoksa profil açılır)
-  const [viewStory, setViewStory] = useState<Person | null>(null);
+  // Çoklu-segment story izleyici: açık olduğunda gösterilecek gruplar + başlangıç indeksi.
+  const [viewerGroups, setViewerGroups] = useState<StoryGroup[] | null>(null);
+  const [viewerStart, setViewerStart] = useState(0);
   // avatara dokun/basılı tut → fotoğrafı büyütme modal'ı (uri)
   const [photoView, setPhotoView] = useState<string | null>(null);
+  // profil avatar override'ı (benim story halkam için): "meydanfest:avatar" ?? user?.photo
+  const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
+  // bu etkinliğe ait benim story'lerim (reaktif)
+  const { stories, reload: reloadStories } = useStories();
 
   const eid = String(id);
   const rsvpKey = `meydanfest:rsvp:${eid}`;
@@ -127,6 +134,11 @@ export default function EventDetail() {
     });
     return () => { alive = false; };
   }, [event?.city, event?.starts_at]);
+
+  // benim story halkam için profil avatarını yükle
+  useEffect(() => {
+    AsyncStorage.getItem("meydanfest:avatar").then((v) => setAvatarOverride(v ?? null));
+  }, []);
 
   // sakli durumu yükle
   useEffect(() => {
@@ -295,16 +307,26 @@ export default function EventDetail() {
     ]);
   };
 
-  // story: foto seç → önizleme + caption ekranı aç
-  const pickStory = async () => {
-    // Oturum açmayan story yükleyemez → giriş modalı.
-    if (!user) {
-      showAuthPrompt(t("lock_story_title"));
+  // story foto kaynağı: kamera
+  const pickStoryFromCamera = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Kamera izni gerekli", "Story çekmek için kamera iznine ihtiyaç var.");
       return;
     }
-    impactH();
+    const res = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+    if (res.canceled || !res.assets?.length) return;
+    setStoryUri(res.assets[0].uri);
+    setStoryCaption("");
+  };
+
+  // story foto kaynağı: galeri
+  const pickStoryFromLibrary = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      Alert.alert("Galeri izni gerekli", "Story seçmek için galeri iznine ihtiyaç var.");
+      return;
+    }
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.7,
@@ -312,6 +334,21 @@ export default function EventDetail() {
     if (res.canceled || !res.assets?.length) return;
     setStoryUri(res.assets[0].uri);
     setStoryCaption("");
+  };
+
+  // story: kaynak seç (Kamera / Galeri / İptal) → önizleme + caption ekranı aç.
+  const pickStory = () => {
+    // Oturum açmayan story yükleyemez → giriş modalı (akışı kilitlemez, sadece bilgilendirir).
+    if (!user) {
+      showAuthPrompt(t("lock_story_title"));
+      return;
+    }
+    impactH();
+    Alert.alert("Story paylaş", "Fotoğraf kaynağını seç", [
+      { text: "📷 Kamera", onPress: () => { void pickStoryFromCamera(); } },
+      { text: "🖼️ Galeri", onPress: () => { void pickStoryFromLibrary(); } },
+      { text: "İptal", style: "cancel" },
+    ]);
   };
 
   // story: paylaş → local liste + best-effort API
@@ -338,6 +375,7 @@ export default function EventDetail() {
     successH();
     setStoryUri(null);
     setStoryCaption("");
+    reloadStories(); // şerit anında güncellensin
   };
 
   if (loading) return <View style={{ flex: 1, backgroundColor: T.bg }}><Loader /></View>;
@@ -388,6 +426,31 @@ export default function EventDetail() {
   };
   // Kullanıcı bir kategori seçtiyse "Sen" o kategorinin sayımına +1 olarak eklenir.
   const catCount = (cat: Rsvp) => catPeople[cat].length + (rsvp === cat ? 1 : 0);
+
+  // ── Story şeridi grupları ──
+  // Benim bu etkinliğe ait story'lerim → tek grup (avatar: profil override ?? user.photo).
+  const myEventStories = stories.filter((s) => s.eventSlug === event.slug);
+  const myAvatar = avatarOverride || user?.photo || "";
+  const myGroup: StoryGroup | null =
+    myEventStories.length > 0
+      ? {
+          id: "__me",
+          name: user?.name || "Sen",
+          avatar: myAvatar,
+          isMe: true,
+          // En yeniden eskiye → kronolojik göstermek için ters çevir.
+          segments: [...myEventStories].reverse().map((s) => ({ uri: s.uri, caption: s.caption || undefined })),
+        }
+      : null;
+  // Mock katkıda bulunanlar (deterministik; slug+id ile sabit).
+  const mockGroups: StoryGroup[] = mockStoryContributors(`${event.slug}:${event.id}`).map(personToGroup);
+  const storyGroups: StoryGroup[] = [...(myGroup ? [myGroup] : []), ...mockGroups];
+
+  const openStoryViewer = (index: number) => {
+    tapH();
+    setViewerStart(index);
+    setViewerGroups(storyGroups);
+  };
 
   const openTicket = () => {
     impactH();
@@ -541,10 +604,17 @@ export default function EventDetail() {
             </View>
           </Animated.View>
 
-          {/* Story paylaş (#C web stories gibi) */}
+          {/* Story şeridi + paylaş (Instagram tarzı) */}
           <Animated.View entering={FadeInDown.duration(450).delay(180)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+            <Text style={[Type.label, { color: T.textFaint, marginBottom: 12 }]}>✨ Story'ler</Text>
+            <EventStoryStrip
+              myGroup={myGroup}
+              mockGroups={mockGroups}
+              onOpen={openStoryViewer}
+              onShare={pickStory}
+            />
             {storyUri ? (
-              <View style={{ gap: 12 }}>
+              <View style={{ gap: 12, marginTop: 14 }}>
                 <Image source={{ uri: storyUri }} style={styles.storyPreview} contentFit="cover" transition={200} />
                 <TextInput
                   value={storyCaption}
@@ -566,9 +636,7 @@ export default function EventDetail() {
                   </View>
                 </View>
               </View>
-            ) : (
-              <GradientButton label={`📸 ${t("share_story")}`} gradient={c.gradient} onPress={pickStory} />
-            )}
+            ) : null}
           </Animated.View>
 
           {/* #14 — Etkinliğe katılacaklar (dokun → liste + her satırda "Mesaj at") */}
@@ -731,8 +799,14 @@ export default function EventDetail() {
                   <Pressable
                     onPress={() => {
                       tapH();
-                      if (!isMe && p.hasStory) { setListOpen(false); setViewStory(p); }
-                      else setPhotoView(p.avatar);
+                      if (!isMe && p.hasStory) {
+                        // Bu kişiyi tek-segment grup olarak yeni izleyicide aç.
+                        setListOpen(false);
+                        setViewerStart(0);
+                        setViewerGroups([personToGroup(p)]);
+                      } else {
+                        setPhotoView(p.avatar);
+                      }
                     }}
                     onLongPress={() => { tapH(); setPhotoView(p.avatar); }}
                     delayLongPress={250}
@@ -794,35 +868,14 @@ export default function EventDetail() {
         onPressPerson={openPerson}
       />
 
-      {/* Story izleyici — story halkası olan kişiye dokununca. Mock kişilerde gerçek
-          story medyası yok → avatar tam ekran gösterilir; gerçek story'ler DB ile gelecek. */}
-      <Modal visible={!!viewStory} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setViewStory(null)}>
-        <Animated.View entering={FadeIn.duration(160)} style={styles.storyViewer}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setViewStory(null)} />
-          {viewStory ? (
-            <>
-              <View style={[styles.storyBarTop, { top: insets.top + 8 }]}>
-                <View style={[styles.storyProgress, { backgroundColor: T.primary }]} />
-              </View>
-              <Image source={{ uri: viewStory.avatar }} style={styles.storyViewerImg} contentFit="cover" transition={200} />
-              <Pressable
-                onPress={() => { const id = viewStory.id; setViewStory(null); router.push(`/kisi/${id}`); }}
-                style={[styles.storyViewerInfo, { top: insets.top + 22 }]}
-                hitSlop={8}
-              >
-                <StoryAvatar uri={viewStory.avatar} name={viewStory.name} size={38} online={viewStory.online} />
-                <Text style={[Type.title, { color: "#fff" }]}>{viewStory.name}</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => { const id = viewStory.id; setViewStory(null); router.push(`/kisi/${id}`); }}
-                style={[styles.storyProfileBtn, { bottom: insets.bottom + 28 }]}
-              >
-                <Text style={[Type.title, { color: "#fff" }]}>👤 {viewStory.name} · {t("person_about")} →</Text>
-              </Pressable>
-            </>
-          ) : null}
-        </Animated.View>
-      </Modal>
+      {/* Çoklu-segment Instagram-tarzı story izleyici (benim story'lerim + mock katkılar + listeden hasStory'li kişi) */}
+      {viewerGroups ? (
+        <EventStoryViewer
+          groups={viewerGroups}
+          startIndex={viewerStart}
+          onClose={() => setViewerGroups(null)}
+        />
+      ) : null}
 
       {/* Avatar fotoğrafını büyütme modal'ı (dokun/basılı tut) */}
       <Modal visible={!!photoView} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPhotoView(null)}>
@@ -831,6 +884,23 @@ export default function EventDetail() {
         </Pressable>
       </Modal>
     </View>
+  );
+}
+
+/** RSVP kategorisi sayaç satırı — dokununca o kategorinin kişi listesi açılır. */
+function RsvpCountRow({ T, icon, label, count, active, onPress }: { T: Palette; icon: string; label: string; count: number; active?: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.countRow, { backgroundColor: T.surfaceStrong, borderColor: active ? T.primary : T.hairline }]}
+    >
+      <Text style={{ fontSize: 16 }}>{icon}</Text>
+      <Text style={[Type.title, { color: T.text, flex: 1 }]} numberOfLines={1}>{label}</Text>
+      <View style={[styles.countBadge, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+        <Text style={[Type.label, { color: active ? T.primary : T.textDim }]}>{count}</Text>
+      </View>
+      <Text style={[Type.label, { color: T.primary }]}>→</Text>
+    </Pressable>
   );
 }
 
@@ -856,6 +926,8 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: "row", gap: 14, alignItems: "center", paddingVertical: 6 },
   sep: { height: StyleSheet.hairlineWidth * 2, marginVertical: 6 },
   rsvpRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  countRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 11, borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2 },
+  countBadge: { minWidth: 28, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center", justifyContent: "center" },
   storyPreview: { width: "100%", height: 200, borderRadius: Radius.md },
   avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2 },
   avatarMore: { alignItems: "center", justifyContent: "center" },
@@ -872,12 +944,6 @@ const styles = StyleSheet.create({
   sendBtn: { paddingHorizontal: 16, paddingVertical: 11, alignItems: "center", justifyContent: "center" },
   addPhoto: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
   photo: { width: 100, height: 100, borderRadius: Radius.md },
-  storyViewer: { flex: 1, backgroundColor: "#000", alignItems: "center", justifyContent: "center" },
-  storyViewerImg: { width: "100%", height: "100%" },
-  storyBarTop: { position: "absolute", left: 12, right: 12, height: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.25)", overflow: "hidden" },
-  storyProgress: { position: "absolute", left: 0, top: 0, bottom: 0, width: "100%", borderRadius: 2 },
-  storyViewerInfo: { position: "absolute", left: 14, flexDirection: "row", alignItems: "center", gap: 10 },
-  storyProfileBtn: { position: "absolute", alignSelf: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: StyleSheet.hairlineWidth * 2, borderColor: "rgba(255,255,255,0.3)", paddingHorizontal: 18, paddingVertical: 12, borderRadius: Radius.pill },
   photoModalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center", padding: 16 },
   photoModalImg: { width: "94%", height: "78%", borderRadius: Radius.lg },
   photoDel: {
