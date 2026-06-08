@@ -57,6 +57,16 @@ export interface ChatMessage {
 }
 
 const chatKey = (id: string) => `meydanfest:chat:${id}`;
+const readKey = (id: string) => `meydanfest:chatread:${id}`;
+
+/** Bu sohbeti "okundu" işaretle (şimdiki zamanı son-okuma damgası yapar). */
+export async function markChatRead(personId: string) {
+  try {
+    await AsyncStorage.setItem(readKey(personId), String(Date.now()));
+  } catch {
+    // sessiz geç
+  }
+}
 
 const OPENERS: Record<string, string> = {
   default: "Selam! Yaklaşan etkinliklerden hangisine gidiyorsun? 🎉",
@@ -95,6 +105,12 @@ export function useChat(personId: string) {
     })();
     return () => { alive = false; };
   }, [personId]);
+
+  // Sohbet açıkken (bu ekran mount'luyken) mesaj değiştikçe okundu işaretle.
+  // Ekrandan çıkıp da sonradan gelen mesaj (örn. geç gelen bot cevabı) okunmamış kalır.
+  useEffect(() => {
+    if (messages.length) void markChatRead(personId);
+  }, [messages, personId]);
 
   const persist = useCallback((next: ChatMessage[]) => {
     setMessages(next);

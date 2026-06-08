@@ -2,7 +2,7 @@ import React, { useCallback, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,7 +10,7 @@ import { Radius, Type, glow } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { impactH, tapH } from "@/lib/haptics";
-import { listConversations, type Conversation } from "@/lib/conversations";
+import { listConversations, totalUnread, type Conversation } from "@/lib/conversations";
 
 const SIZE = 58;
 const MARGIN = 16;
@@ -26,6 +26,14 @@ export function ChatBubble() {
   const { width, height } = useWindowDimensions();
   const [open, setOpen] = useState(false);
   const [convos, setConvos] = useState<Conversation[]>([]);
+  const unread = totalUnread(convos);
+
+  const refresh = useCallback(() => {
+    listConversations().then(setConvos).catch(() => {});
+  }, []);
+
+  // Anasayfa her odaklandığında (sohbetten dönünce) okunmamış sayılarını tazele.
+  useFocusEffect(refresh);
 
   const minX = MARGIN;
   const maxX = width - SIZE - MARGIN;
@@ -91,6 +99,11 @@ export function ChatBubble() {
           <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
             <Text style={styles.emoji}>💬</Text>
           </LinearGradient>
+          {unread > 0 && (
+            <View style={[styles.bubbleBadge, { borderColor: T.bg }]}>
+              <Text style={styles.badgeText}>{unread > 99 ? "99+" : unread}</Text>
+            </View>
+          )}
         </Animated.View>
       </GestureDetector>
 
@@ -129,11 +142,23 @@ export function ChatBubble() {
                       <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>
                         {c.person.name}
                       </Text>
-                      <Text style={[Type.label, { color: T.textDim, marginTop: 2 }]} numberOfLines={1}>
+                      <Text
+                        style={[
+                          Type.label,
+                          { color: c.unread > 0 ? T.text : T.textDim, marginTop: 2, fontWeight: c.unread > 0 ? "700" : "400" },
+                        ]}
+                        numberOfLines={1}
+                      >
                         {c.last?.fromMe ? "Sen: " : ""}{c.last?.text ?? ""}
                       </Text>
                     </View>
-                    <Text style={{ color: T.textFaint, fontSize: 18 }}>›</Text>
+                    {c.unread > 0 ? (
+                      <View style={styles.rowBadge}>
+                        <Text style={styles.badgeText}>{c.unread > 99 ? "99+" : c.unread}</Text>
+                      </View>
+                    ) : (
+                      <Text style={{ color: T.textFaint, fontSize: 18 }}>›</Text>
+                    )}
                   </Pressable>
                 ))}
               </ScrollView>
@@ -163,6 +188,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   emoji: { fontSize: 26 },
+  bubbleBadge: {
+    position: "absolute",
+    top: -3,
+    right: -3,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#FF3B30",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5,
+    borderWidth: 2,
+  },
+  rowBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#FF3B30",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+  badgeText: { color: "#fff", fontSize: 11, fontWeight: "800" },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
   sheet: {
     paddingHorizontal: 16,
