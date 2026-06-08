@@ -8,6 +8,7 @@ import { PhotoUpload } from "./PhotoUpload";
 import { InstagramIcon } from "./icons/Social";
 import { Select } from "./ui/Select";
 import { CITIES } from "@/lib/types";
+import { COUNTRIES } from "@/lib/countries";
 import { calcAge } from "@/lib/social-data";
 
 const LS_KEY = "es.profile";
@@ -19,6 +20,7 @@ interface ProfileData {
   avatarUrl: string | null;
   instagram: string;
   instagramVisible: boolean;
+  country: string; // İngilizce ülke adı (Ticketmaster uyumlu), örn. "Turkey"
   city: string;
   birthDate: string; // YYYY-MM-DD
   hobbies: string[];
@@ -43,6 +45,7 @@ const DEFAULT: ProfileData = {
   avatarUrl: null,
   instagram: "",
   instagramVisible: false,
+  country: "Turkey",
   city: "",
   birthDate: "",
   hobbies: [],
@@ -386,6 +389,25 @@ export function ProfileSettingsClient({ initialAuthName, initialAuthImage }: Pro
           Konum & Yaş
         </h2>
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 space-y-4">
+          <Field label="Ülke" hint="Profilinde görünür ve etkinlik filtrelerinde kullanılır">
+            <div className="flex items-stretch gap-2">
+              <span className="grid place-items-center px-3 rounded-s-xl border border-[var(--border)] border-e-0 bg-[var(--primary)]/10 text-[var(--primary)]">
+                <MapPin className="size-4" />
+              </span>
+              <div className="flex-1">
+                <Select
+                  value={profile.country}
+                  onChange={(v) => update("country", v)}
+                  options={COUNTRIES.map((c) => ({
+                    value: c.name,
+                    label: `${c.flag} ${c.tr}`,
+                  }))}
+                  className="!rounded-s-none"
+                />
+              </div>
+            </div>
+          </Field>
+
           <Field label="Şehir" hint="Profilinde görünür ve etkinlik filtrelerinde kullanılır">
             <div className="flex items-stretch gap-2">
               <span className="grid place-items-center px-3 rounded-s-xl border border-[var(--border)] border-e-0 bg-[var(--primary)]/10 text-[var(--primary)]">
