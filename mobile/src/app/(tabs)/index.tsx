@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dimensions, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { router, useFocusEffect } from "expo-router";
@@ -52,6 +52,8 @@ export default function DiscoverScreen() {
   const [day, setDay] = useState<"all" | "today" | "tomorrow" | "weekend">("all");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Tam-ekran Loader yalnız ilk yüklemede; sonraki şehir/gün değişiminde hero kaybolmasın.
+  const loadedOnce = useRef(false);
 
   // Şehir+kategori+gün kombinasyonuna göre cache anahtarı.
   const cacheKey = useCallback(
@@ -80,13 +82,16 @@ export default function DiscoverScreen() {
         feedRes = await fetchEvents({ category: category ?? undefined, from: range.from, to: range.to, pageSize: 30 });
       }
       const withImg = feedRes.data.filter((e) => e.image_url);
-      setFeatured((withImg.length >= 5 ? withImg : feedRes.data).slice(0, 6));
+      const list = (withImg.length >= 5 ? withImg : feedRes.data).slice(0, 6);
+      // Boş sonuç mevcut hero'yu boşaltmasın (ilk yükleme hariç).
+      if (list.length > 0 || !loadedOnce.current) setFeatured(list);
       void saveEventsCache(key, feedRes.data);
     } catch {
       /* cache gösterildiyse koru */
     } finally {
       setLoading(false);
       setRefreshing(false);
+      loadedOnce.current = true;
     }
   }, [cacheKey]);
 
@@ -94,7 +99,7 @@ export default function DiscoverScreen() {
     let alive = true;
     // Spinner SADECE cache yokken görünsün: cache varsa load() içinde anında kapanır.
     void loadEventsCache(cacheKey(cat, city, day)).then((c) => {
-      if (alive && !c) setLoading(true);
+      if (alive && !c && !loadedOnce.current) setLoading(true);
     });
     load(cat, city, day);
     return () => {
