@@ -17,6 +17,7 @@ export interface ApiEvent {
   category: string;
   venue: string;
   city: string;
+  country?: string;
   starts_at: string;
   ends_at: string | null;
   price_min: number | null;
@@ -41,6 +42,7 @@ export interface EventsResponse {
 
 export interface EventQuery {
   city?: string;
+  country?: string;
   category?: string;
   freeOnly?: boolean;
   search?: string;
@@ -53,6 +55,7 @@ export interface EventQuery {
 export async function fetchEvents(q: EventQuery = {}): Promise<EventsResponse> {
   const sp = new URLSearchParams();
   if (q.city) sp.set("city", q.city);
+  if (q.country) sp.set("country", q.country);
   if (q.category) sp.set("category", q.category);
   if (q.freeOnly) sp.set("free", "1");
   if (q.search) sp.set("q", q.search);

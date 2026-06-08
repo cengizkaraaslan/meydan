@@ -16,6 +16,8 @@ import { fetchEvents, type ApiEvent } from "@/lib/api";
 import { loadEventsCache, saveEventsCache } from "@/lib/eventCache";
 import { dayRange, isPastDay } from "@/lib/format";
 import { useActiveCity, ALL_CITIES } from "@/lib/location";
+import { COUNTRIES, DEFAULT_COUNTRY, countryByCode, type Country } from "@/lib/countries";
+import * as Location from "expo-location";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -60,6 +62,57 @@ export default function DiscoverScreen() {
     const q = citySearch.trim().toLocaleLowerCase("tr");
     return q ? ALL_CITIES.filter((c) => c.toLocaleLowerCase("tr").includes(q)) : ALL_CITIES;
   }, [citySearch]);
+
+  // Ülke seçimi (varsayılan Türkiye). AsyncStorage'dan yüklenir/kaydedilir.
+  const [country, setCountryState] = useState<Country>(DEFAULT_COUNTRY);
+  const [countryList, setCountryList] = useState(false); // modal içinde ülke liste görünümü açık mı
+  const [countrySearch, setCountrySearch] = useState("");
+  const isTR = country.code === "TR";
+  const filteredCountries = useMemo(() => {
+    const q = countrySearch.trim().toLocaleLowerCase("tr");
+    if (!q) return COUNTRIES;
+    return COUNTRIES.filter(
+      (c) => c.tr.toLocaleLowerCase("tr").includes(q) || c.name.toLowerCase().includes(q.toLowerCase()),
+    );
+  }, [countrySearch]);
+
+  useEffect(() => {
+    let alive = true;
+    AsyncStorage.getItem("meydanfest:country").then((code) => {
+      if (!alive) return;
+      const c = countryByCode(code ?? undefined);
+      if (c) setCountryState(c);
+    });
+    return () => { alive = false; };
+  }, []);
+
+  const setCountry = useCallback((c: Country) => {
+    setCountryState(c);
+    void AsyncStorage.setItem("meydanfest:country", c.code);
+  }, []);
+
+  // "Konumumu kullan": GPS şehir akışı + ters jeokodla ülkeyi otomatik seç.
+  const handleUseLocation = useCallback(async () => {
+    setCity(null); // Türkiye şehir akışı: manuel şehri temizle → GPS tespiti devreye girsin
+    setCityModal(false);
+    setCitySearch("");
+    setCountryList(false);
+    setCountrySearch("");
+    try {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (perm.status !== "granted") return;
+      let pos = await Location.getLastKnownPositionAsync();
+      if (!pos) pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      if (!pos) return;
+      const geo = await Location.reverseGeocodeAsync({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+      const iso = geo[0]?.isoCountryCode;
+      const detected = countryByCode(iso ?? undefined);
+      if (detected) setCountry(detected);
+      else setCountry(DEFAULT_COUNTRY);
+    } catch {
+      /* sessizce geç */
+    }
+  }, [setCity, setCountry]);
   const [featured, setFeatured] = useState<ApiEvent[]>([]);
   const [cat, setCat] = useState<string | null>(null);
   const [day, setDay] = useState<"all" | "today" | "tomorrow" | "weekend">("all");
@@ -68,14 +121,16 @@ export default function DiscoverScreen() {
   // Tam-ekran Loader yalnız ilk yüklemede; sonraki şehir/gün değişiminde hero kaybolmasın.
   const loadedOnce = useRef(false);
 
-  // Şehir+kategori+gün kombinasyonuna göre cache anahtarı.
+  // Ülke+şehir+kategori+gün kombinasyonuna göre cache anahtarı.
   const cacheKey = useCallback(
-    (category: string | null, useCity: string | null, useDay: string) => `feed:${useCity ?? "auto"}:${category ?? "all"}:${useDay}`,
+    (category: string | null, useCity: string | null, useDay: string, ctry: string) =>
+      `feed:${ctry}:${useCity ?? "auto"}:${category ?? "all"}:${useDay}`,
     []
   );
 
-  const load = useCallback(async (category: string | null, useCity: string | null, useDay: "all" | "today" | "tomorrow" | "weekend") => {
-    const key = cacheKey(category, useCity, useDay);
+  const load = useCallback(async (category: string | null, useCity: string | null, useDay: "all" | "today" | "tomorrow" | "weekend", ctry: Country) => {
+    const trCountry = ctry.code === "TR";
+    const key = cacheKey(category, trCountry ? useCity : null, useDay, ctry.code);
 
     // 1) Cache varsa HEMEN göster (hızlı ilk boya), spinner'ı kapat.
     const cached = await loadEventsCache(key);
@@ -89,10 +144,16 @@ export default function DiscoverScreen() {
     try {
       // Seçili güne göre tarih aralığı ("all" → aralık yok).
       const range = dayRange(useDay);
-      // Öncelik: bulunduğun şehir. O şehirde sonuç yoksa → genel (random) feed.
-      let feedRes = await fetchEvents({ city: useCity ?? undefined, category: category ?? undefined, from: range.from, to: range.to, pageSize: 30 });
-      if (useCity && feedRes.data.length === 0) {
-        feedRes = await fetchEvents({ category: category ?? undefined, from: range.from, to: range.to, pageSize: 30 });
+      let feedRes;
+      if (!trCountry) {
+        // Yurt dışı: o ülkenin etkinlikleri (şehir filtresi yok).
+        feedRes = await fetchEvents({ country: ctry.name, category: category ?? undefined, from: range.from, to: range.to, pageSize: 30 });
+      } else {
+        // Türkiye: öncelik bulunduğun şehir. O şehirde sonuç yoksa → genel (random) feed.
+        feedRes = await fetchEvents({ city: useCity ?? undefined, category: category ?? undefined, from: range.from, to: range.to, pageSize: 30 });
+        if (useCity && feedRes.data.length === 0) {
+          feedRes = await fetchEvents({ category: category ?? undefined, from: range.from, to: range.to, pageSize: 30 });
+        }
       }
       const withImg = feedRes.data.filter((e) => e.image_url);
       const list = (withImg.length >= 5 ? withImg : feedRes.data).slice(0, 6);
@@ -111,14 +172,14 @@ export default function DiscoverScreen() {
   useEffect(() => {
     let alive = true;
     // Spinner SADECE cache yokken görünsün: cache varsa load() içinde anında kapanır.
-    void loadEventsCache(cacheKey(cat, city, day)).then((c) => {
+    void loadEventsCache(cacheKey(cat, isTR ? city : null, day, country.code)).then((c) => {
       if (alive && !c && !loadedOnce.current) setLoading(true);
     });
-    load(cat, city, day);
+    load(cat, city, day, country);
     return () => {
       alive = false;
     };
-  }, [cat, city, day, load, cacheKey]);
+  }, [cat, city, day, country, isTR, load, cacheKey]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -127,17 +188,23 @@ export default function DiscoverScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(cat, city, day); }} tintColor={T.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(cat, city, day, country); }} tintColor={T.primary} />
         }
       >
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(450)} style={styles.header}>
           <Pressable onPress={() => { tapH(); setCityModal(true); }} hitSlop={8}>
             <Text style={[Type.label, { color: T.textFaint }]}>
-              {city ? t("your_location") : status === "loading" ? t("locating") : t("welcome")}
+              {!isTR ? t("your_location") : city ? t("your_location") : status === "loading" ? t("locating") : t("welcome")}
             </Text>
             <Text style={[Type.h1, { color: T.text }]}>
-              {city ? <>📍 {city} <Text style={{ color: T.primary, fontSize: 16 }}>▾</Text></> : <>Meydan<Text style={{ color: T.primary }}>Fest</Text></>}
+              {!isTR ? (
+                <>{country.flag} {country.tr} <Text style={{ color: T.primary, fontSize: 16 }}>▾</Text></>
+              ) : city ? (
+                <>📍 {city} <Text style={{ color: T.primary, fontSize: 16 }}>▾</Text></>
+              ) : (
+                <>Meydan<Text style={{ color: T.primary }}>Fest</Text></>
+              )}
             </Text>
           </Pressable>
           <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
@@ -246,41 +313,87 @@ export default function DiscoverScreen() {
               </Pressable>
             </View>
 
-            {/* Konumu kullan */}
+            {/* Konumu kullan — ülke + (TR ise) şehri otomatik tespit eder */}
             <Pressable
-              onPress={() => { tapH(); setCity(null); setCityModal(false); setCitySearch(""); }}
-              style={[styles.useLoc, { borderColor: city === null ? T.primary : T.hairline, backgroundColor: T.surfaceStrong }]}
+              onPress={() => { tapH(); void handleUseLocation(); }}
+              style={[styles.useLoc, { borderColor: city === null && isTR ? T.primary : T.hairline, backgroundColor: T.surfaceStrong }]}
             >
-              <Text style={[Type.title, { color: city === null ? T.primary : T.text }]}>✦ {t("use_my_location")}</Text>
+              <Text style={[Type.title, { color: city === null && isTR ? T.primary : T.text }]}>✦ {t("use_my_location")}</Text>
             </Pressable>
 
-            {/* Şehir ara (81 il) */}
-            <TextInput
-              value={citySearch}
-              onChangeText={setCitySearch}
-              placeholder="Şehir ara…"
-              placeholderTextColor={T.textFaint}
-              autoCorrect={false}
-              style={[Type.body, styles.citySearch, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
-            />
+            {/* Ülke seçici — dokununca ülke listesini aç/kapa */}
+            <Pressable
+              onPress={() => { tapH(); setCountryList((v) => !v); setCountrySearch(""); }}
+              style={[styles.useLoc, { borderColor: T.hairline, backgroundColor: T.surfaceStrong, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}
+            >
+              <Text style={[Type.title, { color: T.text }]}>{country.flag} {country.tr}</Text>
+              <Text style={{ color: T.primary, fontSize: 16 }}>{countryList ? "▴" : "▾"}</Text>
+            </Pressable>
 
-            <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-              {filteredCities.map((c) => (
-                <Pressable
-                  key={c}
-                  onPress={() => { tapH(); setCity(c); setCityModal(false); setCitySearch(""); }}
-                  style={[styles.cityRow, { borderBottomColor: T.hairline }]}
-                >
-                  <Text style={[Type.body, { color: city === c ? T.primary : T.text, fontWeight: city === c ? "800" : "500" }]}>
-                    📍 {c}
-                  </Text>
-                  {city === c ? <Text style={{ color: T.primary }}>✓</Text> : null}
-                </Pressable>
-              ))}
-              {filteredCities.length === 0 ? (
-                <Text style={[Type.body, { color: T.textFaint, textAlign: "center", paddingVertical: 16 }]}>Sonuç yok</Text>
-              ) : null}
-            </ScrollView>
+            {countryList ? (
+              <>
+                {/* Ülke ara */}
+                <TextInput
+                  value={countrySearch}
+                  onChangeText={setCountrySearch}
+                  placeholder="Ülke ara…"
+                  placeholderTextColor={T.textFaint}
+                  autoCorrect={false}
+                  style={[Type.body, styles.citySearch, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+                />
+                <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                  {filteredCountries.map((c) => (
+                    <Pressable
+                      key={c.code}
+                      onPress={() => { tapH(); setCountry(c); setCountryList(false); setCountrySearch(""); }}
+                      style={[styles.cityRow, { borderBottomColor: T.hairline }]}
+                    >
+                      <Text style={[Type.body, { color: country.code === c.code ? T.primary : T.text, fontWeight: country.code === c.code ? "800" : "500" }]}>
+                        {c.flag} {c.tr}
+                      </Text>
+                      {country.code === c.code ? <Text style={{ color: T.primary }}>✓</Text> : null}
+                    </Pressable>
+                  ))}
+                  {filteredCountries.length === 0 ? (
+                    <Text style={[Type.body, { color: T.textFaint, textAlign: "center", paddingVertical: 16 }]}>Sonuç yok</Text>
+                  ) : null}
+                </ScrollView>
+              </>
+            ) : isTR ? (
+              <>
+                {/* Şehir ara (81 il) — yalnız Türkiye seçiliyken */}
+                <TextInput
+                  value={citySearch}
+                  onChangeText={setCitySearch}
+                  placeholder="Şehir ara…"
+                  placeholderTextColor={T.textFaint}
+                  autoCorrect={false}
+                  style={[Type.body, styles.citySearch, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+                />
+
+                <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                  {filteredCities.map((c) => (
+                    <Pressable
+                      key={c}
+                      onPress={() => { tapH(); setCity(c); setCityModal(false); setCitySearch(""); }}
+                      style={[styles.cityRow, { borderBottomColor: T.hairline }]}
+                    >
+                      <Text style={[Type.body, { color: city === c ? T.primary : T.text, fontWeight: city === c ? "800" : "500" }]}>
+                        📍 {c}
+                      </Text>
+                      {city === c ? <Text style={{ color: T.primary }}>✓</Text> : null}
+                    </Pressable>
+                  ))}
+                  {filteredCities.length === 0 ? (
+                    <Text style={[Type.body, { color: T.textFaint, textAlign: "center", paddingVertical: 16 }]}>Sonuç yok</Text>
+                  ) : null}
+                </ScrollView>
+              </>
+            ) : (
+              <Text style={[Type.body, { color: T.textFaint, textAlign: "center", paddingVertical: 16 }]}>
+                {country.flag} {country.tr} etkinlikleri gösteriliyor
+              </Text>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
