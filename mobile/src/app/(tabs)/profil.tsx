@@ -423,9 +423,16 @@ export default function ProfileScreen() {
         )}
 
         {/* Profil bilgileri — tanışma alanları (hakkımda, yaş, ilgi alanları, ...) */}
-        <Animated.View entering={FadeInDown.duration(450).delay(105)} style={{ marginBottom: Space.xl }}>
+        <Animated.View entering={FadeInDown.duration(450).delay(105)} style={{ marginBottom: Space.md }}>
           <DatingProfileFields />
         </Animated.View>
+
+        {/* Profilimi Kaydet — değişiklikler otomatik kaydolur, bu buton anında senkronlar */}
+        <Pressable onPress={saveProfile} style={{ marginBottom: Space.xl, borderRadius: Radius.pill, overflow: "hidden" }}>
+          <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.saveBtn}>
+            <Text style={[Type.title, { color: "#fff" }]}>💾 Profilimi Kaydet</Text>
+          </LinearGradient>
+        </Pressable>
 
         {/* 📍 Konum — şehir/ilçe dropdown + gerçek koordinat */}
         <Animated.View entering={FadeInDown.duration(450).delay(110)} style={{ marginBottom: Space.xl }}>
@@ -784,6 +791,7 @@ const styles = StyleSheet.create({
   },
   statValue: { fontSize: 28, lineHeight: 34, fontWeight: "800", letterSpacing: -0.4 },
   emptyCard: { alignItems: "center", gap: 8, paddingVertical: Space.xl, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2 },
+  saveBtn: { alignItems: "center", justifyContent: "center", paddingVertical: 15 },
   adminRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   adminIcon: { width: 44, height: 44, borderRadius: Radius.md, alignItems: "center", justifyContent: "center" },
   googleBtn: { flexDirection: "row", gap: 10, alignItems: "center", justifyContent: "center", paddingVertical: 15, borderRadius: Radius.pill, backgroundColor: "#fff", ...glow("#fff", 18, 0.18) },
