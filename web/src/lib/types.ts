@@ -51,6 +51,8 @@ export interface ScrapedEvent {
   category: EventCategory;
   venue: string;
   city: string;
+  /** İngilizce ülke adı (Ticketmaster venue country.name, ör. "Turkey", "Spain"). Yurt dışı filtresi için. */
+  country?: string;
   /** İl içinde ilçe (örn. "Kadıköy", "Çankaya") - opsiyonel. Filtre için kullanılır. */
   district?: string;
   startsAt: Date;
@@ -73,6 +75,7 @@ export interface EventListItem extends ScrapedEvent {
 
 export interface EventFilters {
   city?: string;
+  country?: string;
   district?: string;
   category?: EventCategory;
   source?: EventSource;

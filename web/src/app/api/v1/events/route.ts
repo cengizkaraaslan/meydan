@@ -92,6 +92,7 @@ export async function GET(request: NextRequest) {
 
   const result = await getEvents({
     city: sp.get("city") ?? undefined,
+    country: sp.get("country") ?? undefined,
     category: (sp.get("category") as EventCategory) ?? undefined,
     source: (sp.get("source") as EventSource) ?? undefined,
     freeOnly: sp.get("free") === "true" || sp.get("free") === "1",
@@ -113,6 +114,7 @@ export async function GET(request: NextRequest) {
         category: e.category,
         venue: e.venue,
         city: e.city,
+        country: e.country ?? null,
         starts_at: e.startsAt.toISOString(),
         ends_at: e.endsAt?.toISOString() ?? null,
         price_min: e.priceMin ?? null,

@@ -472,6 +472,7 @@ model Event {
   category      EventCategory
   venue         String
   city          String
+  country       String?
   startsAt      DateTime
   endsAt        DateTime?
   priceMin      Float?

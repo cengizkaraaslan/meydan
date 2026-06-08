@@ -7,16 +7,16 @@ import type { EventCategory, EventSource, ScrapedEvent } from "../../types";
  * Tek JSON endpoint (Discovery v2). API anahtarı gerekir: TICKETMASTER_API_KEY env'i.
  * Anahtar yoksa sessizce boş döner (projedeki diğer opsiyonel entegrasyonlar gibi).
  *
- * Çekim seti: Türkiye derinlemesine (3 sayfa, size=100) + seçili dünya ülkeleri
- * (her biri 1 sayfa, size=50). Toplam ~11 istek; Discovery limiti 5000/gün.
+ * Çekim seti: Türkiye derinlemesine (3 sayfa, size=50) + seçili dünya ülkeleri
+ * (her biri 1 sayfa, size=40). Toplam ~21 istek; Discovery limiti 5000/gün.
  * Docs: https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/
  */
-// NOT: setEventsForSource her event'i ardışık DB upsert ile yazar → tek run'da
-// yazılan event sayısı serverless maxDuration(60sn) için bounded tutulmalı (~180).
-const TR_PAGES = 2;
-const TR_SIZE = 40;
-const WORLD_COUNTRIES = ["US", "GB", "DE", "FR", "NL", "ES", "IT", "AE"];
-const WORLD_SIZE = 15;
+// NOT: fetch PARALEL (Promise.all); yazma EventCache'te transaction-batch (CHUNK=50)
+// → ~870 event tek run'da sığar.
+const TR_PAGES = 3;
+const TR_SIZE = 50;
+const WORLD_COUNTRIES = ["US", "GB", "DE", "FR", "NL", "ES", "IT", "AE", "CA", "AU", "MX", "BE", "AT", "CH", "SE", "IE", "PT", "PL"];
+const WORLD_SIZE = 40;
 
 interface TmImage {
   url?: string;
@@ -34,7 +34,7 @@ interface TmEvent {
     genre?: { name?: string };
   }>;
   _embedded?: {
-    venues?: Array<{ name?: string; city?: { name?: string } }>;
+    venues?: Array<{ name?: string; city?: { name?: string }; country?: { name?: string } }>;
     attractions?: Array<{ name?: string }>;
   };
 }
@@ -148,6 +148,7 @@ export class TicketmasterScraper extends TicketingScraper {
             category,
             venue,
             city,
+            country: ev._embedded?.venues?.[0]?.country?.name ?? undefined,
             startsAt,
             isFree: false,
             imageUrl: pickImage(ev.images),

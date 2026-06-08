@@ -145,6 +145,8 @@ export default function EventDetail() {
 
   // story paylaşma akışı — seçilen/çekilen foto editöre verilir; editör onDone'da ANINDA paylaşılır.
   const [storyUri, setStoryUri] = useState<string | null>(null);
+  // story kaynak seçimi (Kamera/Galeri) — alttan açılan şık modal.
+  const [storySrcModal, setStorySrcModal] = useState(false);
   // duvara (Meydan feed) foto paylaşma durumu
   const [wallPosting, setWallPosting] = useState(false);
 
@@ -464,7 +466,7 @@ export default function EventDetail() {
   };
 
   // story: PRATİK akış → kaynak seç (Kamera/Galeri) → ImageEditor → onDone'da ANINDA paylaş.
-  // Caption yok, geri/iptal karmaşası yok.
+  // Caption yok, geri/iptal karmaşası yok. Kaynak seçimi şık alt-modalda (storySrcModal).
   const pickStory = () => {
     // Oturum açmayan story yükleyemez → giriş modalı (akışı kilitlemez, sadece bilgilendirir).
     if (!user) {
@@ -472,11 +474,15 @@ export default function EventDetail() {
       return;
     }
     impactH();
-    Alert.alert("Story paylaş", "Fotoğraf kaynağını seç", [
-      { text: "📷 Kamera", onPress: () => { void pickStoryFromCamera(); } },
-      { text: "🖼️ Galeri", onPress: () => { void pickStoryFromLibrary(); } },
-      { text: "İptal", style: "cancel" },
-    ]);
+    setStorySrcModal(true);
+  };
+
+  // Kaynak modalından seçim: modalı kapat → ilgili picker (kamera/galeri) → ImageEditor → anında paylaş.
+  const chooseStorySource = (source: "camera" | "library") => {
+    tapH();
+    setStorySrcModal(false);
+    if (source === "camera") void pickStoryFromCamera();
+    else void pickStoryFromLibrary();
   };
 
   // Editör 'Bitir'e basınca: ANINDA addStory (caption boş) + etkinlik adı/konum ile + reload.
@@ -1096,6 +1102,57 @@ export default function EventDetail() {
         onMessagePerson={messagePerson}
       />
 
+      {/* Story kaynak seçimi — alttan açılan şık modal (Kamera / Galeri). */}
+      <Modal
+        visible={storySrcModal}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setStorySrcModal(false)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setStorySrcModal(false)} />
+        <View style={[styles.sheet, { backgroundColor: T.bgElevated, paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetHandle, { backgroundColor: T.hairline }]} />
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+            <Text style={[Type.h2, { color: T.text }]}>✨ Story paylaş</Text>
+            <Pressable onPress={() => { tapH(); setStorySrcModal(false); }} hitSlop={10}>
+              <Text style={{ color: T.textDim, fontSize: 22 }}>✕</Text>
+            </Pressable>
+          </View>
+
+          {/* İki büyük seçenek — yan yana, gradient ikon daireli */}
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <Pressable
+              onPress={() => chooseStorySource("camera")}
+              style={[styles.storySrcOpt, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+            >
+              <LinearGradient colors={c.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.storySrcIcon}>
+                <Text style={{ fontSize: 28 }}>📷</Text>
+              </LinearGradient>
+              <Text style={[Type.title, { color: T.text }]}>Kamera</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => chooseStorySource("library")}
+              style={[styles.storySrcOpt, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+            >
+              <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.storySrcIcon}>
+                <Text style={{ fontSize: 28 }}>🖼️</Text>
+              </LinearGradient>
+              <Text style={[Type.title, { color: T.text }]}>Galeri</Text>
+            </Pressable>
+          </View>
+
+          {/* Sade iptal */}
+          <Pressable
+            onPress={() => { tapH(); setStorySrcModal(false); }}
+            style={[styles.storySrcCancel, { borderColor: T.hairline, backgroundColor: T.surface }]}
+          >
+            <Text style={[Type.label, { color: T.textDim }]}>İptal</Text>
+          </Pressable>
+        </View>
+      </Modal>
+
       {/* Story editör — kaynak seçilince açılır; 'Bitir'de ANINDA paylaşır (caption yok, geri yok). */}
       {storyUri ? (
         <ImageEditor
@@ -1311,6 +1368,9 @@ const styles = StyleSheet.create({
     position: "absolute", top: 6, right: 6, width: 28, height: 28, borderRadius: 14,
     backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center",
   },
+  storySrcOpt: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingVertical: 22, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2 },
+  storySrcIcon: { width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center" },
+  storySrcCancel: { marginTop: 16, paddingVertical: 13, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center", justifyContent: "center" },
   leaveBackdrop: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.7)" },
   leaveCenter: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   leaveCard: { width: "100%", maxWidth: 420, borderRadius: Radius.xl, padding: 22, paddingTop: 30, borderWidth: StyleSheet.hairlineWidth * 2, ...glow("#000", 24, 0.4) },

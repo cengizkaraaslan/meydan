@@ -35,6 +35,7 @@ interface CachedRow {
   category: string;
   venue: string;
   city: string;
+  country: string | null;
   district: string | null;
   startsAt: Date;
   endsAt: Date | null;
@@ -58,6 +59,7 @@ function rowToListItem(r: CachedRow): EventListItem {
     category: r.category as EventCategory,
     venue: r.venue,
     city: r.city,
+    country: r.country ?? undefined,
     district: r.district ?? undefined,
     startsAt: r.startsAt,
     endsAt: r.endsAt ?? undefined,
@@ -73,7 +75,7 @@ function rowToListItem(r: CachedRow): EventListItem {
 
 const SELECT = {
   id: true, slug: true, source: true, externalId: true, title: true, description: true,
-  category: true, venue: true, city: true, district: true, startsAt: true, endsAt: true,
+  category: true, venue: true, city: true, country: true, district: true, startsAt: true, endsAt: true,
   priceMin: true, priceMax: true, isFree: true, ticketUrl: true, imageUrl: true,
   artist: true, featured: true,
 } as const;
@@ -131,6 +133,7 @@ export async function setEventsForSource(
       category: e.category as EventCategory,
       venue: e.venue,
       city: e.city,
+      country: e.country ?? null,
       district: e.district ?? null,
       startsAt: e.startsAt,
       endsAt: e.endsAt ?? null,

@@ -159,6 +159,10 @@ function applyFilters(items: EventListItem[], filters: EventFilters): EventListI
     const c = foldTr(filters.city);
     out = out.filter((e) => foldTr(e.city) === c);
   }
+  if (filters.country) {
+    const c = foldTr(filters.country);
+    out = out.filter((e) => (e.country ? foldTr(e.country) === c : false));
+  }
   if (filters.district) {
     const q = foldTr(filters.district);
     out = out.filter(
@@ -240,6 +244,7 @@ export async function getEvents(filters: EventFilters = {}): Promise<EventQueryR
     hidden: false,
     // case-insensitive: "İstanbul" / "istanbul" / "İSTANBUL" hepsi eşleşsin
     ...(filters.city && { city: { equals: filters.city, mode: "insensitive" as const } }),
+    ...(filters.country && { country: { equals: filters.country, mode: "insensitive" as const } }),
     ...(filters.category && { category: filters.category }),
     // Cast: yeni üniversite source'ları Prisma şemasına Faz 2 migration'ı ile eklenecek;
     // o zamana dek client tip-checker'ı bypass etmek için cast'liyoruz.
@@ -293,6 +298,7 @@ export async function getEvents(filters: EventFilters = {}): Promise<EventQueryR
       category: r.category,
       venue: r.venue,
       city: r.city,
+      country: r.country ?? undefined,
       startsAt: r.startsAt,
       endsAt: r.endsAt ?? undefined,
       priceMin: r.priceMin ?? undefined,
