@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getOrCreateDeviceId } from "./device";
 import { getPerson } from "./people";
+import { uploadImage } from "./social";
 import {
   apiDeleteMessage,
   apiEditMessage,

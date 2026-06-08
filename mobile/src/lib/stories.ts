@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
-import { createStory, deleteStoryRemote, updateStoryCaption as updateStoryCaptionRemote, uploadImage } from "./social";
+import { createStory, deleteStoryRemote, fetchMyStories, updateStoryCaption as updateStoryCaptionRemote, uploadImage } from "./social";
 
 /**
  * Kullanıcının paylaştığı story'ler. "meydanfest:stories" anahtarı.
@@ -90,6 +90,34 @@ export async function updateStoryCaption(ts: number, caption: string): Promise<v
   const next = list.map((s) => (s.ts === ts ? { ...s, caption } : s));
   await AsyncStorage.setItem(KEY, JSON.stringify(next));
   notify();
+}
+
+/**
+ * Backend'teki KENDİ story'lerimi (deviceId) çekip yerelle birleştirir.
+ * Böylece profil her zaman ID'ye bağlı, yalnızca BENİM story'lerimi gösterir
+ * (yeniden kurulumda bile gelir). Çevrimdışıysa yerel korunur.
+ */
+export async function syncStoriesFromBackend(): Promise<void> {
+  try {
+    const remote = await fetchMyStories();
+    const local = await getStories();
+    const mapped: Story[] = remote.map((r) => ({
+      uri: r.imageUrl,
+      caption: r.caption ?? "",
+      eventSlug: r.eventSlug ?? "",
+      ts: Date.parse(r.createdAt) || Date.now(),
+      id: r.id,
+      eventTitle: r.eventTitle ?? undefined,
+    }));
+    const remoteIds = new Set(mapped.map((m) => m.id));
+    // Backend'de olmayan yerel (henüz yüklenmemiş / offline) kayıtları koru.
+    const localOnly = local.filter((l) => !l.id || !remoteIds.has(l.id));
+    const merged = [...mapped, ...localOnly].sort((a, b) => b.ts - a.ts);
+    await AsyncStorage.setItem(KEY, JSON.stringify(merged));
+    notify();
+  } catch {
+    /* çevrimdışı → yerel kalır */
+  }
 }
 
 /** Story'ler için reaktif okuma — herhangi bir ekranda değişiklik anında yansır. */

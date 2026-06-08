@@ -25,6 +25,7 @@ import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { showAuthPrompt } from "@/lib/authPrompt";
 import { syncProfile } from "@/lib/profileSync";
+import { uploadImage } from "@/lib/social";
 import { useDProfile } from "@/lib/dprofile";
 import { useActiveCity, ALL_CITIES, districtsFor } from "@/lib/location";
 import { tapH, impactH, successH } from "@/lib/haptics";
@@ -173,14 +174,27 @@ export default function ProfileScreen() {
     setCropUri(res.assets[0].uri);
   };
 
-  // Düzenleme onayı → kaydet (yerel + DB senkron) + ÖNCEKİ avatar dosyasını sil (şişmesin).
+  // Düzenleme onayı → önce yerel önizleme, sonra R2'ye YÜKLE → public URL'i kaydet + DB'ye senkron.
   const saveAvatar = (uri: string) => {
     const prev = avatarOverride;
     setCropUri(null);
-    setAvatarOverride(uri);
+    setAvatarOverride(uri); // hızlı önizleme (yerel)
     AsyncStorage.setItem("meydanfest:avatar", uri);
-    syncProfile({ avatar: uri });
-    if (prev && prev !== uri) deleteLocalFile(prev); // file:// değilse (Google foto) dokunmaz
+    void (async () => {
+      // Yerel görseli sunucuya (R2) yükle → public URL. Başarısızsa yerelde kalır.
+      const url = await uploadImage(uri, "post");
+      if (url) {
+        setAvatarOverride(url);
+        AsyncStorage.setItem("meydanfest:avatar", url);
+        syncProfile({ avatar: url }); // DB'ye GERÇEK URL gider
+        if (prev && prev !== url) deleteLocalFile(prev);
+      } else {
+        // Yükleme olmadıysa en azından yerel yolu senkronla (eski davranış).
+        syncProfile({ avatar: uri });
+        showToast("Avatar yüklenemedi (çevrimdışı?) — yerelde kayıtlı");
+        if (prev && prev !== uri) deleteLocalFile(prev);
+      }
+    })();
   };
 
   // ── 📍 Konum: şehir/ilçe dropdown + gerçek koordinat ──

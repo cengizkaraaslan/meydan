@@ -31,6 +31,7 @@ import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { API_BASE } from "@/lib/api";
 import { getMyEvent, upsertMyEvent } from "@/lib/myEvents";
+import { uploadImage } from "@/lib/social";
 import { tapH, impactH, successH } from "@/lib/haptics";
 
 /** Görseli 1200px genişliğe sığdırıp JPEG olarak sıkıştırır (SDK56 context API + fallback). */
@@ -213,6 +214,13 @@ export default function CreateEventScreen() {
   async function publish() {
     if (!canPublish || published) return;
     impactH();
+    // Yerel görseli (file://) gönderim öncesi R2'ye yükle → public URL kaydet.
+    // Görsel zaten http ile başlıyorsa (düzenlemede mevcut URL) tekrar yükleme. Upload best-effort: null → yerel uri ile devam.
+    let imageToSend = image;
+    if (image && !image.startsWith("http")) {
+      const uploaded = await uploadImage(image, "post");
+      if (uploaded) imageToSend = uploaded;
+    }
     // Best-effort POST — görsel upload backend'i YOK, yerel uri ya da boş gönderilir.
     try {
       await fetch(`${API_BASE}/api/v1/create-event`, {
@@ -230,7 +238,7 @@ export default function CreateEventScreen() {
           instagram: instagram.trim(),
           facebook: facebook.trim(),
           tiktok: tiktok.trim(),
-          imageUrl: image ?? "",
+          imageUrl: imageToSend ?? "",
           creatorEmail: user?.email ?? "",
           creatorName: creatorHidden ? "" : (user?.name ?? ""),
           creatorHidden,
@@ -253,7 +261,7 @@ export default function CreateEventScreen() {
         instagram: instagram.trim(),
         facebook: facebook.trim(),
         tiktok: tiktok.trim(),
-        imageUri: image,
+        imageUri: imageToSend,
         startsAt: (when ?? new Date()).toISOString(),
         creatorName: user?.name ?? user?.email ?? "",
         creatorHidden,
