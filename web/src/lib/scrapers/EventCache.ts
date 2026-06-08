@@ -121,7 +121,9 @@ export async function setEventsForSource(
   let written = 0;
   const now = new Date();
   const writtenForFeed: { slug: string; title: string; city: string; category: string; imageUrl: string | null }[] = [];
-  for (const e of events) {
+
+  // Her event için upsert verisi + (feed için) özet hazırla.
+  const items = events.map((e) => {
     const data = {
       slug: buildSlug(e),
       title: e.title,
@@ -141,20 +143,43 @@ export async function setEventsForSource(
       hidden: false,
       lastScrapedAt: now,
     };
-    try {
-      await db.event.upsert({
-        where: { source_externalId: { source: String(source), externalId: e.externalId } },
-        create: { source: String(source), externalId: e.externalId, ...data },
-        update: data,
-      });
-      written++;
-      writtenForFeed.push({ slug: data.slug, title: data.title, city: data.city, category: String(data.category), imageUrl: data.imageUrl });
-    } catch (err) {
-      console.warn(
-        `[EventCache] ${source} ${e.externalId} yazılamadı:`,
-        err instanceof Error ? err.message : err,
-      );
+    return { externalId: e.externalId, data };
+  });
+
+  const upsertOne = (it: (typeof items)[number]) =>
+    db.event.upsert({
+      where: { source_externalId: { source: String(source), externalId: it.externalId } },
+      create: { source: String(source), externalId: it.externalId, ...it.data },
+      update: it.data,
+    });
+
+  // Tek tek `await` (her biri ayrı round-trip) yüzlerce event'te 60sn serverless
+  // limitini aşıyordu. Parçalara böl ve her parçayı TEK transaction'da batch'le
+  // → round-trip yığılması biter (silme yok; katılım/yorum FK'leri korunur).
+  const CHUNK = 50;
+  try {
+    for (let i = 0; i < items.length; i += CHUNK) {
+      const chunk = items.slice(i, i + CHUNK);
+      await db.$transaction(chunk.map(upsertOne));
+      written += chunk.length;
     }
+  } catch (err) {
+    console.warn(
+      `[EventCache] ${source} batch yazımı düştü, tek tek deneniyor:`,
+      err instanceof Error ? err.message : err,
+    );
+    written = 0;
+    for (const it of items) {
+      try {
+        await upsertOne(it);
+        written++;
+      } catch {
+        /* tek kayıt hatasını yut */
+      }
+    }
+  }
+  for (const it of items) {
+    writtenForFeed.push({ slug: it.data.slug, title: it.data.title, city: it.data.city, category: String(it.data.category), imageUrl: it.data.imageUrl });
   }
   // Meydan duvarına "Sistem" etkinlik gönderileri (eventSlug ile idempotent — yalnız yeniler eklenir).
   try {
