@@ -47,6 +47,16 @@ interface ProfileBody {
   lng?: number | null;
   birthDate?: string | null;
   showAge?: boolean;
+  heightCm?: string | null;
+  weightKg?: string | null;
+  interests?: string | null;
+  goal?: string | null;
+  languages?: string | null;
+  zodiac?: string | null;
+  education?: string | null;
+  drinking?: string | null;
+  smoking?: string | null;
+  exercise?: string | null;
 }
 
 /** Boş/whitespace string'i null'a indirger (alan temizleme için). */
@@ -98,6 +108,16 @@ export async function POST(request: NextRequest) {
   if ("lng" in body) data.lng = numOrNull(body.lng);
   if ("birthDate" in body) data.birthDate = strOrNull(body.birthDate);
   if ("showAge" in body) data.showAge = Boolean(body.showAge);
+  if ("heightCm" in body) data.heightCm = strOrNull(body.heightCm);
+  if ("weightKg" in body) data.weightKg = strOrNull(body.weightKg);
+  if ("interests" in body) data.interests = strOrNull(body.interests);
+  if ("goal" in body) data.goal = strOrNull(body.goal);
+  if ("languages" in body) data.languages = strOrNull(body.languages);
+  if ("zodiac" in body) data.zodiac = strOrNull(body.zodiac);
+  if ("education" in body) data.education = strOrNull(body.education);
+  if ("drinking" in body) data.drinking = strOrNull(body.drinking);
+  if ("smoking" in body) data.smoking = strOrNull(body.smoking);
+  if ("exercise" in body) data.exercise = strOrNull(body.exercise);
 
   // district/avatar yeni kolonlar — `prisma generate` (Vercel build) sonrası tipler
   // güncellenir; yerel stale client'ta derlensin diye unknown üzerinden cast.
@@ -122,6 +142,16 @@ export async function POST(request: NextRequest) {
     delete rest.lng;
     delete rest.birthDate;
     delete rest.showAge;
+    delete rest.heightCm;
+    delete rest.weightKg;
+    delete rest.interests;
+    delete rest.goal;
+    delete rest.languages;
+    delete rest.zodiac;
+    delete rest.education;
+    delete rest.drinking;
+    delete rest.smoking;
+    delete rest.exercise;
     try {
       const profile = await run(rest);
       return NextResponse.json({ ok: true, profile });
@@ -151,7 +181,21 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     profile: p
-      ? { ...p, birthDate: p.birthDate ?? null, showAge: p.showAge ?? true }
+      ? {
+          ...p,
+          birthDate: p.birthDate ?? null,
+          showAge: p.showAge ?? true,
+          heightCm: p.heightCm ?? null,
+          weightKg: p.weightKg ?? null,
+          interests: p.interests ?? null,
+          goal: p.goal ?? null,
+          languages: p.languages ?? null,
+          zodiac: p.zodiac ?? null,
+          education: p.education ?? null,
+          drinking: p.drinking ?? null,
+          smoking: p.smoking ?? null,
+          exercise: p.exercise ?? null,
+        }
       : p,
   });
 }

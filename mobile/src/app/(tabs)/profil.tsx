@@ -25,6 +25,7 @@ import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { showAuthPrompt } from "@/lib/authPrompt";
 import { syncProfile } from "@/lib/profileSync";
+import { useDProfile } from "@/lib/dprofile";
 import { useActiveCity, ALL_CITIES, districtsFor } from "@/lib/location";
 import { tapH, impactH, successH } from "@/lib/haptics";
 
@@ -116,6 +117,33 @@ export default function ProfileScreen() {
     }, 2200);
   };
   const toastStyle = useAnimatedStyle(() => ({ opacity: toastO.value }));
+
+  // Tanışma profilini (değişince, debounce'lı) backend'e senkronla → DB'de dolu olsun.
+  const { profile: dprof } = useDProfile();
+  const dprofTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (dprofTimer.current) clearTimeout(dprofTimer.current);
+    dprofTimer.current = setTimeout(() => {
+      void syncProfile({
+        bio: dprof.about,
+        birthDate: dprof.birthDate || null,
+        showAge: dprof.showAge,
+        heightCm: dprof.heightCm,
+        weightKg: dprof.weightKg,
+        interests: dprof.interests.join(","),
+        goal: dprof.goal,
+        languages: dprof.languages.join(","),
+        zodiac: dprof.zodiac,
+        education: dprof.education,
+        drinking: dprof.drinking,
+        smoking: dprof.smoking,
+        exercise: dprof.exercise,
+      });
+    }, 900);
+    return () => {
+      if (dprofTimer.current) clearTimeout(dprofTimer.current);
+    };
+  }, [dprof]);
 
   const toggleSocial = (key: string, label: string) => {
     impactH();

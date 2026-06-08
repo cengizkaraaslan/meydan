@@ -32,6 +32,20 @@ export async function syncProfile(data: {
   name?: string;
   lat?: number;
   lng?: number;
+  // Tanışma profili alanları (backend MobileProfile'a yazılır)
+  bio?: string; // "Hakkımda"
+  birthDate?: string | null;
+  showAge?: boolean;
+  heightCm?: string;
+  weightKg?: string;
+  interests?: string; // virgülle ayrık
+  goal?: string | null;
+  languages?: string; // virgülle ayrık
+  zodiac?: string | null;
+  education?: string | null;
+  drinking?: string | null;
+  smoking?: string | null;
+  exercise?: string | null;
 }): Promise<void> {
   try {
     const deviceId = await getDeviceId();

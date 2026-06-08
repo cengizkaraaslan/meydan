@@ -103,7 +103,13 @@ async function ensureLoaded(): Promise<void> {
   if (loaded) return;
   try {
     const raw = await AsyncStorage.getItem(KEY);
-    if (raw) cache = { ...DEFAULT_DPROFILE, ...(JSON.parse(raw) as Partial<DProfile>) };
+    if (raw) {
+      cache = { ...DEFAULT_DPROFILE, ...(JSON.parse(raw) as Partial<DProfile>) };
+    } else {
+      // Yeni kullanıcı: bildiğim dil telefon diline göre, ilişki hedefi varsayılan.
+      cache = { ...DEFAULT_DPROFILE, languages: [deviceLanguageLabel()] };
+      AsyncStorage.setItem(KEY, JSON.stringify(cache));
+    }
   } catch {
     /* yoksay */
   }

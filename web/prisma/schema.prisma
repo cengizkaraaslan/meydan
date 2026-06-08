@@ -341,6 +341,26 @@ model MobileProfile {
   birthDate  String?
   /// Yaşın profilde görünüp görünmeyeceği.
   showAge    Boolean  @default(true)
+  /// Boy (cm) — string olarak saklanır.
+  heightCm   String?
+  /// Kilo (kg) — string olarak saklanır.
+  weightKg   String?
+  /// İlgi alanları — virgülle ayrık string.
+  interests  String?  @db.Text
+  /// İlişki hedefi (örn. "ciddi" / "arkadaşlık").
+  goal       String?
+  /// Konuşulan diller — virgülle ayrık string.
+  languages  String?  @db.Text
+  /// Burç.
+  zodiac     String?
+  /// Eğitim durumu.
+  education  String?
+  /// Alkol kullanımı.
+  drinking   String?
+  /// Sigara kullanımı.
+  smoking    String?
+  /// Egzersiz/spor alışkanlığı.
+  exercise   String?
   /// Tanışma (dating) alanları — mobil swipe/eşleşme akışı için.
   bio        String?  @db.Text
   /// Kimi arıyor: "male" / "female" / "any".
