@@ -61,7 +61,8 @@
           "photosPermission": "MeydanFest, story ve gönderi paylaşman için galerine erişir.",
           "cameraPermission": "MeydanFest, story/fotoğraf çekmen için kameraya erişir."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -128,6 +128,7 @@ export function useStories() {
   }, []);
   useEffect(() => {
     reload();
+    void syncStoriesFromBackend(); // ID'ye bağlı kendi story'lerimi backend'den getir
     listeners.add(reload);
     return () => {
       listeners.delete(reload);

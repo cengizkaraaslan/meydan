@@ -44,6 +44,9 @@ const REPLIES = [
 const imgKey = (mk: string) => `meydanfest:imgmsgs:${mk}`;
 const botId = (personId: string) => `bot_${personId}`;
 
+/** Backend metin mesajının bir fotoğraf olduğunu işaretleyen önek. text = "[img]<R2 url>". */
+const IMG_PREFIX = "[img]";
+
 /**
  * Gerçek backend destekli sohbet hook'u.
  * - Metin mesajları Neon'a kaydedilir (apiSendMessage / apiFetchMessages, 3sn polling).
@@ -153,15 +156,32 @@ export function useChat(personId: string) {
 
   const sendImage = useCallback(
     async (uri: string) => {
-      if (!matchKey) return;
+      if (!matchKey || !deviceId) return;
       counter.current += 1;
-      const msg: Msg = { id: `img_${counter.current}`, fromMe: true, text: "", at: Date.now(), imageUri: uri };
-      const next = [...localImgs, msg];
+      const tempId = `tmp_img_${counter.current}`;
+      // Optimistik: yerel uri ile anında göster (gönderiliyor).
+      const optimistic: Msg = { id: tempId, fromMe: true, text: "", at: Date.now(), imageUri: uri, pending: true };
+      setPending((p) => [...p, optimistic]);
+
+      // R2'ye yükle, sonra backend'e "[img]<url>" metin mesajı olarak gönder (kalıcı + cross-device).
+      const url = await uploadImage(uri, "post");
+      if (url) {
+        const sent = await apiSendMessage({ matchKey, senderDeviceId: deviceId, text: IMG_PREFIX + url });
+        if (sent) await refetch(matchKey, deviceId);
+        setPending((p) => p.filter((m) => m.id !== tempId));
+        botReply("📷 fotoğraf");
+        return;
+      }
+
+      // Çevrimdışı / yükleme başarısız → eski davranışa düş: yerel foto mesajı (offline fallback).
+      const local: Msg = { id: `img_${counter.current}`, fromMe: true, text: "", at: Date.now(), imageUri: uri };
+      const next = [...localImgs, local];
       setLocalImgs(next);
       await AsyncStorage.setItem(imgKey(matchKey), JSON.stringify(next));
+      setPending((p) => p.filter((m) => m.id !== tempId));
       botReply("📷 fotoğraf");
     },
-    [matchKey, localImgs, botReply],
+    [matchKey, deviceId, localImgs, refetch, botReply],
   );
 
   /** Metin mesajını düzenler (yalnız kendi & 10 dk içinde). Başarıda refetch. */
@@ -204,7 +224,13 @@ export function useChat(personId: string) {
   );
 
   const messages = useMemo<Msg[]>(() => {
-    const fromServer: Msg[] = serverMsgs.map((m) => ({ id: m.id, fromMe: m.fromMe, text: m.text, at: m.at }));
+    const fromServer: Msg[] = serverMsgs.map((m) => {
+      // Backend foto mesajı: text "[img]<url>" → imageUri olarak render et (karşı taraf/öteki cihaz da görür).
+      if (m.text.startsWith(IMG_PREFIX)) {
+        return { id: m.id, fromMe: m.fromMe, text: "", at: m.at, imageUri: m.text.slice(IMG_PREFIX.length) };
+      }
+      return { id: m.id, fromMe: m.fromMe, text: m.text, at: m.at };
+    });
     const all = [...fromServer, ...localImgs, ...pending];
     all.sort((a, b) => a.at - b.at);
     return all;

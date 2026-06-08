@@ -383,7 +383,10 @@ export default function EventDetail() {
       quality: 0.7,
     });
     if (res.canceled || !res.assets?.length) return;
-    const photo: Photo = { uri: res.assets[0].uri, by: ownerId, ts: Date.now() };
+    // Yerel görseli R2'ye yükle → public URL sakla. Best-effort: null dönerse yerel uri ile devam.
+    const localUri = res.assets[0].uri;
+    const uploaded = await uploadImage(localUri, "post");
+    const photo: Photo = { uri: uploaded ?? localUri, by: ownerId, ts: Date.now() };
     setPhotos((prev) => {
       const next = [...prev, photo];
       AsyncStorage.setItem(photosKey, JSON.stringify(next));
