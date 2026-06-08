@@ -8,6 +8,7 @@ import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withTim
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { AuroraBackground } from "@/components/AuroraBackground";
+import { DatingProfileFields } from "@/components/DatingProfileFields";
 import { EventRow } from "@/components/EventCard";
 import { ImageEditor } from "@/components/ImageEditor";
 import { deleteLocalFile } from "@/lib/fileStore";
@@ -80,6 +81,7 @@ export default function ProfileScreen() {
   const { stories, remove, reload } = useStories();
   const [viewer, setViewer] = useState<Story | null>(null);
   const [listView, setListView] = useState<null | "upcoming" | "past" | "fav">(null);
+  const [socialOpen, setSocialOpen] = useState(false);
 
   // Sosyal hesaplar (yerelde saklanır; görünürlük toggle'lı).
   const [social, setSocial] = useState<SocialMap>(EMPTY_SOCIAL);
@@ -259,37 +261,57 @@ export default function ProfileScreen() {
           </Animated.View>
         )}
 
-        {/* Sosyal hesaplar — her birinin yanında görünürlük anahtarı */}
-        <Animated.View entering={FadeInDown.duration(450).delay(110)} style={{ marginBottom: Space.xl }}>
-          <SectionHeader title={t("social_title")} accent={T.pink} />
-          <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.md }]}>{t("social_desc")}</Text>
-          {SOCIALS.map((s) => (
-            <View key={s.key} style={[styles.socialRow, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-              <View style={styles.socialTop}>
-                <Text style={{ fontSize: 18 }}>{s.icon}</Text>
-                <TextInput
-                  value={social[s.key].handle}
-                  onChangeText={(txt) => saveSocial({ ...social, [s.key]: { ...social[s.key], handle: txt } })}
-                  placeholder={s.placeholder}
-                  placeholderTextColor={T.textFaint}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  style={[Type.body, styles.socialInput, { color: T.text }]}
-                />
-              </View>
-              <View style={[styles.socialBottom, { borderTopColor: T.hairline }]}>
-                <Text style={[Type.label, { color: social[s.key].pub ? T.success : T.textFaint, flex: 1 }]}>
-                  {social[s.key].pub ? t("social_visible") : t("social_hidden")}
-                </Text>
-                <Switch
-                  value={social[s.key].pub}
-                  onValueChange={() => toggleSocial(s.key, s.label)}
-                  trackColor={{ false: T.hairline, true: T.primary }}
-                  thumbColor="#fff"
-                />
-              </View>
+        {/* Profil bilgileri — tanışma alanları (hakkımda, yaş, ilgi alanları, ...) */}
+        <Animated.View entering={FadeInDown.duration(450).delay(105)} style={{ marginBottom: Space.xl }}>
+          <DatingProfileFields />
+        </Animated.View>
+
+        {/* Sosyal hesaplar — kompakt; "Ekle" ile kutucuklar açılır */}
+        <Animated.View entering={FadeInDown.duration(450).delay(115)} style={{ marginBottom: Space.xl }}>
+          <View style={styles.socialHead}>
+            <View style={{ flex: 1 }}>
+              <SectionHeader title={t("social_title")} accent={T.pink} />
             </View>
-          ))}
+            <Pressable onPress={() => { tapH(); setSocialOpen((v) => !v); }} hitSlop={8} style={[styles.socialToggle, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}>
+              <Text style={[Type.label, { color: T.primary }]}>{socialOpen ? t("hide") : `＋ ${t("add")}`}</Text>
+            </Pressable>
+          </View>
+          {socialOpen ? (
+            <>
+              <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.md }]}>{t("social_desc")}</Text>
+              {SOCIALS.map((s) => (
+                <View key={s.key} style={[styles.socialRow, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+                  <View style={styles.socialTop}>
+                    <Text style={{ fontSize: 18 }}>{s.icon}</Text>
+                    <TextInput
+                      value={social[s.key].handle}
+                      onChangeText={(txt) => saveSocial({ ...social, [s.key]: { ...social[s.key], handle: txt } })}
+                      placeholder={s.placeholder}
+                      placeholderTextColor={T.textFaint}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      style={[Type.body, styles.socialInput, { color: T.text }]}
+                    />
+                  </View>
+                  <View style={[styles.socialBottom, { borderTopColor: T.hairline }]}>
+                    <Text style={[Type.label, { color: social[s.key].pub ? T.success : T.textFaint, flex: 1 }]}>
+                      {social[s.key].pub ? t("social_visible") : t("social_hidden")}
+                    </Text>
+                    <Switch
+                      value={social[s.key].pub}
+                      onValueChange={() => toggleSocial(s.key, s.label)}
+                      trackColor={{ false: T.hairline, true: T.primary }}
+                      thumbColor="#fff"
+                    />
+                  </View>
+                </View>
+              ))}
+            </>
+          ) : (
+            <Text style={[Type.label, { color: T.textFaint }]}>
+              {SOCIALS.filter((s) => social[s.key].handle.trim()).map((s) => s.label).join(" · ") || t("social_none")}
+            </Text>
+          )}
         </Animated.View>
 
         {/* İpucu: yukarıdaki sayaç kartlarına dokununca ilgili liste açılır. */}
@@ -396,6 +418,8 @@ const styles = StyleSheet.create({
   },
   sheetHandle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, marginBottom: 14, opacity: 0.6 },
   // Sosyal hesap satırı
+  socialHead: { flexDirection: "row", alignItems: "center", gap: Space.sm },
+  socialToggle: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
   socialRow: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, marginBottom: Space.md, paddingHorizontal: Space.md, paddingTop: Space.sm },
   socialTop: { flexDirection: "row", alignItems: "center", gap: Space.sm, paddingVertical: Space.sm },
   socialInput: { flex: 1, paddingVertical: 4 },

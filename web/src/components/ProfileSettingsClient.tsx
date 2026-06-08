@@ -22,6 +22,18 @@ interface ProfileData {
   city: string;
   birthDate: string; // YYYY-MM-DD
   hobbies: string[];
+  // Tanışma profili alanları (mobil ile aynı)
+  showAge: boolean;
+  heightCm: string;
+  weightKg: string;
+  goal: string;
+  languages: string[];
+  zodiac: string;
+  education: string;
+  drinking: string;
+  smoking: string;
+  exercise: string;
+  interests: string[];
 }
 
 const DEFAULT: ProfileData = {
@@ -34,7 +46,31 @@ const DEFAULT: ProfileData = {
   city: "",
   birthDate: "",
   hobbies: [],
+  showAge: true,
+  heightCm: "",
+  weightKg: "",
+  goal: "",
+  languages: [],
+  zodiac: "",
+  education: "",
+  drinking: "",
+  smoking: "",
+  exercise: "",
+  interests: [],
 };
+
+const GOAL_OPTIONS = ["Uzun ilişki", "Kısa süreli", "Etkinlik arkadaşı", "Arkadaşlık", "Henüz emin değilim"];
+const LANGUAGE_OPTIONS = ["Türkçe", "İngilizce", "Almanca", "Fransızca", "İspanyolca", "İtalyanca", "Arapça", "Rusça"];
+const ZODIAC_OPTIONS = ["Koç", "Boğa", "İkizler", "Yengeç", "Aslan", "Başak", "Terazi", "Akrep", "Yay", "Oğlak", "Kova", "Balık"];
+const EDUCATION_OPTIONS = ["Lise", "Ön lisans", "Üniversite", "Yüksek lisans", "Doktora"];
+const DRINKING_OPTIONS = ["Hiç", "Sosyal içerim", "Sık sık"];
+const SMOKING_OPTIONS = ["Hayır", "Bazen", "Evet"];
+const EXERCISE_OPTIONS = ["Hiç", "Bazen", "Düzenli", "Her gün"];
+const INTEREST_OPTIONS = [
+  "Film", "Dizi", "Oyun", "Konser", "Tiyatro", "Müzik", "Spor", "Seyahat",
+  "Kitap", "Yemek", "Dans", "Sanat", "Fotoğraf", "Doğa", "Kahve", "Festival",
+  "Stand-up", "Teknoloji",
+];
 
 const POPULAR_HOBBIES = [
   "Konser", "Festival", "Sinema", "Tiyatro", "Sergi", "Dans", "Spor",
@@ -107,6 +143,20 @@ export function ProfileSettingsClient({ initialAuthName, initialAuthImage }: Pro
       "hobbies",
       profile.hobbies.filter((x) => x !== h),
     );
+  }
+
+  // Çoklu seçim: tıklayınca aç/kapat
+  function toggleMulti(key: "languages" | "interests", value: string) {
+    const list = profile[key];
+    update(key, list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
+  }
+
+  // Tek seçim: tıklayınca seç, tekrar tıklayınca kaldır
+  function toggleSingle(
+    key: "goal" | "zodiac" | "education" | "drinking" | "smoking" | "exercise",
+    value: string,
+  ) {
+    update(key, profile[key] === value ? "" : value);
   }
 
   async function save() {
@@ -342,6 +392,32 @@ export function ProfileSettingsClient({ initialAuthName, initialAuthImage }: Pro
                 min="1925-01-01"
                 className="flex-1 rounded-e-xl border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
               />
+
+              {/* Yaşımı göster toggle */}
+              <motion.label
+                whileTap={{ scale: 0.96 }}
+                title={
+                  profile.showAge
+                    ? "Yaşın profilinde görünür — gizlemek için tıkla"
+                    : "Yaşın gizli — göstermek için tıkla"
+                }
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 cursor-pointer transition-colors select-none ${
+                  profile.showAge
+                    ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]"
+                    : "border-[var(--border)] text-[var(--muted)] hover:bg-[var(--muted-bg)]"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={profile.showAge}
+                  onChange={(e) => update("showAge", e.target.checked)}
+                  className="sr-only"
+                />
+                {profile.showAge ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                <span className="text-xs font-medium hidden sm:inline">
+                  {profile.showAge ? "Yaşım görünür" : "Yaşım gizli"}
+                </span>
+              </motion.label>
             </div>
           </Field>
         </div>
@@ -361,6 +437,122 @@ export function ProfileSettingsClient({ initialAuthName, initialAuthImage }: Pro
             onAdd={addHobby}
             onRemove={removeHobby}
             maxCount={MAX_HOBBIES}
+          />
+        </div>
+      </section>
+
+      {/* Fiziksel & İlişki */}
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)] mb-3">
+          Tanışma Profili
+        </h2>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Boy (cm)" hint="İsteğe bağlı">
+              <input
+                type="number"
+                inputMode="numeric"
+                value={profile.heightCm}
+                onChange={(e) => update("heightCm", e.target.value)}
+                min={100}
+                max={250}
+                placeholder="175"
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+              />
+            </Field>
+            <Field label="Kilo (kg)" hint="İsteğe bağlı">
+              <input
+                type="number"
+                inputMode="numeric"
+                value={profile.weightKg}
+                onChange={(e) => update("weightKg", e.target.value)}
+                min={30}
+                max={250}
+                placeholder="70"
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+              />
+            </Field>
+          </div>
+
+          <Field label="İlişki Hedefi" hint="Tek seçim">
+            <ChipSelect
+              options={GOAL_OPTIONS}
+              selected={profile.goal ? [profile.goal] : []}
+              onToggle={(v) => toggleSingle("goal", v)}
+            />
+          </Field>
+
+          <Field label="Bildiğim Diller" hint="Çoklu seçim">
+            <ChipSelect
+              options={LANGUAGE_OPTIONS}
+              selected={profile.languages}
+              onToggle={(v) => toggleMulti("languages", v)}
+            />
+          </Field>
+
+          <Field label="Burç" hint="Tek seçim">
+            <ChipSelect
+              options={ZODIAC_OPTIONS}
+              selected={profile.zodiac ? [profile.zodiac] : []}
+              onToggle={(v) => toggleSingle("zodiac", v)}
+            />
+          </Field>
+
+          <Field label="Eğitim" hint="Tek seçim">
+            <ChipSelect
+              options={EDUCATION_OPTIONS}
+              selected={profile.education ? [profile.education] : []}
+              onToggle={(v) => toggleSingle("education", v)}
+            />
+          </Field>
+        </div>
+      </section>
+
+      {/* Yaşam Tarzı */}
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)] mb-3">
+          Yaşam Tarzı
+        </h2>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 space-y-4">
+          <Field label="İçki" hint="Tek seçim">
+            <ChipSelect
+              options={DRINKING_OPTIONS}
+              selected={profile.drinking ? [profile.drinking] : []}
+              onToggle={(v) => toggleSingle("drinking", v)}
+            />
+          </Field>
+
+          <Field label="Sigara" hint="Tek seçim">
+            <ChipSelect
+              options={SMOKING_OPTIONS}
+              selected={profile.smoking ? [profile.smoking] : []}
+              onToggle={(v) => toggleSingle("smoking", v)}
+            />
+          </Field>
+
+          <Field label="Egzersiz" hint="Tek seçim">
+            <ChipSelect
+              options={EXERCISE_OPTIONS}
+              selected={profile.exercise ? [profile.exercise] : []}
+              onToggle={(v) => toggleSingle("exercise", v)}
+            />
+          </Field>
+        </div>
+      </section>
+
+      {/* İlgi Alanları */}
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--muted)] mb-3">
+          İlgi Alanları
+          <span className="ms-2 text-[10px] normal-case font-normal">
+            ({profile.interests.length} seçili)
+          </span>
+        </h2>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
+          <ChipSelect
+            options={INTEREST_OPTIONS}
+            selected={profile.interests}
+            onToggle={(v) => toggleMulti("interests", v)}
           />
         </div>
       </section>
@@ -397,6 +589,40 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
         {hint && <span className="text-[10px] text-[var(--muted)]">{hint}</span>}
       </div>
       {children}
+    </div>
+  );
+}
+
+/** Çoklu veya tek seçimlik chip listesi. Seçim durumunu üst bileşen yönetir. */
+function ChipSelect({
+  options,
+  selected,
+  onToggle,
+}: {
+  options: string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map((opt) => {
+        const active = selected.includes(opt);
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onToggle(opt)}
+            aria-pressed={active}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              active
+                ? "bg-[var(--primary)]/10 text-[var(--primary)] ring-1 ring-[var(--primary)]/25"
+                : "border border-dashed border-[var(--border)] text-[var(--foreground)] hover:border-[var(--primary)] hover:bg-[var(--primary)]/5 hover:text-[var(--primary)]"
+            }`}
+          >
+            {opt}
+          </button>
+        );
+      })}
     </div>
   );
 }
