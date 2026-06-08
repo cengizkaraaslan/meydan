@@ -19,6 +19,7 @@ import { useActiveCity, ALL_CITIES } from "@/lib/location";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { fetchNotifs } from "@/lib/social";
 import { Image } from "expo-image";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { tapH } from "@/lib/haptics";
@@ -41,6 +42,15 @@ export default function DiscoverScreen() {
     }, []),
   );
   const photoUri = avatarOverride ?? user?.photo;
+  // Okunmamış bildirim sayacı — ekran her odaklandığında tazelenir.
+  const [unread, setUnread] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      fetchNotifs().then((r) => { if (alive) setUnread(r.unread); }).catch(() => {});
+      return () => { alive = false; };
+    }, []),
+  );
   const [cityModal, setCityModal] = useState(false);
   const [citySearch, setCitySearch] = useState("");
   const filteredCities = useMemo(() => {
@@ -128,6 +138,15 @@ export default function DiscoverScreen() {
             </Text>
           </Pressable>
           <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+            {/* Bildirim zili — okunmamış sayacı rozetiyle */}
+            <Pressable onPress={() => { tapH(); router.push("/bildirimler"); }} style={[styles.searchBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+              <Text style={{ fontSize: 18 }}>🔔</Text>
+              {unread > 0 ? (
+                <View style={[styles.badge, { backgroundColor: "#EF4444", borderColor: T.bg }]}>
+                  <Text style={styles.badgeText}>{unread > 9 ? "9+" : String(unread)}</Text>
+                </View>
+              ) : null}
+            </Pressable>
             <Pressable onPress={() => { tapH(); router.push("/ara"); }} style={[styles.searchBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
               <Text style={{ fontSize: 18 }}>🔍</Text>
             </Pressable>
@@ -279,6 +298,11 @@ const styles = StyleSheet.create({
     width: 46, height: 46, borderRadius: Radius.md, alignItems: "center", justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth * 2,
   },
+  badge: {
+    position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9,
+    paddingHorizontal: 4, alignItems: "center", justifyContent: "center", borderWidth: 1.5,
+  },
+  badgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",
