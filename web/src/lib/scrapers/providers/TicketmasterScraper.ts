@@ -85,15 +85,27 @@ export class TicketmasterScraper extends TicketingScraper {
       requests.push({ cc, size: WORLD_SIZE, page: 0 });
     }
 
-    for (const req of requests) {
-      const url =
-        `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${encodeURIComponent(apiKey)}` +
-        `&countryCode=${req.cc}&size=${req.size}&page=${req.page}&sort=date,asc`;
-      try {
-        const raw = await this.httpGet(url);
-        const data = JSON.parse(raw) as TmResponse;
-        const list = data._embedded?.events ?? [];
+    // Tüm istekleri PARALEL çalıştır (ardışık olursa 11 istek 60sn maxDuration'ı aşıyordu).
+    const lists = await Promise.all(
+      requests.map(async (req) => {
+        const url =
+          `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${encodeURIComponent(apiKey)}` +
+          `&countryCode=${req.cc}&size=${req.size}&page=${req.page}&sort=date,asc`;
+        try {
+          const raw = await this.httpGet(url);
+          const data = JSON.parse(raw) as TmResponse;
+          return data._embedded?.events ?? [];
+        } catch (err) {
+          console.warn(
+            `[TicketmasterScraper] ${req.cc} sayfa ${req.page} hatası:`,
+            err instanceof Error ? err.message : err,
+          );
+          return [];
+        }
+      }),
+    );
 
+    for (const list of lists) {
         for (const ev of list) {
           const externalId = `ticketmaster-${ev.id}`;
           if (seen.has(externalId)) continue;
@@ -139,12 +151,6 @@ export class TicketmasterScraper extends TicketingScraper {
             artist,
           });
         }
-      } catch (err) {
-        console.warn(
-          `[TicketmasterScraper] ${req.cc} sayfa ${req.page} hatası:`,
-          err instanceof Error ? err.message : err,
-        );
-      }
     }
 
     return all;
