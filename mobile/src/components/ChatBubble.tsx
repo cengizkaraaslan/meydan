@@ -14,7 +14,6 @@ import { listConversations, type Conversation } from "@/lib/conversations";
 
 const SIZE = 58;
 const MARGIN = 16;
-const TAP_THRESHOLD = 6; // bu mesafenin altı "tıklama" sayılır
 
 /**
  * Anasayfada sürüklenebilir, en yakın kenara yapışan yüzen sohbet balonu.
@@ -50,7 +49,15 @@ export function ChatBubble() {
     return Math.min(Math.max(v, lo), hi);
   };
 
+  // Saf dokunuş Pan'i aktive etmediği için ayrı bir Tap gesture'ı şart.
+  const tap = Gesture.Tap()
+    .maxDistance(12)
+    .onEnd(() => {
+      runOnJS(openPanel)();
+    });
+
   const pan = Gesture.Pan()
+    .minDistance(8)
     .onBegin(() => {
       startX.value = x.value;
       startY.value = y.value;
@@ -59,16 +66,13 @@ export function ChatBubble() {
       x.value = clamp(startX.value + e.translationX, minX, maxX);
       y.value = clamp(startY.value + e.translationY, minY, maxY);
     })
-    .onEnd((e) => {
-      const moved = Math.hypot(e.translationX, e.translationY);
-      if (moved < TAP_THRESHOLD) {
-        runOnJS(openPanel)();
-        return;
-      }
+    .onEnd(() => {
       const center = x.value + SIZE / 2;
       x.value = withSpring(center < width / 2 ? minX : maxX, { damping: 15 });
       y.value = withSpring(clamp(y.value, minY, maxY), { damping: 15 });
     });
+
+  const gesture = Gesture.Race(pan, tap);
 
   const style = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value }, { translateY: y.value }],
@@ -82,7 +86,7 @@ export function ChatBubble() {
 
   return (
     <>
-      <GestureDetector gesture={pan}>
+      <GestureDetector gesture={gesture}>
         <Animated.View style={[styles.wrap, style, glow(T.primary, 20, 0.5)]}>
           <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
             <Text style={styles.emoji}>💬</Text>
