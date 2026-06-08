@@ -81,8 +81,11 @@ export default function ProfileScreen() {
   const { user, signInWithGoogle, configured } = useAuth();
   const { list: favs } = useFavorites();
   const { upcoming, past } = useAttending();
-  const { stories, remove, reload } = useStories();
+  const { stories, remove, reload, editCaption } = useStories();
   const [viewer, setViewer] = useState<Story | null>(null);
+  // Story başlığı (caption) düzenleme — thumbnail'a uzun basınca açılır.
+  const [editingStory, setEditingStory] = useState<Story | null>(null);
+  const [captionDraft, setCaptionDraft] = useState("");
   const [listView, setListView] = useState<null | "upcoming" | "past" | "fav">(null);
   const [socialOpen, setSocialOpen] = useState(false);
 
@@ -269,6 +272,22 @@ export default function ProfileScreen() {
     successH();
   };
 
+  // Story başlığı düzenleme modalını aç — mevcut caption draft'a yüklenir.
+  const openCaptionEditor = (s: Story) => {
+    impactH();
+    setEditingStory(s);
+    setCaptionDraft(s.caption ?? "");
+  };
+
+  // Kaydet → reaktif editCaption (yerel + backend), modal kapanır. Boş başlık serbest.
+  const saveCaption = async () => {
+    if (!editingStory) return;
+    const s = editingStory;
+    setEditingStory(null);
+    await editCaption(s.ts, captionDraft.trim());
+    successH();
+  };
+
   return (
     <View style={[styles.root, { backgroundColor: T.bg }]}>
       <AuroraBackground />
@@ -307,7 +326,7 @@ export default function ProfileScreen() {
             </Pressable>
             {/* Story'ler */}
             {stories.map((s) => (
-              <Pressable key={s.ts} onPress={() => { tapH(); setViewer(s); }} style={styles.storyItem}>
+              <Pressable key={s.ts} onPress={() => { tapH(); setViewer(s); }} onLongPress={() => openCaptionEditor(s)} delayLongPress={350} style={styles.storyItem}>
                 <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.storyRing}>
                   <Image source={{ uri: s.uri }} style={[styles.storyThumb, { borderColor: T.bg }]} contentFit="cover" transition={200} />
                 </LinearGradient>
@@ -498,6 +517,30 @@ export default function ProfileScreen() {
         </Animated.View>
       </Modal>
 
+      {/* Story başlığı (caption) düzenleme — thumbnail'a uzun basınca */}
+      <Modal visible={!!editingStory} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setEditingStory(null)}>
+        <Pressable style={styles.editBackdrop} onPress={() => setEditingStory(null)}>
+          <Pressable
+            style={[styles.editCard, { backgroundColor: T.bgElevated, borderColor: T.hairline }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={[Type.h2, { color: T.text, marginBottom: Space.md }]}>Story başlığını düzenle</Text>
+            <TextInput
+              value={captionDraft}
+              onChangeText={setCaptionDraft}
+              placeholder="Story başlığı (örn. konum/etkinlik)"
+              placeholderTextColor={T.textFaint}
+              autoFocus
+              style={[Type.body, styles.editInput, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+            />
+            <View style={styles.editActions}>
+              <Pill label="İptal" onPress={() => setEditingStory(null)} />
+              <Pill label="Kaydet" gradient={T.primarySoft} onPress={saveCaption} />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Şehir seçimi (aranabilir 81 il) */}
       <Modal visible={cityModal} transparent animationType="slide" onRequestClose={() => setCityModal(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setCityModal(false)}>
@@ -624,6 +667,11 @@ const styles = StyleSheet.create({
   socialTop: { flexDirection: "row", alignItems: "center", gap: Space.sm, paddingVertical: Space.sm },
   socialInput: { flex: 1, paddingVertical: 4 },
   socialBottom: { flexDirection: "row", alignItems: "center", gap: Space.sm, borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: Space.sm },
+  // Story başlığı düzenleme modalı
+  editBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", padding: 24 },
+  editCard: { width: "100%", maxWidth: 420, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: Space.lg },
+  editInput: { borderWidth: StyleSheet.hairlineWidth * 2, borderRadius: Radius.md, paddingHorizontal: Space.md, paddingVertical: 12, marginBottom: Space.lg },
+  editActions: { flexDirection: "row", gap: Space.md, justifyContent: "flex-end" },
   toast: {
     position: "absolute", left: 40, right: 40, paddingVertical: 12, paddingHorizontal: 18,
     borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center",

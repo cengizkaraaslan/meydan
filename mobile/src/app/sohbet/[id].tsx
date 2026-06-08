@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -37,7 +37,7 @@ export default function ChatScreen() {
   const { t } = useT();
   const canSeeAges = useCanSeeAges();
   const person = getPerson(String(id));
-  const { messages, typing, send, sendImage, editMessage, deleteMessage } = useChat(String(id));
+  const { messages, typing, send, sendImage, editMessage, deleteMessage, ready } = useChat(String(id));
   const [text, setText] = useState("");
   const [editing, setEditing] = useState<Msg | null>(null);
   const [tipVisible, setTipVisible] = useState(false);
@@ -212,24 +212,32 @@ export default function ChatScreen() {
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <FlatList
-          ref={listRef}
-          data={messages}
-          keyExtractor={(m) => m.id}
-          contentContainerStyle={{ padding: 16, gap: 8, paddingBottom: 16 }}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item, index }) => (
-            <Bubble
-              T={T}
-              m={item}
-              read={item.fromMe && !item.pending && item.at < lastIncomingAt}
-              // Yalnızca en sondaki KENDİ balonum, üstelik az önce gönderilmişse "pop" girişi yapar.
-              justSent={item.fromMe && index === messages.length - 1 && item.at >= lastSentAt && lastSentAt > 0}
-              onLongPress={() => onLongPressMsg(item)}
-            />
-          )}
-          ListFooterComponent={typing ? <TypingBubble T={T} /> : null}
-        />
+        {/* Sohbet hazır olana kadar (ensureMatch + ilk fetch) şık bir loading; header zaten yukarıda anında çiziliyor. */}
+        {ready ? (
+          <FlatList
+            ref={listRef}
+            data={messages}
+            keyExtractor={(m) => m.id}
+            contentContainerStyle={{ padding: 16, gap: 8, paddingBottom: 16 }}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item, index }) => (
+              <Bubble
+                T={T}
+                m={item}
+                read={item.fromMe && !item.pending && item.at < lastIncomingAt}
+                // Yalnızca en sondaki KENDİ balonum, üstelik az önce gönderilmişse "pop" girişi yapar.
+                justSent={item.fromMe && index === messages.length - 1 && item.at >= lastSentAt && lastSentAt > 0}
+                onLongPress={() => onLongPressMsg(item)}
+              />
+            )}
+            ListFooterComponent={typing ? <TypingBubble T={T} /> : null}
+          />
+        ) : (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color={T.primary} />
+            <Text style={[Type.label, { color: T.textFaint, marginTop: 12 }]}>Sohbet yükleniyor…</Text>
+          </View>
+        )}
 
         {/* Düzenleme modu göstergesi */}
         {editing ? (
@@ -244,20 +252,21 @@ export default function ChatScreen() {
         ) : null}
 
         {/* Girdi */}
-        <View style={[styles.inputBar, { paddingBottom: insets.bottom ? insets.bottom : 12, borderTopColor: T.hairline }]}>
-          <Pressable onPress={onPickImage} hitSlop={8} style={[styles.attach, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+        <View style={[styles.inputBar, { paddingBottom: insets.bottom ? insets.bottom : 12, borderTopColor: T.hairline, opacity: ready ? 1 : 0.55 }]}>
+          <Pressable onPress={onPickImage} disabled={!ready} hitSlop={8} style={[styles.attach, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
             <Text style={{ fontSize: 20 }}>📷</Text>
           </Pressable>
           <TextInput
             value={text}
             onChangeText={setText}
+            editable={ready}
             placeholder={t("message_hint", { name: person.name })}
             placeholderTextColor={T.textFaint}
             style={[Type.body, styles.input, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
             multiline
             onSubmitEditing={onSend}
           />
-          <Pressable onPress={onSend}>
+          <Pressable onPress={onSend} disabled={!ready}>
             <Animated.View style={sendBtnStyle}>
               <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.send}>
                 <Ionicons name="send" size={20} color="#fff" />
@@ -413,6 +422,7 @@ const styles = StyleSheet.create({
   hAvatarWrap: { borderRadius: 21 },
   hAvatar: { width: 42, height: 42, borderRadius: 21 },
   lock: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
+  loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
   lockAvatar: { width: 96, height: 96, borderRadius: 48 },
   bubble: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18 },
   imgBubble: { padding: 4 },

@@ -25,10 +25,15 @@ export function DatingProfileFields() {
   const { t: T } = useTheme();
   const { profile, update, toggleIn } = useDProfile();
   const [confirmHide, setConfirmHide] = useState(false);
-
-  // Yaş kilidi: bir kez geçerli yaş kaydedilince (profile.age dolu) artık değiştirilemez.
-  const ageLocked = profile.age.trim().length > 0;
-  const [ageDraft, setAgeDraft] = useState("");
+  // Katlanabilir bölümler (ilgi alanları, hedef, diller, burç, eğitim) — açık olanların kümesi.
+  const [openSecs, setOpenSecs] = useState<Set<string>>(new Set());
+  const toggleSec = (id: string) =>
+    setOpenSecs((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
 
   // Doğum tarihi parçaları (gün/ay/yıl) — profil.birthDate ("YYYY-MM-DD") ile senkron.
   const [bd, setBd] = useState({ d: "", m: "", y: "" });
@@ -113,6 +118,25 @@ export function DatingProfileFields() {
     <Text style={[Type.label, { color: T.textDim, marginBottom: Space.sm }]}>{title}</Text>
   );
 
+  /** Katlanabilir bölüm: başlığa dokun → aç/kapat. Kapalıyken sağda seçim özeti. */
+  const Section = ({ id, title, summary, children }: { id: string; title: string; summary: string; children: React.ReactNode }) => {
+    const isOpen = openSecs.has(id);
+    return (
+      <View>
+        <Pressable onPress={() => toggleSec(id)} style={styles.secHead} hitSlop={6}>
+          <Text style={[Type.label, { color: T.textDim }]}>{title}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
+            {!isOpen ? (
+              <Text style={[Type.label, { color: T.textFaint, maxWidth: 180 }]} numberOfLines={1}>{summary}</Text>
+            ) : null}
+            <Text style={{ color: T.textDim, fontSize: 12 }}>{isOpen ? "▾" : "▸"}</Text>
+          </View>
+        </Pressable>
+        {isOpen ? <View style={{ marginTop: Space.sm }}>{children}</View> : null}
+      </View>
+    );
+  };
+
   return (
     <View style={{ gap: Space.lg }}>
       {/* 1. Hakkımda */}
@@ -161,44 +185,22 @@ export function DatingProfileFields() {
           />
         </View>
         <View style={[styles.switchRow, { marginTop: Space.md }]}>
-          <Text style={[Type.body, { color: T.text }]}>
+          <Text style={[Type.body, { color: age != null ? T.text : T.textFaint }]}>
             Yaşımı göster{age != null ? ` (${age})` : ""}
           </Text>
           <Switch
             value={profile.showAge}
             onValueChange={onToggleShowAge}
+            disabled={age == null}
             trackColor={{ false: T.hairline, true: T.primary }}
           />
         </View>
         <Text style={[Type.label, { color: T.textFaint, marginTop: Space.sm }]}>
-          {profile.showAge ? "Yaşın profilinde görünür" : "Yaşın gizli — sen de başkalarının yaşını göremezsin"}
-        </Text>
-      </View>
-
-      {/* Yaş — bir kez girilir, sonradan değiştirilemez (kilitli) */}
-      <View>
-        <Header title="Yaş" />
-        <TextInput
-          style={[inputStyle, ageLocked && { opacity: 0.55 }]}
-          keyboardType="number-pad"
-          maxLength={2}
-          editable={!ageLocked}
-          placeholder="Yaşın (13-99)"
-          placeholderTextColor={T.textFaint}
-          value={ageLocked ? profile.age : ageDraft}
-          onChangeText={(raw) => {
-            if (ageLocked) return;
-            const val = raw.replace(/[^0-9]/g, "").slice(0, 2);
-            setAgeDraft(val);
-            // Geçerli (2 hane, 13-99) olunca KALICI kaydet → bundan sonra kilitlenir.
-            const n = parseInt(val, 10);
-            if (val.length === 2 && n >= 13 && n <= 99) update({ age: val });
-          }}
-        />
-        <Text style={[Type.label, { color: ageLocked ? T.textFaint : T.gold, marginTop: Space.sm }]}>
-          {ageLocked
-            ? "🔒 Yaş bir kez girilir, sonradan değiştirilemez."
-            : "Yaşını dikkatli gir — kaydettikten sonra değiştiremezsin."}
+          {age == null
+            ? "Yaş, doğum tarihinden otomatik hesaplanır. Önce doğum tarihini gir."
+            : profile.showAge
+              ? "Yaşın doğum tarihinden hesaplanıp profilinde görünür"
+              : "Yaşın gizli — sen de başkalarının yaşını göremezsin"}
         </Text>
       </View>
 
@@ -230,35 +232,30 @@ export function DatingProfileFields() {
         </View>
       </View>
 
-      {/* 4. İlgi alanları (çoklu) */}
-      <View>
-        <Header title="İlgi alanları" />
+      {/* 4. İlgi alanları (çoklu) — katlanabilir */}
+      <Section id="interests" title="İlgi alanları" summary={profile.interests.length ? `${profile.interests.length} seçili` : "Seç"}>
         {renderMulti(INTERESTS, profile.interests, "interests")}
-      </View>
+      </Section>
 
-      {/* 5. İlişki hedefi (tek) */}
-      <View>
-        <Header title="İlişki hedefi" />
+      {/* 5. İlişki hedefi (tek) — katlanabilir */}
+      <Section id="goal" title="İlişki hedefi" summary={profile.goal ?? "Seç"}>
         {renderSingle(GOALS, profile.goal, (goal) => update({ goal }))}
-      </View>
+      </Section>
 
-      {/* 6. Bildiğim diller (çoklu) */}
-      <View>
-        <Header title="Bildiğim diller" />
+      {/* 6. Bildiğim diller (çoklu) — katlanabilir */}
+      <Section id="languages" title="Bildiğim diller" summary={profile.languages.length ? profile.languages.join(", ") : "Seç"}>
         {renderMulti(LANGS, profile.languages, "languages")}
-      </View>
+      </Section>
 
-      {/* 7. Burç (tek) */}
-      <View>
-        <Header title="Burç" />
+      {/* 7. Burç (tek) — katlanabilir */}
+      <Section id="zodiac" title="Burç" summary={profile.zodiac ?? "Seç"}>
         {renderSingle(ZODIACS, profile.zodiac, (zodiac) => update({ zodiac }))}
-      </View>
+      </Section>
 
-      {/* 8. Eğitim (tek) */}
-      <View>
-        <Header title="Eğitim" />
+      {/* 8. Eğitim (tek) — katlanabilir */}
+      <Section id="education" title="Eğitim" summary={profile.education ?? "Seç"}>
         {renderSingle(EDUCATION, profile.education, (education) => update({ education }))}
-      </View>
+      </Section>
 
       {/* 9. İçki (tek) */}
       <View>
@@ -306,6 +303,7 @@ export function DatingProfileFields() {
 
 const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: Space.sm },
+  secHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 },
   switchRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   pairRow: { flexDirection: "row", gap: Space.lg },
   bdRow: { flexDirection: "row", gap: Space.md },

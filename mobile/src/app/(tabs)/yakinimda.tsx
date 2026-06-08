@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -17,8 +17,7 @@ import { PEOPLE, type Person } from "@/lib/people";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useCanSeeAges } from "@/lib/dprofile";
-import { tapH, impactH } from "@/lib/haptics";
-import { scheduleProximityPing } from "@/lib/notify";
+import { tapH } from "@/lib/haptics";
 import { StoryAvatar } from "@/components/StoryAvatar";
 import { StoryViewer } from "@/components/StoryViewer";
 
@@ -168,11 +167,9 @@ export default function NearbyScreen() {
     return () => clearInterval(id);
   }, []);
 
-  const [btDismissed, setBtDismissed] = useState(false);
   const [onlyOnline, setOnlyOnline] = useState(false);
   // Story halkalı kişiye dokununca açılan tam ekran izleyici.
   const [viewStory, setViewStory] = useState<Person | null>(null);
-  const veryClose = PEOPLE.find((p) => p.distanceKm <= 1);
 
   // Her kişi için canlı online durumu (id -> boolean).
   const onlineMap = useMemo(() => {
@@ -189,28 +186,6 @@ export default function NearbyScreen() {
     const base = onlyOnline ? PEOPLE.filter((p) => onlineMap[p.id]) : PEOPLE;
     return [...base].sort((a, b) => Number(onlineMap[b.id]) - Number(onlineMap[a.id]));
   }, [onlineMap, onlyOnline]);
-
-  const enableBt = async () => {
-    impactH();
-    if (Platform.OS === "android") {
-      try {
-        await Linking.sendIntent("android.settings.BLUETOOTH_SETTINGS");
-      } catch {
-        try {
-          await Linking.openSettings();
-        } catch {
-          /* yoksay */
-        }
-      }
-    } else {
-      try {
-        await Linking.openSettings();
-      } catch {
-        /* yoksay */
-      }
-    }
-    if (veryClose) scheduleProximityPing(veryClose.name);
-  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -289,36 +264,6 @@ export default function NearbyScreen() {
                 </ScrollView>
               </Animated.View>
             )}
-
-            {veryClose && !btDismissed && (
-              <Animated.View entering={FadeInDown.delay(80).duration(450)}>
-                <LinearGradient
-                  colors={T.primaryGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[styles.btCard, glow(T.primary, 18, 0.5)]}
-                >
-                  <Text style={[Type.title, { color: "#FFFFFF" }]}>{t("bt_nearby_title")}</Text>
-                  <Text style={[Type.body, { color: "#F5F3FF", marginTop: 6 }]}>
-                    {t("bt_suggest", { name: veryClose.name })}
-                  </Text>
-                  <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
-                    <Pressable onPress={enableBt} style={[styles.btBtn, { backgroundColor: "#FFFFFF" }]}>
-                      <Text style={[Type.label, { color: T.bg }]}>{t("open_bluetooth")}</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => {
-                        tapH();
-                        setBtDismissed(true);
-                      }}
-                      style={[styles.btBtn, { backgroundColor: "rgba(255,255,255,0.18)" }]}
-                    >
-                      <Text style={[Type.label, { color: "#FFFFFF" }]}>{t("bt_later")}</Text>
-                    </Pressable>
-                  </View>
-                </LinearGradient>
-              </Animated.View>
-            )}
           </View>
         }
         renderItem={({ item, index }) => (
@@ -348,8 +293,6 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", gap: 6,
     paddingHorizontal: 14, paddingVertical: 9, borderRadius: Radius.pill,
   },
-  btCard: { borderRadius: Radius.lg, padding: 16 },
-  btBtn: { borderRadius: Radius.pill, paddingHorizontal: 16, paddingVertical: 9 },
   onlineTag: {
     flexDirection: "row", alignItems: "center", gap: 5,
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth,

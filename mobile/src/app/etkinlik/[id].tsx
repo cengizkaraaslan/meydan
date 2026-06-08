@@ -18,7 +18,7 @@ import { toggleFavorite, useFavorites } from "@/lib/favorites";
 import { setAttending, mockAttendeesFor } from "@/lib/attending";
 import { addStory, useStories } from "@/lib/stories";
 import { uploadImage, createPost } from "@/lib/social";
-import { Badge, GradientButton, Loader, Pill } from "@/ui/atoms";
+import { Badge, Loader, Pill } from "@/ui/atoms";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useCanSeeAges } from "@/lib/dprofile";
 import { useT } from "@/lib/i18n";
@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { PEOPLE, type Person } from "@/lib/people";
 import { StoryAvatar } from "@/components/StoryAvatar";
+import { ImageEditor } from "@/components/ImageEditor";
 import { AttendeeListModal } from "@/components/AttendeeListModal";
 import { EventStoryStrip, mockStoryContributors, personToGroup } from "@/components/EventStoryStrip";
 import { EventStoryViewer, type StoryGroup } from "@/components/EventStoryViewer";
@@ -78,6 +79,8 @@ interface Story {
   caption: string;
   eventSlug: string;
   ts: number;
+  eventTitle?: string;
+  city?: string;
 }
 
 // Türkçe tam gün isimleri (Date.getDay(): 0 Pazar … 6 Cumartesi).
@@ -137,9 +140,8 @@ export default function EventDetail() {
   // #18 — hava durumu
   const [weather, setWeather] = useState<DayWeather | null>(null);
 
-  // story paylaşma akışı
+  // story paylaşma akışı — seçilen/çekilen foto editöre verilir; editör onDone'da ANINDA paylaşılır.
   const [storyUri, setStoryUri] = useState<string | null>(null);
-  const [storyCaption, setStoryCaption] = useState("");
   // duvara (Meydan feed) foto paylaşma durumu
   const [wallPosting, setWallPosting] = useState(false);
 
@@ -156,8 +158,10 @@ export default function EventDetail() {
   const [photoView, setPhotoView] = useState<string | null>(null);
   // profil avatar override'ı (benim story halkam için): "meydanfest:avatar" ?? user?.photo
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
+  // kullanıcı cinsiyeti (foto yokken default avatar ikonunu seçer): "male" | "female" | null
+  const [gender, setGender] = useState<"male" | "female" | null>(null);
   // bu etkinliğe ait benim story'lerim (reaktif)
-  const { stories, reload: reloadStories } = useStories();
+  const { stories, reload: reloadStories, remove: removeStory } = useStories();
 
   // Etkinlik detaydan geri dönerken ömür boyu 1 kez gösterilen "yardım" modalı.
   const [leaveHelp, setLeaveHelp] = useState(false);
@@ -236,6 +240,13 @@ export default function EventDetail() {
   // benim story halkam için profil avatarını yükle
   useEffect(() => {
     AsyncStorage.getItem("meydanfest:avatar").then((v) => setAvatarOverride(v ?? null));
+  }, []);
+
+  // foto yokken cinsiyete göre default avatar için cinsiyeti yükle
+  useEffect(() => {
+    AsyncStorage.getItem("meydanfest:gender").then((v) =>
+      setGender(v === "male" || v === "female" ? v : null),
+    );
   }, []);
 
   // sakli durumu yükle
@@ -405,7 +416,7 @@ export default function EventDetail() {
     ]);
   };
 
-  // story foto kaynağı: kamera
+  // story foto kaynağı: kamera → seçilen uri editöre verilir (storyUri set edilir).
   const pickStoryFromCamera = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
@@ -415,10 +426,9 @@ export default function EventDetail() {
     const res = await ImagePicker.launchCameraAsync({ quality: 0.7 });
     if (res.canceled || !res.assets?.length) return;
     setStoryUri(res.assets[0].uri);
-    setStoryCaption("");
   };
 
-  // story foto kaynağı: galeri
+  // story foto kaynağı: galeri → seçilen uri editöre verilir (storyUri set edilir).
   const pickStoryFromLibrary = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
@@ -431,10 +441,10 @@ export default function EventDetail() {
     });
     if (res.canceled || !res.assets?.length) return;
     setStoryUri(res.assets[0].uri);
-    setStoryCaption("");
   };
 
-  // story: kaynak seç (Kamera / Galeri / İptal) → önizleme + caption ekranı aç.
+  // story: PRATİK akış → kaynak seç (Kamera/Galeri) → ImageEditor → onDone'da ANINDA paylaş.
+  // Caption yok, geri/iptal karmaşası yok.
   const pickStory = () => {
     // Oturum açmayan story yükleyemez → giriş modalı (akışı kilitlemez, sadece bilgilendirir).
     if (!user) {
@@ -449,30 +459,32 @@ export default function EventDetail() {
     ]);
   };
 
-  // story: paylaş → local liste + best-effort API
-  const shareStory = async () => {
-    if (!storyUri || !event) return;
+  // Editör 'Bitir'e basınca: ANINDA addStory (caption boş) + etkinlik adı/konum ile + reload.
+  const onStoryEdited = async (editedUri: string) => {
+    if (!event) { setStoryUri(null); return; }
+    setStoryUri(null); // editörü kapat
     const story: Story = {
-      uri: storyUri,
-      caption: storyCaption.trim(),
+      uri: editedUri,
+      caption: "",
       eventSlug: event.slug,
       ts: Date.now(),
+      eventTitle: event.title,
+      city: event.city,
     };
-    await addStory(story);
+    await addStory(story); // R2'ye yükler + DB'ye kaydeder (reaktif → her ekranda anında)
     // best-effort API (varsa /api/stories; yoksa sadece local kalır)
     try {
       const deviceId = await getDeviceId();
       await fetch(`${API_BASE}/api/stories`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-key": "meydanfest-app" },
-        body: JSON.stringify({ deviceId, eventSlug: event.slug, caption: story.caption }),
+        body: JSON.stringify({ deviceId, eventSlug: event.slug, caption: "" }),
       });
     } catch {
       /* yok say */
     }
     successH();
-    setStoryUri(null);
-    setStoryCaption("");
+    Alert.alert("Story paylaşıldı ✓", "Story'in bu etkinlikte yayında.");
     reloadStories(); // şerit anında güncellensin
   };
 
@@ -564,6 +576,11 @@ export default function EventDetail() {
   // NOT: gerçek çapraz-cihaz katılımcılar (android↔web) Postgres + eventAttendance ile
   // gelecek; şimdilik kendi RSVP'n anında görünür.
   // Kullanıcının kendi Person'u ("Sen") — herhangi bir kategori önizlemesinde başa eklenebilir.
+  // Benim gerçek fotoğrafım: önce profil override, sonra Google foto. İkisi de yoksa null
+  // (→ foto yerine cinsiyete göre emoji-daire gösterilir).
+  const myPhoto = avatarOverride || user?.photo || "";
+  // Foto yokken gösterilecek cinsiyet ikonu (👨 erkek / 👩 kadın / 👤 bilinmiyor).
+  const genderEmoji = gender === "male" ? "👨" : gender === "female" ? "👩" : "👤";
   const buildMePerson = (): Person => ({
     id: "__me",
     name: user?.name || "Sen",
@@ -571,10 +588,11 @@ export default function EventDetail() {
     city: event.city,
     distanceKm: 0,
     online: true,
-    avatar: avatarOverride || user?.photo || "https://i.pravatar.cc/600?img=12",
+    // Boş bırakılırsa render tarafı emoji-daire gösterir (kırık/sahte foto yerine).
+    avatar: myPhoto,
     bio: "",
     interests: [],
-    gender: "male",
+    gender: gender ?? "male",
   });
   const meAttendee: Person | null = rsvp === "going" && user ? buildMePerson() : null;
   const attendeeList = meAttendee ? [meAttendee, ...PEOPLE] : PEOPLE;
@@ -591,16 +609,15 @@ export default function EventDetail() {
     maybe: maybePeople,
     interested: interestedPeople,
   };
-  // Kullanıcı bir kategori seçtiyse "Sen" o kategorinin sayımına +1 olarak eklenir.
-  const catCount = (cat: Rsvp) => catPeople[cat].length + (rsvp === cat ? 1 : 0);
-  // Bir kategorinin önizleme listesi: rsvp o kategoriyse "Sen" başa eklenir.
-  const peopleForCat = (cat: Rsvp): Person[] =>
-    rsvp === cat && user ? [buildMePerson(), ...catPeople[cat]] : catPeople[cat];
+  // Kategori sayımı: yapay "+1 ben" yok — yalnızca mock liste boyutu.
+  const catCount = (cat: Rsvp) => catPeople[cat].length;
+  // Bir kategorinin önizleme listesi: kendini başa ekleme (yapay +1 üretmesin).
+  const peopleForCat = (cat: Rsvp): Person[] => catPeople[cat];
 
   // ── Story şeridi grupları ──
   // Benim bu etkinliğe ait story'lerim → tek grup (avatar: profil override ?? user.photo).
   const myEventStories = stories.filter((s) => s.eventSlug === event.slug);
-  const myAvatar = avatarOverride || user?.photo || "";
+  const myAvatar = myPhoto;
   const myGroup: StoryGroup | null =
     myEventStories.length > 0
       ? {
@@ -609,7 +626,13 @@ export default function EventDetail() {
           avatar: myAvatar,
           isMe: true,
           // En yeniden eskiye → kronolojik göstermek için ters çevir.
-          segments: [...myEventStories].reverse().map((s) => ({ uri: s.uri, caption: s.caption || undefined })),
+          segments: [...myEventStories].reverse().map((s) => ({
+            uri: s.uri,
+            caption: s.caption || undefined,
+            // Story üzerinde etkinlik adı/konum gösterimi için (viewer kullanır).
+            eventTitle: s.eventTitle || event.title,
+            city: s.city || event.city,
+          })),
         }
       : null;
   // Mock katkıda bulunanlar (deterministik; slug+id ile sabit).
@@ -756,30 +779,6 @@ export default function EventDetail() {
               onOpen={openStoryViewer}
               onShare={pickStory}
             />
-            {storyUri ? (
-              <View style={{ gap: 12, marginTop: 14 }}>
-                <Image source={{ uri: storyUri }} style={styles.storyPreview} contentFit="cover" transition={200} />
-                <TextInput
-                  value={storyCaption}
-                  onChangeText={setStoryCaption}
-                  placeholder={t("write_comment")}
-                  placeholderTextColor={T.textFaint}
-                  style={[styles.input, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
-                  returnKeyType="done"
-                />
-                <View style={{ flexDirection: "row", gap: 8 }}>
-                  <Pressable
-                    onPress={() => { tapH(); setStoryUri(null); setStoryCaption(""); }}
-                    style={[styles.addPhoto, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}
-                  >
-                    <Text style={[Type.label, { color: T.textDim }]}>{t("back")}</Text>
-                  </Pressable>
-                  <View style={{ flex: 1 }}>
-                    <GradientButton label={t("send")} icon="✦" gradient={c.gradient} onPress={shareStory} />
-                  </View>
-                </View>
-              </View>
-            ) : null}
 
             {/* 📷 Duvarda paylaş — story'den AYRI: fotoğraf Meydan duvarına (feed) düşer. */}
             <Pressable
@@ -835,28 +834,23 @@ export default function EventDetail() {
                   ) : (
                     <Pressable
                       onPress={() => { tapH(); setCatOpen(attTab); }}
-                      style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+                      style={{ flexDirection: "row", alignItems: "center" }}
                     >
-                      <View style={{ flexDirection: "row", alignItems: "center" }}>
-                        {shown.map((p, i) => (
-                          <Image
-                            key={p.id}
-                            source={{ uri: p.avatar }}
-                            style={[styles.avatar, { borderColor: T.bg, marginLeft: i === 0 ? 0 : -12 }]}
-                            contentFit="cover"
-                            transition={200}
-                          />
-                        ))}
-                        {extra > 0 ? (
-                          <View style={[styles.avatar, styles.avatarMore, { marginLeft: -12, borderColor: T.bg, backgroundColor: T.surfaceStrong }]}>
-                            <Text style={[Type.label, { color: T.textDim }]}>+{extra}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                      {/* "+N" rozeti — dokununca tüm liste modalı açılır */}
-                      <View style={[styles.plusBadge, { backgroundColor: T.primary + "22", borderColor: T.primary }]}>
-                        <Text style={[Type.label, { color: T.primary, fontWeight: "800" }]}>+{catCount(attTab)}</Text>
-                      </View>
+                      {/* Avatarlar + "+N" rozeti TEK satırda; "+N" son avatarın hemen bitiminde. */}
+                      {shown.map((p, i) => (
+                        <PreviewAvatar
+                          key={p.id}
+                          T={T}
+                          uri={p.avatar || undefined}
+                          fallbackEmoji={p.id === "__me" ? genderEmoji : "👤"}
+                          marginLeft={i === 0 ? 0 : -12}
+                        />
+                      ))}
+                      {extra > 0 ? (
+                        <View style={[styles.plusInline, { backgroundColor: T.primary + "22", borderColor: T.primary, marginLeft: shown.length ? 6 : 0 }]}>
+                          <Text style={[Type.label, { color: T.primary, fontWeight: "800" }]}>+{extra}</Text>
+                        </View>
+                      ) : null}
                     </Pressable>
                   )}
 
@@ -1073,12 +1067,37 @@ export default function EventDetail() {
         onPressPerson={openPerson}
       />
 
+      {/* Story editör — kaynak seçilince açılır; 'Bitir'de ANINDA paylaşır (caption yok, geri yok). */}
+      {storyUri ? (
+        <ImageEditor
+          uri={storyUri}
+          aspect={9 / 16}
+          outWidth={1080}
+          title="Story"
+          onDone={(u) => { void onStoryEdited(u); }}
+          onCancel={() => setStoryUri(null)}
+        />
+      ) : null}
+
       {/* Çoklu-segment Instagram-tarzı story izleyici (benim story'lerim + mock katkılar + listeden hasStory'li kişi) */}
       {viewerGroups ? (
         <EventStoryViewer
           groups={viewerGroups}
           startIndex={viewerStart}
           onClose={() => setViewerGroups(null)}
+          onDeleteSegment={(gi, si) => {
+            // Yalnızca AÇILAN grup benim story grubumsa sil.
+            const g = viewerGroups[gi];
+            if (!g?.isMe) return;
+            // Segmentler [...myEventStories].reverse() ile kuruluyor → aynı sırada ts'i bul.
+            const seg = [...myEventStories].reverse()[si];
+            if (!seg) return;
+            void (async () => {
+              await removeStory(seg.ts); // useStories.remove → stories.ts removeStory (DB + yerel) + reload
+              reloadStories();
+              setViewerGroups(null); // izleyiciyi kapat
+            })();
+          }}
         />
       ) : null}
 
@@ -1173,6 +1192,39 @@ function RsvpCountRow({ T, icon, label, count, active, onPress }: { T: Palette; 
   );
 }
 
+/**
+ * Katılımcı önizleme avatarı. Foto URL'i varsa <Image>, yoksa cinsiyet/ad ikonu
+ * gösteren bir daire (örn. "ben" fotosuz olduğunda 👨/👩/👤). marginLeft ile
+ * üst üste binme (overlapping) sağlanır.
+ */
+function PreviewAvatar({
+  T,
+  uri,
+  fallbackEmoji,
+  marginLeft,
+}: {
+  T: Palette;
+  uri?: string;
+  fallbackEmoji: string;
+  marginLeft: number;
+}) {
+  if (uri) {
+    return (
+      <Image
+        source={{ uri }}
+        style={[styles.avatar, { borderColor: T.bg, marginLeft }]}
+        contentFit="cover"
+        transition={200}
+      />
+    );
+  }
+  return (
+    <View style={[styles.avatar, styles.avatarMore, { borderColor: T.bg, backgroundColor: T.surfaceStrong, marginLeft }]}>
+      <Text style={{ fontSize: 20 }}>{fallbackEmoji}</Text>
+    </View>
+  );
+}
+
 function InfoRow({ T, icon, label, value, valueColor, onPress, actionLabel, badge, badgeColor }: { T: Palette; icon: string; label: string; value: string; valueColor?: string; onPress?: () => void; actionLabel?: string; badge?: string | null; badgeColor?: string }) {
   return (
     <Pressable onPress={onPress} disabled={!onPress} style={styles.infoRow}>
@@ -1204,11 +1256,10 @@ const styles = StyleSheet.create({
   sep: { height: StyleSheet.hairlineWidth * 2, marginVertical: 6 },
   rsvpRow: { flexDirection: "row", gap: 6 },
   attTab: { paddingHorizontal: 6, paddingVertical: 9, alignItems: "center", justifyContent: "center" },
-  plusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
+  plusInline: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
   countRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 11, borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2 },
   countBadge: { minWidth: 28, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center", justifyContent: "center" },
   joinBtn: { marginTop: 14, alignSelf: "flex-start", paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
-  storyPreview: { width: "100%", height: 200, borderRadius: Radius.md },
   avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2 },
   avatarMore: { alignItems: "center", justifyContent: "center" },
   backdrop: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.6)" },

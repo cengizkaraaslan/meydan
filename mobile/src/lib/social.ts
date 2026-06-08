@@ -210,3 +210,9 @@ export async function deleteStoryRemote(id: string): Promise<boolean> {
   const r = await send<{ ok?: boolean }>("DELETE", "/api/v1/social/stories", { id, deviceId }, {});
   return !!r.ok;
 }
+
+export async function updateStoryCaption(id: string, caption: string): Promise<boolean> {
+  const deviceId = await getOrCreateDeviceId();
+  const r = await send<{ ok?: boolean }>("PATCH", "/api/v1/social/stories", { id, deviceId, caption }, {});
+  return !!r.ok;
+}

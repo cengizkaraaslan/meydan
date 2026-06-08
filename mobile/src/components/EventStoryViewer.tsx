@@ -22,6 +22,10 @@ const SEGMENT_MS = 4000;
 export interface StorySegment {
   uri: string;
   caption?: string;
+  /** Story bir etkinlikten paylaşıldıysa etkinlik adı (opsiyonel, geri uyumlu). */
+  eventTitle?: string;
+  /** Etkinliğin şehri/konumu (opsiyonel, geri uyumlu). */
+  city?: string;
 }
 
 export interface StoryGroup {
@@ -130,6 +134,9 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
 
   const isRealPerson = !group.isMe && !!getPerson(group.id);
 
+  // Etkinlikten paylaşılan story → "📍 konum · etkinlik" etiketi (alanlar opsiyonel).
+  const eventLabel = [segment.city, segment.eventTitle].filter(Boolean).join(" · ");
+
   return (
     <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={close}>
       <View style={styles.root}>
@@ -180,6 +187,21 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
         <Pressable onPress={close} hitSlop={12} style={[styles.close, { top: insets.top + 22 }]}>
           <Text style={styles.closeTxt}>✕</Text>
         </Pressable>
+
+        {/* Etkinlik etiketi (📍 konum · etkinlik) — caption'ın üstünde, ayrı blok */}
+        {eventLabel ? (
+          <View
+            style={[
+              styles.eventTagWrap,
+              { bottom: insets.bottom + (segment.caption ? 84 : 36) },
+            ]}
+            pointerEvents="none"
+          >
+            <Text style={[Type.body, styles.eventTag]} numberOfLines={1}>
+              📍 {eventLabel}
+            </Text>
+          </View>
+        ) : null}
 
         {/* Caption */}
         {segment.caption ? (
@@ -241,6 +263,12 @@ const styles = StyleSheet.create({
   menuCard: { position: "absolute", left: 16, right: 16, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, overflow: "hidden" },
   menuItem: { paddingVertical: 16, alignItems: "center", justifyContent: "center" },
   menuDivider: { height: StyleSheet.hairlineWidth },
+  eventTagWrap: { position: "absolute", left: 18, right: 18, alignItems: "center" },
+  eventTag: {
+    color: "#fff", fontWeight: "700", textAlign: "center", backgroundColor: "rgba(0,0,0,0.55)",
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.md, overflow: "hidden",
+    maxWidth: "100%",
+  },
   captionWrap: { position: "absolute", left: 18, right: 18, alignItems: "center" },
   caption: {
     color: "#fff", textAlign: "center", backgroundColor: "rgba(0,0,0,0.45)",
