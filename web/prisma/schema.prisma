@@ -337,6 +337,10 @@ model MobileProfile {
   /// Kullanıcının seçtiği profil fotoğrafı URL'i (Google foto override'ı).
   avatar     String?  @db.Text
   lang       String?
+  /// Doğum tarihi (YYYY-MM-DD olarak saklanır).
+  birthDate  String?
+  /// Yaşın profilde görünüp görünmeyeceği.
+  showAge    Boolean  @default(true)
   /// Tanışma (dating) alanları — mobil swipe/eşleşme akışı için.
   bio        String?  @db.Text
   /// Kimi arıyor: "male" / "female" / "any".

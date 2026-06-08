@@ -3,6 +3,7 @@ import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, View } from
 import { LinearGradient } from "expo-linear-gradient";
 import { Radius, Type } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
+import { useCanSeeAges } from "@/lib/dprofile";
 import { tapH } from "@/lib/haptics";
 import { StoryAvatar } from "@/components/StoryAvatar";
 import { type Person } from "@/lib/people";
@@ -28,6 +29,7 @@ interface Props {
  */
 export function AttendeeListModal({ visible, title, people, gradient, bottomInset, meLabel, onClose, onPressPerson }: Props) {
   const { t: T } = useTheme();
+  const canSeeAges = useCanSeeAges();
   const total = people.length + (meLabel ? 1 : 0);
 
   return (
@@ -72,7 +74,7 @@ export function AttendeeListModal({ visible, title, people, gradient, bottomInse
               >
                 <StoryAvatar uri={p.avatar} name={p.name} size={48} hasStory={p.hasStory} online={p.online} />
                 <View style={{ flex: 1 }}>
-                  <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>{p.name}, {p.age}</Text>
+                  <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>{canSeeAges ? `${p.name}, ${p.age}` : p.name}</Text>
                   <Text style={[Type.label, { color: T.textFaint }]} numberOfLines={1}>📍 {p.city} · {p.distanceKm} km</Text>
                 </View>
                 <Text style={[Type.label, { color: T.primary }]}>→</Text>

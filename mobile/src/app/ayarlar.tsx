@@ -13,7 +13,6 @@ import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { CITIES, CATEGORIES } from "@/lib/categories";
 import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { ALL_CITIES, districtsFor } from "@/lib/location";
 import { usePrefs, replayTour } from "@/lib/prefs";
 import {
   useTheme,
@@ -27,7 +26,6 @@ import {
   type Mode,
 } from "@/lib/theme";
 import { useT, LANGS } from "@/lib/i18n";
-import { useActiveCity } from "@/lib/location";
 import { syncProfile } from "@/lib/profileSync";
 import { tapH, impactH } from "@/lib/haptics";
 import { getNotifPrefs, setNotifPrefs, type NotifPrefs } from "@/lib/notify";
@@ -115,7 +113,6 @@ export default function SettingsScreen() {
   const { user, signOut } = useAuth();
   const { t: T, name, setTheme, mode, setMode, gender, setGender } = useTheme();
   const { t, lang, setLang } = useT();
-  const { city, setCity } = useActiveCity();
   const prefs = usePrefs();
 
   // Akordeon: aynı anda tek bölüm açık. Açılışta "Bildirim" açık gelsin
@@ -138,41 +135,6 @@ export default function SettingsScreen() {
     }
   };
 
-  // İlçe seçimi (şehre bağlı) — cihazda saklanır + best-effort DB'ye senkron.
-  const [district, setDistrictState] = useState<string | null>(null);
-  const [districts, setDistricts] = useState<string[]>([]);
-
-  useEffect(() => {
-    AsyncStorage.getItem("meydanfest:district").then((d) => setDistrictState(d));
-  }, []);
-
-  // Seçili şehrin ilçeleri: API → boşsa yerel yedek. Şehir yoksa boş.
-  useEffect(() => {
-    if (!city) { setDistricts([]); return; }
-    let alive = true;
-    (async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/districts?city=${encodeURIComponent(city)}`);
-        const json = (await res.json()) as { districts?: string[] };
-        const apiList = Array.isArray(json.districts) ? json.districts : [];
-        if (alive) setDistricts(apiList.length ? apiList : districtsFor(city));
-      } catch {
-        if (alive) setDistricts(districtsFor(city));
-      }
-    })();
-    return () => { alive = false; };
-  }, [city]);
-
-  const pickDistrict = (d: string) => {
-    tapH();
-    // d boş ("Tüm ilçeler") → temizle; aynı ilçeye tekrar dokun → temizle; aksi → seç.
-    const next = d && district !== d ? d : null;
-    setDistrictState(next);
-    if (next) AsyncStorage.setItem("meydanfest:district", next);
-    else AsyncStorage.removeItem("meydanfest:district");
-    syncProfile({ city, district: next });
-  };
-
   useEffect(() => {
     let alive = true;
     getNotifPrefs().then((p) => { if (alive) setNotif(p); });
@@ -193,14 +155,6 @@ export default function SettingsScreen() {
   const toggleNotifCat = (key: string) => {
     const has = notif.categories.includes(key);
     persistPrefs({ ...notif, categories: has ? notif.categories.filter((x) => x !== key) : [...notif.categories, key] });
-  };
-  const pickCity = (c: string) => {
-    const next = city === c ? null : c;
-    setCity(next);
-    syncProfile({ city: next, district: null });
-    // Şehir değişince ilçe sıfırlanır.
-    setDistrictState(null);
-    AsyncStorage.removeItem("meydanfest:district");
   };
   const pickGender = (g: Gender) => {
     setGender(g);
@@ -278,34 +232,6 @@ export default function SettingsScreen() {
                   </Animated.Text>
                 )}
           </GlassCard>
-        </Section>
-
-        {/* Şehir + İlçe — tüm 81 il + şehre bağlı ilçeler (cihazda + DB'de tutulur) */}
-        <Section
-          title={`${t("detected_city")}  📍 ${city ?? "—"}${district ? " · " + district : ""}`}
-          accent={T.blue}
-          openKey="city"
-          current={open}
-          onToggle={toggle}
-        >
-          <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>{t("select_city")}</Text>
-          <View style={styles.pillWrap}>
-            {ALL_CITIES.map((c) => (
-              <Pill key={c} label={c} active={city === c} gradient={T.primarySoft} onPress={() => pickCity(c)} />
-            ))}
-          </View>
-          {city && districts.length > 0 ? (
-            <>
-              <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
-              <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>{t("district")}</Text>
-              <View style={styles.pillWrap}>
-                <Pill label={t("all_districts")} active={district === null} onPress={() => pickDistrict("")} />
-                {districts.map((d) => (
-                  <Pill key={d} label={d} active={district === d} gradient={T.primarySoft} onPress={() => pickDistrict(d)} />
-                ))}
-              </View>
-            </>
-          ) : null}
         </Section>
 
         {/* Görünüm: mode + tema + dil + cinsiyet */}

@@ -1,10 +1,12 @@
-import React from "react";
-import { StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useTheme } from "@/lib/theme";
 import { Pill } from "@/ui/atoms";
 import { Radius, Space, Type } from "@/theme/aurora";
 import {
   useDProfile,
+  ageFromBirthDate,
+  zodiacFromBirthDate,
   INTERESTS,
   GOALS,
   LANGS,
@@ -22,6 +24,40 @@ import {
 export function DatingProfileFields() {
   const { t: T } = useTheme();
   const { profile, update, toggleIn } = useDProfile();
+  const [confirmHide, setConfirmHide] = useState(false);
+
+  // Doğum tarihi parçaları (gün/ay/yıl) — profil.birthDate ("YYYY-MM-DD") ile senkron.
+  const [bd, setBd] = useState({ d: "", m: "", y: "" });
+  useEffect(() => {
+    if (profile.birthDate) {
+      const [y, m, d] = profile.birthDate.split("-");
+      setBd({ d: d ?? "", m: m ?? "", y: y ?? "" });
+    }
+  }, [profile.birthDate]);
+
+  const setBdPart = (part: "d" | "m" | "y", raw: string) => {
+    const val = raw.replace(/[^0-9]/g, "");
+    const next = { ...bd, [part]: val };
+    setBd(next);
+    if (next.d && next.m && next.y.length === 4) {
+      const iso = `${next.y}-${next.m.padStart(2, "0")}-${next.d.padStart(2, "0")}`;
+      // Doğum tarihi tamamlanınca burcu otomatik belirle ve kaydet (DB'ye de gider).
+      update({ birthDate: iso, zodiac: zodiacFromBirthDate(iso) ?? profile.zodiac });
+    } else {
+      update({ birthDate: "" });
+    }
+  };
+
+  // Yaşımı göster: kapatmaya çalışınca önce onay iste.
+  const onToggleShowAge = (val: boolean) => {
+    if (!val) {
+      setConfirmHide(true);
+      return;
+    }
+    update({ showAge: true });
+  };
+
+  const age = ageFromBirthDate(profile.birthDate);
 
   const inputStyle = {
     backgroundColor: T.surfaceStrong,

@@ -9,6 +9,7 @@ import { AuroraBackground } from "@/components/AuroraBackground";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { PEOPLE, type Person } from "@/lib/people";
 import { useTheme } from "@/lib/theme";
+import { useCanSeeAges } from "@/lib/dprofile";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { SignInPrompt } from "@/components/SignInPrompt";
@@ -19,6 +20,7 @@ export default function MatchScreen() {
   const insets = useSafeAreaInsets();
   const { t: T, gender } = useTheme();
   const { t } = useT();
+  const canSeeAges = useCanSeeAges();
   const { user } = useAuth();
 
   const deck = useMemo<Person[]>(() => {
@@ -139,7 +141,7 @@ export default function MatchScreen() {
             <View style={styles.cardInfo}>
               <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8 }}>
                 <Text style={[Type.hero, { color: "#FFFFFF" }]}>
-                  {current.name}, {current.age}
+                  {canSeeAges ? `${current.name}, ${current.age}` : current.name}
                 </Text>
               </View>
               <Text style={[Type.label, { color: T.textDim, marginTop: 4 }]}>📍 {current.distanceKm} km</Text>

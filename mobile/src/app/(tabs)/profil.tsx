@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -24,6 +25,7 @@ import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { showAuthPrompt } from "@/lib/authPrompt";
 import { syncProfile } from "@/lib/profileSync";
+import { useActiveCity, ALL_CITIES, districtsFor } from "@/lib/location";
 import { tapH, impactH, successH } from "@/lib/haptics";
 
 /** Tek istatistik kartı — büyük rakam + altında etiket. Dokununca ilgili liste açılır. */
@@ -150,6 +152,73 @@ export default function ProfileScreen() {
     if (prev && prev !== uri) deleteLocalFile(prev); // file:// değilse (Google foto) dokunmaz
   };
 
+  // ── 📍 Konum: şehir/ilçe dropdown + gerçek koordinat ──
+  const { city, setCity } = useActiveCity();
+  const [district, setDistrict] = useState<string | null>(null);
+  const [cityModal, setCityModal] = useState(false);
+  const [districtModal, setDistrictModal] = useState(false);
+  const [citySearch, setCitySearch] = useState("");
+  const [coordsLoading, setCoordsLoading] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem("meydanfest:district").then(setDistrict);
+  }, []);
+
+  // Seçili şehrin ilçe listesi (yerel yedek; şehir yoksa boş).
+  const districts = useMemo(() => districtsFor(city), [city]);
+
+  // Şehir araması (Türkçe karakter duyarsız basit filtre).
+  const filteredCities = useMemo(() => {
+    const q = citySearch.trim().toLocaleLowerCase("tr-TR");
+    if (!q) return ALL_CITIES;
+    return ALL_CITIES.filter((c) => c.toLocaleLowerCase("tr-TR").includes(q));
+  }, [citySearch]);
+
+  const pickCity = (c: string) => {
+    tapH();
+    setCityModal(false);
+    setCitySearch("");
+    setCity(c); // useActiveCity → setManualCity (uygulamanın geri kalanı bunu kullanır)
+    // Şehir değişince ilçe sıfırlanır.
+    setDistrict(null);
+    AsyncStorage.removeItem("meydanfest:district");
+    syncProfile({ city: c, district: null });
+  };
+
+  const pickDistrict = (d: string | null) => {
+    tapH();
+    setDistrictModal(false);
+    setDistrict(d);
+    if (d) AsyncStorage.setItem("meydanfest:district", d);
+    else AsyncStorage.removeItem("meydanfest:district");
+    syncProfile({ district: d });
+  };
+
+  // Tam koordinatı al → yerelde sakla + backend'e gönder.
+  const captureCoords = async () => {
+    if (coordsLoading) return;
+    impactH();
+    setCoordsLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Konum izni gerekli", "Tam konumunu kaydetmek için konum iznini açman gerekiyor.");
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      await AsyncStorage.setItem("meydanfest:coords", JSON.stringify({ lat, lng, ts: Date.now() }));
+      syncProfile({ lat, lng });
+      successH();
+      showToast("Konumun kaydedildi 📍");
+    } catch {
+      Alert.alert("Konum alınamadı", "Konum servisi kapalı olabilir. Lütfen tekrar dene.");
+    } finally {
+      setCoordsLoading(false);
+    }
+  };
+
   // Story paylaş — oturum + medya izni gerekir.
   const shareStory = async () => {
     if (!user) {
@@ -266,6 +335,44 @@ export default function ProfileScreen() {
           <DatingProfileFields />
         </Animated.View>
 
+        {/* 📍 Konum — şehir/ilçe dropdown + gerçek koordinat */}
+        <Animated.View entering={FadeInDown.duration(450).delay(110)} style={{ marginBottom: Space.xl }}>
+          <SectionHeader title="📍 Konum" accent={T.blue} />
+          <View style={[styles.locCard, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+            {/* Şehir dropdown */}
+            <Pressable onPress={() => { tapH(); setCityModal(true); }} style={[styles.locRow, { borderColor: T.hairline }]}>
+              <Text style={[Type.body, { color: T.textDim }]}>Şehir</Text>
+              <View style={styles.locVal}>
+                <Text style={[Type.title, { color: city ? T.text : T.textFaint }]}>{city ?? "Seç"}</Text>
+                <Text style={[Type.title, { color: T.textFaint }]}>▾</Text>
+              </View>
+            </Pressable>
+
+            {/* İlçe dropdown (opsiyonel) — şehir seçili değilse pasif */}
+            <Pressable
+              onPress={() => { if (!city) return; tapH(); setDistrictModal(true); }}
+              disabled={!city}
+              style={[styles.locRow, { borderColor: T.hairline, opacity: city ? 1 : 0.45 }]}
+            >
+              <Text style={[Type.body, { color: T.textDim }]}>İlçe (opsiyonel)</Text>
+              <View style={styles.locVal}>
+                <Text style={[Type.title, { color: district ? T.text : T.textFaint }]}>{district ?? "Seç"}</Text>
+                <Text style={[Type.title, { color: T.textFaint }]}>▾</Text>
+              </View>
+            </Pressable>
+
+            {/* Tam konumu kaydet */}
+            <Pressable onPress={captureCoords} disabled={coordsLoading} style={{ marginTop: Space.md }}>
+              <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.locBtn, coordsLoading && { opacity: 0.6 }]}>
+                <Text style={[Type.title, { color: "#fff" }]}>{coordsLoading ? "Konum alınıyor…" : "📍 Tam konumumu kaydet"}</Text>
+              </LinearGradient>
+            </Pressable>
+            <Text style={[Type.label, { color: T.textFaint, marginTop: Space.sm }]}>
+              Konumunu kaydedersen yakınındaki etkinlikleri daha iyi gösterebiliriz.
+            </Text>
+          </View>
+        </Animated.View>
+
         {/* Sosyal hesaplar — kompakt; "Ekle" ile kutucuklar açılır */}
         <Animated.View entering={FadeInDown.duration(450).delay(115)} style={{ marginBottom: Space.xl }}>
           <View style={styles.socialHead}>
@@ -363,6 +470,64 @@ export default function ProfileScreen() {
         </Animated.View>
       </Modal>
 
+      {/* Şehir seçimi (aranabilir 81 il) */}
+      <Modal visible={cityModal} transparent animationType="slide" onRequestClose={() => setCityModal(false)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setCityModal(false)}>
+          <Pressable
+            style={[styles.sheet, { backgroundColor: T.bgElevated, borderColor: T.hairline, paddingBottom: insets.bottom + 16 }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={[styles.sheetHandle, { backgroundColor: T.hairline }]} />
+            <Text style={[Type.h2, { color: T.text, marginBottom: 12 }]}>Şehir seç</Text>
+            <TextInput
+              value={citySearch}
+              onChangeText={setCitySearch}
+              placeholder="Şehir ara…"
+              placeholderTextColor={T.textFaint}
+              autoCorrect={false}
+              style={[Type.body, styles.citySearch, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+            />
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
+              {filteredCities.map((c) => (
+                <Pressable key={c} onPress={() => pickCity(c)} style={[styles.optRow, { borderColor: T.hairline }]}>
+                  <Text style={[Type.title, { color: city === c ? T.primary : T.text }]}>{c}</Text>
+                  {city === c ? <Text style={[Type.title, { color: T.primary }]}>✓</Text> : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* İlçe seçimi (opsiyonel) */}
+      <Modal visible={districtModal} transparent animationType="slide" onRequestClose={() => setDistrictModal(false)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setDistrictModal(false)}>
+          <Pressable
+            style={[styles.sheet, { backgroundColor: T.bgElevated, borderColor: T.hairline, paddingBottom: insets.bottom + 16 }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={[styles.sheetHandle, { backgroundColor: T.hairline }]} />
+            <Text style={[Type.h2, { color: T.text, marginBottom: 12 }]}>İlçe seç ({city})</Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+              <Pressable onPress={() => pickDistrict(null)} style={[styles.optRow, { borderColor: T.hairline }]}>
+                <Text style={[Type.title, { color: district === null ? T.primary : T.textDim }]}>Seçme / Temizle</Text>
+                {district === null ? <Text style={[Type.title, { color: T.primary }]}>✓</Text> : null}
+              </Pressable>
+              {districts.length === 0 ? (
+                <Text style={[Type.label, { color: T.textFaint, paddingVertical: Space.md }]}>Bu şehir için ilçe listesi yok.</Text>
+              ) : (
+                districts.map((d) => (
+                  <Pressable key={d} onPress={() => pickDistrict(d)} style={[styles.optRow, { borderColor: T.hairline }]}>
+                    <Text style={[Type.title, { color: district === d ? T.primary : T.text }]}>{d}</Text>
+                    {district === d ? <Text style={[Type.title, { color: T.primary }]}>✓</Text> : null}
+                  </Pressable>
+                ))
+              )}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Profil fotoğrafı kırpma ekranı (kare) */}
       <ImageEditor uri={cropUri} aspect={1} outWidth={512} title="Profil fotoğrafı" onDone={saveAvatar} onCancel={() => setCropUri(null)} />
 
@@ -417,6 +582,13 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2,
   },
   sheetHandle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, marginBottom: 14, opacity: 0.6 },
+  // Konum kartı
+  locCard: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: Space.md },
+  locRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: Space.md, borderBottomWidth: StyleSheet.hairlineWidth },
+  locVal: { flexDirection: "row", alignItems: "center", gap: Space.sm },
+  locBtn: { paddingVertical: 14, borderRadius: Radius.pill, alignItems: "center", justifyContent: "center" },
+  citySearch: { borderWidth: StyleSheet.hairlineWidth * 2, borderRadius: Radius.md, paddingHorizontal: Space.md, paddingVertical: 10, marginBottom: Space.sm },
+  optRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: Space.md, borderBottomWidth: StyleSheet.hairlineWidth },
   // Sosyal hesap satırı
   socialHead: { flexDirection: "row", alignItems: "center", gap: Space.sm },
   socialToggle: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },

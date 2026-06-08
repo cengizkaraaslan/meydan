@@ -55,11 +55,11 @@ export default function AdminHubScreen() {
         <Pressable
           onPress={() => { tapH(); router.back(); }}
           hitSlop={12}
-          style={[styles.back, { backgroundColor: "rgba(0,0,0,0.45)", borderColor: T.hairline }]}
+          style={[styles.back, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
         >
-          <Text style={{ color: "#fff", fontSize: 20 }}>←</Text>
+          <Text style={{ color: T.text, fontSize: 20 }}>←</Text>
         </Pressable>
-        <Text style={[Type.h1, { color: T.text }]}>Yönetim</Text>
+        <Text style={[Type.h1, { color: T.text }]}>Admin Yönetim Paneli</Text>
         <View style={{ width: 42 }} />
       </View>
 

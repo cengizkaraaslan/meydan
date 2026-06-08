@@ -101,6 +101,8 @@ export function ProfileSettingsClient({ initialAuthName, initialAuthImage }: Pro
   const [profile, setProfile] = useState<ProfileData>(DEFAULT);
   const [saving, setSaving] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // "Yaşımı göster" açıkken kapatılmak istendiğinde onay modalını açar
+  const [hideAgeConfirm, setHideAgeConfirm] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -122,6 +124,33 @@ export function ProfileSettingsClient({ initialAuthName, initialAuthImage }: Pro
 
   function update<K extends keyof ProfileData>(key: K, value: ProfileData[K]) {
     setProfile((p) => ({ ...p, [key]: value }));
+  }
+
+  // "Yaşımı göster" toggle tıklaması:
+  // - Kapalı → Açık: doğrudan aç (modal yok)
+  // - Açık → Kapalı: önce onay modalı göster, kapatmayı erteleme
+  function handleShowAgeToggle(next: boolean) {
+    if (!next && profile.showAge) {
+      setHideAgeConfirm(true);
+      return;
+    }
+    update("showAge", next);
+  }
+
+  // Onay modalında "Tamam": yaşı gizle + localStorage'a yaz + modalı kapat.
+  // (save() async setState'i beklemediği için showAge=false'u burada elle yazıyoruz)
+  function confirmHideAge() {
+    setProfile((p) => {
+      const updated = { ...p, showAge: false };
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+    setHideAgeConfirm(false);
+    toast.success("Yaşın artık gizli");
   }
 
   function addHobby(raw: string) {
@@ -410,7 +439,7 @@ export function ProfileSettingsClient({ initialAuthName, initialAuthImage }: Pro
                 <input
                   type="checkbox"
                   checked={profile.showAge}
-                  onChange={(e) => update("showAge", e.target.checked)}
+                  onChange={(e) => handleShowAgeToggle(e.target.checked)}
                   className="sr-only"
                 />
                 {profile.showAge ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
@@ -577,6 +606,65 @@ export function ProfileSettingsClient({ initialAuthName, initialAuthImage }: Pro
           )}
         </motion.button>
       </div>
+
+      {/* "Yaşını gizle?" onay modalı — açıkken kapatmaya çalışınca gösterilir */}
+      <AnimatePresence>
+        {hideAgeConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => setHideAgeConfirm(false)}
+            className="fixed inset-0 z-[80] grid place-items-center bg-black/55 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.92, y: 24, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.92, y: 24, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 320, damping: 26 }}
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Yaşını gizle?"
+              className="relative w-full max-w-sm rounded-3xl border border-[var(--border)] bg-[var(--card)] shadow-2xl overflow-hidden"
+            >
+              <div className="relative p-6 text-center">
+                <motion.div
+                  initial={{ scale: 0.5, rotate: -20 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: "spring", stiffness: 260, damping: 18 }}
+                  className="mx-auto grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] text-white shadow-xl mb-4"
+                >
+                  <EyeOff className="size-7" />
+                </motion.div>
+
+                <h2 className="text-lg font-bold tracking-tight">Yaşını gizle?</h2>
+                <p className="mt-2 text-sm text-[var(--muted)] leading-relaxed">
+                  Yaşını gizlersen sen de başkalarının yaşını göremezsin.
+                </p>
+
+                <div className="mt-5 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setHideAgeConfirm(false)}
+                    className="inline-flex items-center justify-center rounded-2xl border border-[var(--border)] text-[var(--foreground)] px-4 py-2.5 text-sm font-medium hover:bg-[var(--muted-bg)] transition-colors"
+                  >
+                    İptal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmHideAge}
+                    className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white px-4 py-2.5 text-sm font-semibold shadow-lg hover:opacity-95 transition-opacity"
+                  >
+                    Tamam
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

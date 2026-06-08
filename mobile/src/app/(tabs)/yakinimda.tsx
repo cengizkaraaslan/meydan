@@ -16,6 +16,7 @@ import { Radius, Type, glow } from "@/theme/aurora";
 import { PEOPLE, type Person } from "@/lib/people";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
+import { useCanSeeAges } from "@/lib/dprofile";
 import { tapH, impactH } from "@/lib/haptics";
 import { scheduleProximityPing } from "@/lib/notify";
 import { StoryAvatar } from "@/components/StoryAvatar";
@@ -70,6 +71,7 @@ function PulseDot({ color, border, size = 16 }: { color: string; border: string;
 
 function PersonCard({ person, online, onOpenStory }: { person: Person; online: boolean; onOpenStory: (p: Person) => void }) {
   const { t: T } = useTheme();
+  const canSeeAges = useCanSeeAges();
   const openAvatar = () => {
     tapH();
     if (person.hasStory) onOpenStory(person);
@@ -100,7 +102,7 @@ function PersonCard({ person, online, onOpenStory }: { person: Person; online: b
       <View style={{ flex: 1, gap: 4 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Text style={[Type.title, { color: T.text }]}>
-            {person.name}, {person.age}
+            {canSeeAges ? `${person.name}, ${person.age}` : person.name}
           </Text>
           <Text style={[Type.label, { color: T.textFaint }]}>· {person.distanceKm} km</Text>
         </View>

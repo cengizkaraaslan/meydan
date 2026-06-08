@@ -10,6 +10,7 @@ import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { getPerson } from "@/lib/people";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
+import { useCanSeeAges } from "@/lib/dprofile";
 import { tapH, impactH } from "@/lib/haptics";
 
 const { height: SCREEN_H } = Dimensions.get("window");
@@ -20,6 +21,7 @@ export default function PersonScreen() {
   const insets = useSafeAreaInsets();
   const { t: T } = useTheme();
   const { t } = useT();
+  const canSeeAges = useCanSeeAges();
   const person = getPerson(String(id));
 
   if (!person) {
@@ -81,7 +83,7 @@ export default function PersonScreen() {
           {/* İsim bloğu — görselin altına biner */}
           <Animated.View entering={FadeInDown.delay(80).duration(480)} style={styles.nameBlock}>
             <Text style={[Type.hero, { color: T.text }]}>
-              {person.name}, {person.age}
+              {canSeeAges ? `${person.name}, ${person.age}` : person.name}
             </Text>
             <Text style={[Type.body, { color: isVeryClose ? T.success : T.textDim, marginTop: 4, fontWeight: "700" }]}>
               {isVeryClose

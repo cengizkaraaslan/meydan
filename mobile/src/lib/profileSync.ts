@@ -30,6 +30,8 @@ export async function syncProfile(data: {
   lang?: string;
   avatar?: string | null;
   name?: string;
+  lat?: number;
+  lng?: number;
 }): Promise<void> {
   try {
     const deviceId = await getDeviceId();

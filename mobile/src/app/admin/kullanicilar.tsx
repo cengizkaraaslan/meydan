@@ -34,12 +34,19 @@ function StatLine({ T, icon, label, value }: { T: Palette; icon: string; label: 
   );
 }
 
-function Badge({ T, real }: { T: Palette; real: boolean }) {
-  const color = real ? T.success : T.textFaint;
-  const bg = real ? "rgba(52,211,153,0.14)" : T.surfaceStrong;
+type Kind = "real" | "fake" | "device";
+
+function Badge({ T, kind }: { T: Palette; kind: Kind }) {
+  // 3 durum: gerçek → yeşil, fake → turuncu/altın, normal cihaz → gri.
+  const map = {
+    real: { color: T.success, bg: "rgba(52,211,153,0.14)", label: "GERÇEK" },
+    fake: { color: T.gold, bg: "rgba(245,194,75,0.16)", label: "FAKE" },
+    device: { color: T.textFaint, bg: T.surfaceStrong, label: "CİHAZ" },
+  } as const;
+  const { color, bg, label } = map[kind];
   return (
     <View style={[styles.badge, { backgroundColor: bg, borderColor: color }]}>
-      <Text style={[Type.micro, { color }]}>{real ? "GERÇEK" : "CİHAZ"}</Text>
+      <Text style={[Type.micro, { color }]}>{label}</Text>
     </View>
   );
 }
@@ -47,9 +54,16 @@ function Badge({ T, real }: { T: Palette; real: boolean }) {
 function UserCard({ T, u, i }: { T: Palette; u: AdminUser; i: number }) {
   const [open, setOpen] = useState(false);
   const real = u.type === "real";
-  const accent = real ? T.success : T.textFaint;
+  const fake = u.type === "device" && u.isFake;
+  const kind: Kind = real ? "real" : fake ? "fake" : "device";
+  const accent = real ? T.success : fake ? T.gold : T.textFaint;
 
-  const title = real ? (u.name || u.email || "İsimsiz") : `Cihaz ${shortId(u.deviceId)}`;
+  // Fake cihaz satırında ad varsa onu göster, yoksa deviceId.
+  const title = real
+    ? (u.name || u.email || "İsimsiz")
+    : fake
+      ? (u.name || `Cihaz ${shortId(u.deviceId)}`)
+      : `Cihaz ${shortId(u.deviceId)}`;
   const sub = real ? (u.email ?? "—") : [u.city, u.district].filter(Boolean).join(" · ") || "Konum yok";
   const avatar = real ? u.image : u.avatar;
 
@@ -70,7 +84,7 @@ function UserCard({ T, u, i }: { T: Palette; u: AdminUser; i: number }) {
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Text style={[Type.title, { color: T.text, flexShrink: 1 }]} numberOfLines={1}>{title}</Text>
-              <Badge T={T} real={real} />
+              <Badge T={T} kind={kind} />
             </View>
             <Text style={[Type.label, { color: T.textFaint, marginTop: 3 }]} numberOfLines={1}>{sub}</Text>
             <Text style={[Type.micro, { color: T.textFaint, marginTop: 4 }]}>
@@ -114,6 +128,7 @@ export default function AdminUsersScreen() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [realCount, setRealCount] = useState(0);
   const [deviceCount, setDeviceCount] = useState(0);
+  const [fakeCount, setFakeCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +147,11 @@ export default function AdminUsersScreen() {
       setUsers(resp.users);
       setRealCount(resp.realCount);
       setDeviceCount(resp.deviceCount);
+      // Fake sayısı: backend verdiyse onu, yoksa listeden say.
+      setFakeCount(
+        resp.fakeCount ??
+          resp.users.filter((u) => u.type === "device" && u.isFake).length,
+      );
     } catch (e) {
       setError((e as AdminApiError)?.message ?? "Veri alınamadı.");
     } finally {
@@ -157,9 +177,9 @@ export default function AdminUsersScreen() {
         <Pressable
           onPress={() => { tapH(); router.back(); }}
           hitSlop={12}
-          style={[styles.back, { backgroundColor: "rgba(0,0,0,0.45)", borderColor: T.hairline }]}
+          style={[styles.back, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
         >
-          <Text style={{ color: "#fff", fontSize: 20 }}>←</Text>
+          <Text style={{ color: T.text, fontSize: 20 }}>←</Text>
         </Pressable>
         <Text style={[Type.h1, { color: T.text }]}>Kullanıcılar</Text>
         <View style={{ width: 42 }} />
@@ -175,6 +195,10 @@ export default function AdminUsersScreen() {
           <View style={[styles.summary, { backgroundColor: "rgba(52,211,153,0.12)", borderColor: T.success }]}>
             <Text style={[Type.hero, { color: T.success, fontSize: 26 }]}>{realCount}</Text>
             <Text style={[Type.label, { color: T.textDim }]}>Gerçek</Text>
+          </View>
+          <View style={[styles.summary, { backgroundColor: "rgba(245,194,75,0.12)", borderColor: T.gold }]}>
+            <Text style={[Type.hero, { color: T.gold, fontSize: 26 }]}>{fakeCount}</Text>
+            <Text style={[Type.label, { color: T.textDim }]}>Fake</Text>
           </View>
           <View style={[styles.summary, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
             <Text style={[Type.hero, { color: T.text, fontSize: 26 }]}>{deviceCount}</Text>

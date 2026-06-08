@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Alert, Dimensions, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Alert, BackHandler, Dimensions, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -19,6 +19,7 @@ import { setAttending, mockAttendeesFor } from "@/lib/attending";
 import { addStory, useStories } from "@/lib/stories";
 import { Badge, GradientButton, Loader, Pill } from "@/ui/atoms";
 import { useTheme, type Palette } from "@/lib/theme";
+import { useCanSeeAges } from "@/lib/dprofile";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
@@ -112,6 +113,7 @@ export default function EventDetail() {
   const { ids } = useFavorites();
   const { t: T } = useTheme();
   const { t } = useT();
+  const canSeeAges = useCanSeeAges();
   const { user, guest } = useAuth();
   const [event, setEvent] = useState<ApiEvent | null>(null);
   const [loading, setLoading] = useState(true);
@@ -149,6 +151,48 @@ export default function EventDetail() {
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
   // bu etkinliğe ait benim story'lerim (reaktif)
   const { stories, reload: reloadStories } = useStories();
+
+  // Etkinlik detaydan geri dönerken ömür boyu 1 kez gösterilen "yardım" modalı.
+  const [leaveHelp, setLeaveHelp] = useState(false);
+  // seen değeri mount'ta okunur ve ref'te tutulur ("1" = daha önce gösterildi).
+  const leaveHelpSeen = useRef(false);
+  const LEAVE_HELP_KEY = "meydanfest:leaveHelpSeen";
+
+  useEffect(() => {
+    AsyncStorage.getItem(LEAVE_HELP_KEY).then((v) => {
+      leaveHelpSeen.current = v === "1";
+    });
+  }, []);
+
+  // Geri gitme denemesi: daha önce görüldüyse normal geri; değilse modalı 1 kez göster.
+  const tryLeave = () => {
+    if (leaveHelpSeen.current) {
+      router.back();
+      return;
+    }
+    leaveHelpSeen.current = true;
+    AsyncStorage.setItem(LEAVE_HELP_KEY, "1");
+    setLeaveHelp(true);
+  };
+
+  // Android donanım geri tuşu:
+  //  - modal açıkken → modalı kapat (geri gitme).
+  //  - modal yokken → tryLeave (seen değilse modal aç, seen ise normal geri).
+  useEffect(() => {
+    const onBack = () => {
+      if (leaveHelp) {
+        setLeaveHelp(false);
+        return true; // default geri'yi engelle
+      }
+      if (!leaveHelpSeen.current) {
+        tryLeave();
+        return true; // modalı açtık, default geri'yi engelle
+      }
+      return false; // seen → normal geri
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBack);
+    return () => sub.remove();
+  }, [leaveHelp]);
 
   const eid = String(id);
   const rsvpKey = `meydanfest:rsvp:${eid}`;
@@ -552,7 +596,7 @@ export default function EventDetail() {
           <LinearGradient colors={["rgba(8,7,13,0.5)", "transparent", "rgba(8,7,13,0.6)", T.bg]} locations={[0, 0.3, 0.7, 1]} style={StyleSheet.absoluteFill} />
           {/* Üst bar */}
           <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
-            <Pressable onPress={() => { tapH(); router.back(); }} style={[styles.circleBtn, { borderColor: T.hairline }]}><Text style={styles.circleTxt}>←</Text></Pressable>
+            <Pressable onPress={() => { tapH(); tryLeave(); }} style={[styles.circleBtn, { borderColor: T.hairline }]}><Text style={styles.circleTxt}>←</Text></Pressable>
             <View style={{ flexDirection: "row", gap: 10 }}>
               <Pressable onPress={share} style={[styles.circleBtn, { borderColor: T.hairline }]}><Text style={styles.circleTxt}>↗</Text></Pressable>
               <Pressable
@@ -863,7 +907,7 @@ export default function EventDetail() {
                     onPress={() => { if (!isMe) openPerson(p.id); }}
                     style={{ flex: 1 }}
                   >
-                    <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>{isMe ? `${p.name} · ${t("you") }` : `${p.name}, ${p.age}`}</Text>
+                    <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>{isMe ? `${p.name} · ${t("you") }` : (canSeeAges ? `${p.name}, ${p.age}` : p.name)}</Text>
                     <Text style={[Type.label, { color: T.textFaint }]} numberOfLines={1}>{isMe ? `✓ ${t("rsvp_going")}` : `📍 ${p.city} · ${p.distanceKm} km`}</Text>
                   </Pressable>
                   {!isMe ? (
@@ -927,6 +971,65 @@ export default function EventDetail() {
         <Pressable style={styles.photoModalBg} onPress={() => setPhotoView(null)}>
           {photoView ? <Image source={{ uri: photoView }} style={styles.photoModalImg} contentFit="contain" transition={150} /> : null}
         </Pressable>
+      </Modal>
+
+      {/* Geri dönerken ömür boyu 1 kez gösterilen yardım modalı */}
+      <Modal
+        visible={leaveHelp}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => { setLeaveHelp(false); router.back(); }}
+      >
+        {/* Arka plana basınca geri dön */}
+        <Pressable style={styles.leaveBackdrop} onPress={() => { setLeaveHelp(false); router.back(); }} />
+        <View style={styles.leaveCenter} pointerEvents="box-none">
+          <View style={[styles.leaveCard, { backgroundColor: T.bgElevated, borderColor: T.hairline }]}>
+            {/* Kapat */}
+            <Pressable
+              onPress={() => { tapH(); setLeaveHelp(false); router.back(); }}
+              hitSlop={10}
+              style={styles.leaveClose}
+            >
+              <Text style={{ color: T.textDim, fontSize: 22 }}>✕</Text>
+            </Pressable>
+
+            <Text style={[Type.h2, { color: T.text, textAlign: "center", marginBottom: 8, paddingHorizontal: 18 }]}>
+              Etkinliğe yalnız gitmek istemediğin için mi vazgeçtin? 🤔
+            </Text>
+            <Text style={[Type.body, { color: T.textDim, textAlign: "center", marginBottom: 20 }]}>
+              Sana yardımcı olalım — birlikte gitmek daha keyifli!
+            </Text>
+
+            {/* Seçenek 1: etkinlik arkadaşı bul */}
+            <Pressable
+              onPress={() => { tapH(); setLeaveHelp(false); router.push("/(tabs)/kategoriler"); }}
+              style={{ borderRadius: Radius.pill, overflow: "hidden", marginBottom: 12 }}
+            >
+              <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.leaveOpt}>
+                <Text style={[Type.title, { color: "#fff" }]}>👯 Etkinlik arkadaşı bul</Text>
+              </LinearGradient>
+            </Pressable>
+
+            {/* Seçenek 2: etkinlikten sevgili bul */}
+            <Pressable
+              onPress={() => { tapH(); setLeaveHelp(false); router.push("/esles"); }}
+              style={{ borderRadius: Radius.pill, overflow: "hidden", marginBottom: 16 }}
+            >
+              <LinearGradient colors={c.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.leaveOpt}>
+                <Text style={[Type.title, { color: "#fff" }]}>❤️ Etkinlikten sevgili bul</Text>
+              </LinearGradient>
+            </Pressable>
+
+            {/* Sade geri dön */}
+            <Pressable
+              onPress={() => { tapH(); setLeaveHelp(false); router.back(); }}
+              style={[styles.leaveBack, { borderColor: T.hairline, backgroundColor: T.surface }]}
+            >
+              <Text style={[Type.label, { color: T.textDim }]}>Hayır, geri dön</Text>
+            </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -1004,4 +1107,10 @@ const styles = StyleSheet.create({
     position: "absolute", top: 6, right: 6, width: 28, height: 28, borderRadius: 14,
     backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center",
   },
+  leaveBackdrop: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.7)" },
+  leaveCenter: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
+  leaveCard: { width: "100%", maxWidth: 420, borderRadius: Radius.xl, padding: 22, paddingTop: 30, borderWidth: StyleSheet.hairlineWidth * 2, ...glow("#000", 24, 0.4) },
+  leaveClose: { position: "absolute", top: 12, right: 14, zIndex: 1 },
+  leaveOpt: { paddingVertical: 16, alignItems: "center", justifyContent: "center" },
+  leaveBack: { paddingVertical: 13, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center", justifyContent: "center" },
 });

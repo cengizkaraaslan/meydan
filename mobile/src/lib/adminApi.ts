@@ -25,6 +25,10 @@ export interface DeviceUser {
   type: "device";
   id: string;
   deviceId: string;
+  /** Backend'in işaretlediği fake/seed hesap mı? Eski cevapta yoksa false. */
+  isFake: boolean;
+  /** Fake hesaplar için görünen ad (varsa). */
+  name?: string | null;
   city: string | null;
   district: string | null;
   gender: string | null;
@@ -43,6 +47,8 @@ export interface AdminUsersResp {
   ok: boolean;
   realCount: number;
   deviceCount: number;
+  /** Fake/seed cihaz hesabı sayısı (varsa). */
+  fakeCount?: number;
   users: AdminUser[];
 }
 
@@ -115,11 +121,19 @@ export async function fetchAdminUsers(email: string): Promise<AdminUsersResp> {
   const res = await fetch(url, { headers: { Accept: "application/json" } });
   if (!res.ok) throw errorFor(res.status);
   const data = (await res.json()) as Partial<AdminUsersResp>;
+  const rawUsers = Array.isArray(data.users) ? data.users : [];
+  // Cihaz kullanıcılarında isFake/name eski cevapta olmayabilir → güvenli normalize et.
+  const users: AdminUser[] = rawUsers.map((u) =>
+    u.type === "device"
+      ? { ...u, isFake: u.isFake === true, name: u.name ?? null }
+      : u,
+  );
   return {
     ok: data.ok ?? true,
     realCount: data.realCount ?? 0,
     deviceCount: data.deviceCount ?? 0,
-    users: Array.isArray(data.users) ? data.users : [],
+    fakeCount: data.fakeCount,
+    users,
   };
 }
 

@@ -45,6 +45,8 @@ interface ProfileBody {
   name?: string;
   lat?: number | null;
   lng?: number | null;
+  birthDate?: string | null;
+  showAge?: boolean;
 }
 
 /** Boş/whitespace string'i null'a indirger (alan temizleme için). */
@@ -94,6 +96,8 @@ export async function POST(request: NextRequest) {
   if ("avatar" in body) data.avatar = strOrNull(body.avatar);
   if ("lat" in body) data.lat = numOrNull(body.lat);
   if ("lng" in body) data.lng = numOrNull(body.lng);
+  if ("birthDate" in body) data.birthDate = strOrNull(body.birthDate);
+  if ("showAge" in body) data.showAge = Boolean(body.showAge);
 
   // district/avatar yeni kolonlar — `prisma generate` (Vercel build) sonrası tipler
   // güncellenir; yerel stale client'ta derlensin diye unknown üzerinden cast.
@@ -116,6 +120,8 @@ export async function POST(request: NextRequest) {
     delete rest.avatar;
     delete rest.lat;
     delete rest.lng;
+    delete rest.birthDate;
+    delete rest.showAge;
     try {
       const profile = await run(rest);
       return NextResponse.json({ ok: true, profile });
@@ -139,5 +145,13 @@ export async function GET(request: NextRequest) {
   }
 
   const profile = await db.mobileProfile.findUnique({ where: { deviceId } });
-  return NextResponse.json({ ok: true, profile });
+  // birthDate/showAge yeni kolonlar — findUnique tüm kolonları döndürür; stale
+  // client tipinde görünmeyebilir diye unknown üzerinden cast ile garanti et.
+  const p = profile as unknown as Record<string, unknown> | null;
+  return NextResponse.json({
+    ok: true,
+    profile: p
+      ? { ...p, birthDate: p.birthDate ?? null, showAge: p.showAge ?? true }
+      : p,
+  });
 }

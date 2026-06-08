@@ -15,6 +15,7 @@ import { useChat, canEditMsg, type Msg } from "@/lib/chat";
 import { useAuth } from "@/lib/auth";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
+import { useCanSeeAges } from "@/lib/dprofile";
 import { SignInPrompt } from "@/components/SignInPrompt";
 import { tapH } from "@/lib/haptics";
 import { sndSend } from "@/lib/sound";
@@ -33,6 +34,7 @@ export default function ChatScreen() {
   const { user } = useAuth();
   const { t: T } = useTheme();
   const { t } = useT();
+  const canSeeAges = useCanSeeAges();
   const person = getPerson(String(id));
   const { messages, typing, send, sendImage, editMessage, deleteMessage } = useChat(String(id));
   const [text, setText] = useState("");
@@ -186,7 +188,7 @@ export default function ChatScreen() {
           <Image source={{ uri: person.avatar }} style={styles.hAvatar} contentFit="cover" />
         </Pressable>
         <Pressable style={{ flex: 1 }} onPress={() => { tapH(); router.push(`/kisi/${person.id}`); }}>
-          <Text style={[Type.title, { color: T.text }]}>{person.name}, {person.age}</Text>
+          <Text style={[Type.title, { color: T.text }]}>{canSeeAges ? `${person.name}, ${person.age}` : person.name}</Text>
           <Text style={[Type.label, { color: typing ? T.primary : person.online ? T.success : T.textFaint }]}>
             {typing ? `${t("typing")}` : person.online ? t("online") : `${person.distanceKm} km ${t("away")}`}
           </Text>
