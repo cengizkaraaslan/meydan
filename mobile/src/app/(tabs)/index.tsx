@@ -11,7 +11,7 @@ import { MovieSection } from "@/components/MovieSection";
 import { PastEventsSection } from "@/components/PastEventsSection";
 import { Loader, Pill } from "@/ui/atoms";
 import { Radius, Type, Space } from "@/theme/aurora";
-import { CATEGORIES, CITIES } from "@/lib/categories";
+import { CATEGORIES } from "@/lib/categories";
 import { fetchEvents, type ApiEvent } from "@/lib/api";
 import { loadEventsCache, saveEventsCache } from "@/lib/eventCache";
 import { dayRange, isPastDay } from "@/lib/format";
@@ -25,6 +25,11 @@ import { tapH } from "@/lib/haptics";
 
 const { width } = Dimensions.get("window");
 const HERO_W = width - 32;
+
+// Anasayfa şehir dropdown'ı — en çok içeriğe (etkinlik/kurs/sinema) sahip 8 il.
+const HOME_CITIES = [
+  "İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Eskişehir", "Konya", "Gaziantep",
+];
 
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
@@ -223,7 +228,7 @@ export default function DiscoverScreen() {
                 active={city === null}
                 onPress={() => { tapH(); setCity(null); setCityModal(false); }}
               />
-              {CITIES.map((c) => (
+              {HOME_CITIES.map((c) => (
                 <Pill
                   key={c}
                   label={c}

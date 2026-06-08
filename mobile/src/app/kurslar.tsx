@@ -29,6 +29,7 @@ interface Row {
   key: string;
   course: Course;
   providerName: string;
+  city?: string;
   url?: string;
   gradIdx: number;
 }
@@ -62,6 +63,7 @@ export default function CoursesScreen() {
         key: `${g.provider.key}-${ci}-${c.name}`,
         course: c,
         providerName,
+        city: g.provider.city,
         url,
         gradIdx: gi + ci,
       });
@@ -120,6 +122,7 @@ export default function CoursesScreen() {
                   key={r.key}
                   course={r.course}
                   providerName={r.providerName}
+                  city={r.city}
                   url={r.url}
                   grad={gradientFor(T, r.gradIdx)}
                   T={T}

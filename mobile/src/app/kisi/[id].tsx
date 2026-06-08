@@ -1,5 +1,5 @@
 import React from "react";
-import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -12,6 +12,7 @@ import { useT } from "@/lib/i18n";
 import { useCanSeeAges } from "@/lib/dprofile";
 import { tapH, impactH } from "@/lib/haptics";
 import { fetchFollowing, followUser, unfollowUser, followIdForPerson } from "@/lib/social";
+import { personStats as getPersonStats } from "@/lib/personStats";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 const HERO_H = Math.round(SCREEN_H * 0.58);
@@ -46,6 +47,9 @@ export default function PersonScreen() {
 
   const [isFollowing, setIsFollowing] = React.useState(false);
   const [followBusy, setFollowBusy] = React.useState(false);
+  const [statsOpen, setStatsOpen] = React.useState(false);
+
+  const detailedStats = React.useMemo(() => getPersonStats(String(id)), [id]);
 
   React.useEffect(() => {
     let alive = true;
@@ -93,16 +97,21 @@ export default function PersonScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
       >
-        {/* Hero görsel */}
+        {/* Hero görsel — fotoğrafa dokun: istatistik modalı */}
         <View style={{ height: HERO_H, width: "100%" }}>
-          <Image
-            source={{ uri: person.avatar }}
+          <Pressable
+            onPress={() => { tapH(); setStatsOpen(true); }}
             style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            transition={300}
-            cachePolicy="memory-disk"
-            recyclingKey={person.id}
-          />
+          >
+            <Image
+              source={{ uri: person.avatar }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              transition={300}
+              cachePolicy="memory-disk"
+              recyclingKey={person.id}
+            />
+          </Pressable>
           {/* Alt karartma — metin okunaklı olsun + zemine erisin (görseli üstte fazla karartma) */}
           <LinearGradient
             colors={["transparent", "transparent", "rgba(8,7,13,0.3)", T.bg]}
@@ -228,6 +237,48 @@ export default function PersonScreen() {
           </Animated.View>
         </View>
       </ScrollView>
+
+      {/* İstatistik modalı — fotoğrafa dokununca açılır */}
+      <Modal visible={statsOpen} transparent animationType="fade" onRequestClose={() => setStatsOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => { tapH(); setStatsOpen(false); }}>
+          <Animated.View entering={FadeIn.duration(220)}>
+            <Pressable
+              onPress={() => {}}
+              style={[styles.statsCard, { backgroundColor: T.bgElevated, borderColor: T.hairline }]}
+            >
+              <Text style={[Type.label, { color: T.textFaint, letterSpacing: 0.6, marginBottom: 2 }]}>
+                {person.name.toUpperCase()}
+              </Text>
+              <Text style={[Type.h2, { color: T.text, marginBottom: 16 }]}>İstatistikler</Text>
+
+              <View style={styles.statsRow}>
+                <View style={[styles.statBox, { borderColor: T.hairline }]}>
+                  <Text style={styles.statEmoji}>🎉</Text>
+                  <Text style={[Type.hero, { color: T.cyan }]}>{detailedStats.attended}</Text>
+                  <Text style={[Type.label, { color: T.textDim }]}>Etkinlik</Text>
+                </View>
+                <View style={[styles.statBox, { borderColor: T.hairline }]}>
+                  <Text style={styles.statEmoji}>❤️</Text>
+                  <Text style={[Type.hero, { color: T.pink }]}>{detailedStats.reactions}</Text>
+                  <Text style={[Type.label, { color: T.textDim }]}>Tepki</Text>
+                </View>
+                <View style={[styles.statBox, { borderColor: T.hairline }]}>
+                  <Text style={styles.statEmoji}>💬</Text>
+                  <Text style={[Type.hero, { color: T.gold }]}>{detailedStats.comments}</Text>
+                  <Text style={[Type.label, { color: T.textDim }]}>Yorum</Text>
+                </View>
+              </View>
+
+              <Pressable
+                onPress={() => { tapH(); setStatsOpen(false); }}
+                style={[styles.closeBtn, { borderColor: T.hairline }]}
+              >
+                <Text style={[Type.title, { color: T.text, fontSize: 15 }]}>Kapat</Text>
+              </Pressable>
+            </Pressable>
+          </Animated.View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -286,5 +337,39 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
     paddingVertical: 16,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  statsCard: {
+    width: "100%",
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    padding: 20,
+  },
+  statsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  statBox: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 16,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+  },
+  statEmoji: { fontSize: 22, marginBottom: 2 },
+  closeBtn: {
+    marginTop: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 13,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth * 2,
   },
 });

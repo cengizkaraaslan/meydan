@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Linking, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -28,6 +28,7 @@ interface Row {
   key: string;
   course: Course;
   providerName: string;
+  city?: string;
   url?: string;
   gradIdx: number;
 }
@@ -36,6 +37,7 @@ interface Row {
 export function CourseRow({
   course,
   providerName,
+  city,
   url,
   grad,
   T,
@@ -43,6 +45,7 @@ export function CourseRow({
 }: {
   course: Course;
   providerName: string;
+  city?: string;
   url?: string;
   grad: readonly [string, string];
   T: Palette;
@@ -50,8 +53,18 @@ export function CourseRow({
 }) {
   const open = () => {
     tapH();
-    if (url) Linking.openURL(url).catch(() => {});
-    else router.push("/kurslar");
+    router.push({
+      pathname: "/kurs",
+      params: {
+        name: course.name,
+        center: course.center ?? "",
+        schedule: course.schedule ?? "",
+        image: course.image ?? "",
+        provider: providerName,
+        city: city ?? "",
+        url: url ?? "",
+      },
+    });
   };
   return (
     <Animated.View entering={FadeInDown.duration(380).delay(delay)}>
@@ -146,6 +159,7 @@ export function CourseSection() {
         key: `${g.provider.key}-${ci}-${c.name}`,
         course: c,
         providerName,
+        city: g.provider.city,
         url,
         gradIdx: gi + ci,
       });
@@ -173,6 +187,7 @@ export function CourseSection() {
             key={r.key}
             course={r.course}
             providerName={r.providerName}
+            city={r.city}
             url={r.url}
             grad={gradientFor(T, r.gradIdx)}
             T={T}
