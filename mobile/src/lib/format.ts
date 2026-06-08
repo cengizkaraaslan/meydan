@@ -29,6 +29,29 @@ export function fmtPrice(e: { is_free: boolean; price_min: number | null; price_
   return `${e.price_min}₺`;
 }
 
+// Üniversite etkinlikleri: biletli/ücretli değil, öğrenciye açık.
+const UNIVERSITY_SOURCES = new Set(["ANADOLU_UNI", "BILKENT", "ITU", "BOGAZICI"]);
+
+/** Kaynak bir üniversite etkinliği mi? (UNI_* veya bilinen üniv. kaynakları) */
+export function isUniversitySource(source?: string | null): boolean {
+  if (!source) return false;
+  return source.startsWith("UNI_") || UNIVERSITY_SOURCES.has(source);
+}
+
+/**
+ * Etkinlik için doğru erişim/fiyat etiketi. Üniversite kaynağı ise "Ücretsiz/Biletli"
+ * yerine "🎓 Öğrenciye açık" döner (hatalı "Ücretsiz" gösterimini engeller).
+ */
+export function priceLabel(e: {
+  source?: string | null;
+  is_free: boolean;
+  price_min: number | null;
+  price_max: number | null;
+}): string {
+  if (isUniversitySource(e.source)) return "🎓 Öğrenciye açık";
+  return fmtPrice(e);
+}
+
 /** Mesafe metni: <1km ise metre ("400 m"), değilse km (gerekirse tek ondalık). */
 export function fmtDistance(km: number): string {
   if (km < 1) return `${Math.round(km * 1000)} m`;

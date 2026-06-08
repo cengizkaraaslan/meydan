@@ -15,6 +15,7 @@ import Animated, {
 import { Radius, Type } from "@/theme/aurora";
 import { StoryAvatar } from "@/components/StoryAvatar";
 import { getPerson } from "@/lib/people";
+import { useTheme } from "@/lib/theme";
 
 const SEGMENT_MS = 4000;
 
@@ -35,6 +36,8 @@ interface Props {
   groups: StoryGroup[];
   startIndex?: number;
   onClose: () => void;
+  /** Sadece isMe grubunda görünür "Sil" akışı. Verilmezse ⋯ butonu gizlenir (geri uyumluluk). */
+  onDeleteSegment?: (groupIndex: number, segmentIndex: number) => void;
 }
 
 /**
@@ -42,14 +45,20 @@ interface Props {
  * çubuğu; aktif segment ~4sn'de dolar → otomatik sonraki segment, sonra sonraki
  * grup, son grup bitince kapanır. Sağ yarı dokun = ileri, sol yarı = geri.
  */
-export function EventStoryViewer({ groups, startIndex = 0, onClose }: Props) {
+export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegment }: Props) {
   const insets = useSafeAreaInsets();
+  const { t: T } = useTheme();
   const [gi, setGi] = useState(startIndex);
   const [si, setSi] = useState(0);
+  // ⋯ menüsü açık mı (açıkken otomatik ilerleme durur).
+  const [menuOpen, setMenuOpen] = useState(false);
   const progress = useSharedValue(0);
 
   const group = groups[gi];
   const segment = group?.segments[si];
+
+  // ⋯ butonu yalnızca isMe grubunda + onDeleteSegment verilmişse görünür.
+  const canDelete = !!group?.isMe && !!onDeleteSegment;
 
   // gi değişince ilk segmente dön
   useEffect(() => {
@@ -75,14 +84,15 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose }: Props) {
   }, [groups, gi, si, close]);
 
   // Aktif segment için zamanlayıcıyı başlat (reanimated withTiming + runOnJS).
+  // Menü açıkken durdur; menü kapanınca segment baştan ilerler.
   useEffect(() => {
-    if (!segment) return;
+    if (!segment || menuOpen) return;
     progress.value = 0;
     progress.value = withTiming(1, { duration: SEGMENT_MS }, (finished) => {
       if (finished) runOnJS(advance)();
     });
     return () => { cancelAnimation(progress); };
-  }, [gi, si, segment, advance, progress]);
+  }, [gi, si, segment, advance, progress, menuOpen]);
 
   const prev = useCallback(() => {
     if (si > 0) {
@@ -109,6 +119,12 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose }: Props) {
       router.push(`/kisi/${g.id}`);
     }
   }, [groups, gi, onClose]);
+
+  const onPressDelete = useCallback(() => {
+    setMenuOpen(false);
+    cancelAnimation(progress);
+    onDeleteSegment?.(gi, si);
+  }, [onDeleteSegment, gi, si, progress]);
 
   if (!group || !segment) return null;
 
@@ -149,6 +165,17 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose }: Props) {
           </Text>
         </Pressable>
 
+        {/* ⋯ menü (sadece kendi story'mde, onDeleteSegment varsa) */}
+        {canDelete ? (
+          <Pressable
+            onPress={() => { cancelAnimation(progress); setMenuOpen(true); }}
+            hitSlop={12}
+            style={[styles.more, { top: insets.top + 22 }]}
+          >
+            <Text style={styles.moreTxt}>⋯</Text>
+          </Pressable>
+        ) : null}
+
         {/* Kapat */}
         <Pressable onPress={close} hitSlop={12} style={[styles.close, { top: insets.top + 22 }]}>
           <Text style={styles.closeTxt}>✕</Text>
@@ -158,6 +185,28 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose }: Props) {
         {segment.caption ? (
           <View style={[styles.captionWrap, { bottom: insets.bottom + 36 }]} pointerEvents="none">
             <Text style={[Type.body, styles.caption]}>{segment.caption}</Text>
+          </View>
+        ) : null}
+
+        {/* ⋯ menü sheet'i: Sil / İptal */}
+        {menuOpen ? (
+          <View style={styles.menuScrim}>
+            {/* Dışına dokun → kapat (timer menü kapanınca devam eder) */}
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenuOpen(false)} />
+            <View
+              style={[
+                styles.menuCard,
+                { backgroundColor: T.bgElevated, borderColor: T.hairline, bottom: insets.bottom + 24 },
+              ]}
+            >
+              <Pressable onPress={onPressDelete} style={styles.menuItem} hitSlop={6}>
+                <Text style={[Type.title, { color: "#FF5A5F" }]}>🗑️  Sil</Text>
+              </Pressable>
+              <View style={[styles.menuDivider, { backgroundColor: T.hairline }]} />
+              <Pressable onPress={() => setMenuOpen(false)} style={styles.menuItem} hitSlop={6}>
+                <Text style={[Type.title, { color: T.text }]}>İptal</Text>
+              </Pressable>
+            </View>
           </View>
         ) : null}
       </View>
@@ -186,6 +235,12 @@ const styles = StyleSheet.create({
   header: { position: "absolute", left: 14, right: 56, flexDirection: "row", alignItems: "center", gap: 10 },
   close: { position: "absolute", right: 16, width: 34, height: 34, alignItems: "center", justifyContent: "center" },
   closeTxt: { color: "#fff", fontSize: 22, fontWeight: "700" },
+  more: { position: "absolute", right: 54, width: 34, height: 34, alignItems: "center", justifyContent: "center" },
+  moreTxt: { color: "#fff", fontSize: 26, fontWeight: "800", lineHeight: 26, marginTop: -6 },
+  menuScrim: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
+  menuCard: { position: "absolute", left: 16, right: 16, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, overflow: "hidden" },
+  menuItem: { paddingVertical: 16, alignItems: "center", justifyContent: "center" },
+  menuDivider: { height: StyleSheet.hairlineWidth },
   captionWrap: { position: "absolute", left: 18, right: 18, alignItems: "center" },
   caption: {
     color: "#fff", textAlign: "center", backgroundColor: "rgba(0,0,0,0.45)",

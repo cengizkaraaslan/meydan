@@ -5,7 +5,6 @@ import { router } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraBackground } from "@/components/AuroraBackground";
-import { GlassCard } from "@/components/GlassCard";
 import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { useAuth } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
@@ -41,7 +40,7 @@ function Badge({ T, kind }: { T: Palette; kind: Kind }) {
   const map = {
     real: { color: T.success, bg: "rgba(52,211,153,0.14)", label: "GERÇEK" },
     fake: { color: T.gold, bg: "rgba(245,194,75,0.16)", label: "FAKE" },
-    device: { color: T.textFaint, bg: T.surfaceStrong, label: "CİHAZ" },
+    device: { color: T.textFaint, bg: T.surface, label: "CİHAZ" },
   } as const;
   const { color, bg, label } = map[kind];
   return (
@@ -69,7 +68,7 @@ function UserCard({ T, u, i }: { T: Palette; u: AdminUser; i: number }) {
 
   return (
     <Animated.View entering={FadeInDown.duration(380).delay(Math.min(i, 12) * 30)}>
-      <GlassCard padded glowColor={open ? accent : undefined}>
+      <View style={[styles.card, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }, open ? glow(accent, 16, 0.25) : null]}>
         <Pressable
           onPress={() => { tapH(); setOpen((o) => !o); }}
           style={{ flexDirection: "row", alignItems: "center", gap: Space.md }}
@@ -77,7 +76,7 @@ function UserCard({ T, u, i }: { T: Palette; u: AdminUser; i: number }) {
           {avatar ? (
             <Image source={{ uri: avatar }} style={[styles.avatar, glow(accent, 8, 0.35)]} contentFit="cover" />
           ) : (
-            <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+            <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: T.surface, borderColor: T.hairline }]}>
               <Text style={{ fontSize: 20 }}>{real ? "🙂" : "📱"}</Text>
             </View>
           )}
@@ -115,7 +114,7 @@ function UserCard({ T, u, i }: { T: Palette; u: AdminUser; i: number }) {
             )}
           </Animated.View>
         ) : null}
-      </GlassCard>
+      </View>
     </Animated.View>
   );
 }
@@ -212,13 +211,13 @@ export default function AdminUsersScreen() {
             <Text style={[Type.label, { color: T.textFaint, marginTop: 10 }]}>Yükleniyor…</Text>
           </View>
         ) : error ? (
-          <GlassCard glowColor={T.pink}>
+          <View style={[styles.card, { backgroundColor: T.surfaceStrong, borderColor: T.pink }]}>
             <Text style={[Type.title, { color: T.pink }]}>Hata</Text>
             <Text style={[Type.body, { color: T.textDim, marginTop: 6 }]}>{error}</Text>
             <Pressable onPress={() => { tapH(); setLoading(true); void load(); }} style={{ marginTop: Space.md }}>
               <Text style={[Type.label, { color: T.primary }]}>Tekrar dene</Text>
             </Pressable>
-          </GlassCard>
+          </View>
         ) : users.length === 0 ? (
           <View style={styles.center}>
             <Text style={[Type.body, { color: T.textFaint }]}>Henüz kullanıcı yok.</Text>
@@ -251,6 +250,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth * 2,
+  },
+  card: {
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    padding: 16,
   },
   summary: {
     flex: 1,

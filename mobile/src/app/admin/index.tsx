@@ -4,8 +4,7 @@ import { router } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraBackground } from "@/components/AuroraBackground";
-import { GlassCard } from "@/components/GlassCard";
-import { Radius, Space, Type } from "@/theme/aurora";
+import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { useAuth } from "@/lib/auth";
 import { isAdmin, ADMIN_EMAIL } from "@/lib/admin";
 import { useTheme, type Palette } from "@/lib/theme";
@@ -69,14 +68,14 @@ export default function AdminHubScreen() {
       >
         {/* Kurucu admin notu */}
         <Animated.View entering={FadeInDown.duration(450)}>
-          <GlassCard glowColor={T.gold} style={{ marginBottom: Space.xl }}>
+          <View style={[styles.card, { backgroundColor: T.surfaceStrong, borderColor: T.hairline, marginBottom: Space.xl }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: Space.md }}>
               <Text style={{ fontSize: 20 }}>🛡️</Text>
               <Text style={[Type.label, { color: T.textDim, flex: 1, lineHeight: 17 }]}>
                 Yönetici: <Text style={{ color: T.gold }}>{ADMIN_EMAIL}</Text>
               </Text>
             </View>
-          </GlassCard>
+          </View>
         </Animated.View>
 
         <View style={{ gap: Space.lg }}>
@@ -85,9 +84,9 @@ export default function AdminHubScreen() {
             return (
               <Animated.View key={it.route} entering={FadeInDown.duration(420).delay(80 + i * 60)}>
                 <Pressable onPress={() => { tapH(); router.push(it.route as never); }}>
-                  <GlassCard glowColor={accent}>
+                  <View style={[styles.card, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }, glow(accent, 16, 0.25)]}>
                     <View style={styles.cardRow}>
-                      <View style={[styles.iconBox, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+                      <View style={[styles.iconBox, { backgroundColor: T.surface, borderColor: T.hairline }]}>
                         <Text style={{ fontSize: 26 }}>{it.icon}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
@@ -98,7 +97,7 @@ export default function AdminHubScreen() {
                       </View>
                       <Text style={[Type.h2, { color: accent }]}>›</Text>
                     </View>
-                  </GlassCard>
+                  </View>
                 </Pressable>
               </Animated.View>
             );
@@ -125,6 +124,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth * 2,
+  },
+  card: {
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    padding: 16,
   },
   cardRow: { flexDirection: "row", alignItems: "center", gap: Space.lg },
   iconBox: {

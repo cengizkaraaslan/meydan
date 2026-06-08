@@ -639,7 +639,18 @@ export default function MeydanScreen() {
       <StoryViewer person={storyPerson} onClose={() => setStoryPerson(null)} />
       {/* Kendi story'lerim — gerçek görselle (çoklu segment). */}
       {myStoryOpen && stories.length > 0 ? (
-        <EventStoryViewer groups={[myStoryGroup]} startIndex={0} onClose={() => setMyStoryOpen(false)} />
+        <EventStoryViewer
+          groups={[myStoryGroup]}
+          startIndex={0}
+          onClose={() => setMyStoryOpen(false)}
+          onDeleteSegment={(_gi, si) => {
+            // Tek grup (kendi story'm) → si ile ilgili story'yi kalıcı sil, şeridi yenile, viewer'ı kapat.
+            const target = stories[si];
+            if (target) void removeStory(target.ts);
+            reloadStories();
+            setMyStoryOpen(false);
+          }}
+        />
       ) : null}
 
       {/* İlk paylaşım ipucu (1 kez) + hata bilgisi — solid arka plan, okunaklı. */}

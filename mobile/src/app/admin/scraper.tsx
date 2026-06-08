@@ -5,8 +5,7 @@ import { router } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraBackground } from "@/components/AuroraBackground";
-import { GlassCard } from "@/components/GlassCard";
-import { Radius, Space, Type } from "@/theme/aurora";
+import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { useAuth } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { useTheme, type Palette } from "@/lib/theme";
@@ -41,7 +40,7 @@ function ScraperRow({
 
   return (
     <Animated.View entering={FadeInDown.duration(360).delay(Math.min(i, 12) * 30)}>
-      <GlassCard padded glowColor={hasRun && !ok ? T.pink : undefined}>
+      <View style={[styles.card, { backgroundColor: T.surfaceStrong, borderColor: hasRun && !ok ? T.pink : T.hairline }, hasRun && !ok ? glow(T.pink, 16, 0.25) : null]}>
         <View style={{ flexDirection: "row", alignItems: "flex-start", gap: Space.md }}>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -78,7 +77,7 @@ function ScraperRow({
             </LinearGradient>
           </Pressable>
         </View>
-      </GlassCard>
+      </View>
     </Animated.View>
   );
 }
@@ -179,9 +178,9 @@ export default function AdminScraperScreen() {
         <Pressable
           onPress={() => { tapH(); router.back(); }}
           hitSlop={12}
-          style={[styles.back, { backgroundColor: "rgba(0,0,0,0.45)", borderColor: T.hairline }]}
+          style={[styles.back, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
         >
-          <Text style={{ color: "#fff", fontSize: 20 }}>←</Text>
+          <Text style={{ color: T.text, fontSize: 20 }}>←</Text>
         </Pressable>
         <Text style={[Type.h1, { color: T.text }]}>Botlar</Text>
         <View style={{ width: 42 }} />
@@ -213,9 +212,9 @@ export default function AdminScraperScreen() {
 
         {summary ? (
           <Animated.View entering={FadeInDown.duration(280)} style={{ marginTop: Space.md }}>
-            <GlassCard glowColor={T.cyan} padded>
+            <View style={[styles.card, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
               <Text style={[Type.label, { color: T.text, lineHeight: 17 }]}>{summary}</Text>
-            </GlassCard>
+            </View>
           </Animated.View>
         ) : null}
 
@@ -227,13 +226,13 @@ export default function AdminScraperScreen() {
             <Text style={[Type.label, { color: T.textFaint, marginTop: 10 }]}>Yükleniyor…</Text>
           </View>
         ) : error ? (
-          <GlassCard glowColor={T.pink}>
+          <View style={[styles.card, { backgroundColor: T.surfaceStrong, borderColor: T.pink }]}>
             <Text style={[Type.title, { color: T.pink }]}>Hata</Text>
             <Text style={[Type.body, { color: T.textDim, marginTop: 6 }]}>{error}</Text>
             <Pressable onPress={() => { tapH(); setLoading(true); void load(); }} style={{ marginTop: Space.md }}>
               <Text style={[Type.label, { color: T.primary }]}>Tekrar dene</Text>
             </Pressable>
-          </GlassCard>
+          </View>
         ) : items.length === 0 ? (
           <View style={styles.center}>
             <Text style={[Type.body, { color: T.textFaint }]}>Bot bulunamadı.</Text>
@@ -273,6 +272,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth * 2,
+  },
+  card: {
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    padding: 16,
   },
   bigBtn: {
     flexDirection: "row",
