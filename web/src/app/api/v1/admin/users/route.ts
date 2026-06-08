@@ -56,6 +56,8 @@ export async function GET(request: NextRequest) {
       type: "device" as const,
       id: p.deviceId,
       deviceId: p.deviceId,
+      name: p.name ?? null,
+      isFake: p.isFake,
       city: p.city,
       district: p.district,
       gender: p.gender,
@@ -71,7 +73,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       realCount: realUsers.length,
-      deviceCount: deviceUsers.length,
+      deviceCount: deviceUsers.filter((d) => !d.isFake).length,
+      fakeCount: deviceUsers.filter((d) => d.isFake).length,
       users: [...realUsers, ...deviceUsers],
     });
   } catch (e) {

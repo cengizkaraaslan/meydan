@@ -323,6 +323,10 @@ model PushSubscription {
 model MobileProfile {
   id         String   @id @default(cuid())
   deviceId   String   @unique
+  /// Görünen ad (özellikle seed'lenen fake hesaplar için; gerçek cihazlarda boş olabilir).
+  name       String?
+  /// Sahte/seed hesap mı (mock kişiler DB'ye taşındı → admin'de "Fake" rozeti).
+  isFake     Boolean  @default(false)
   gender     Gender?
   city       String?
   /// Şehre bağlı ilçe (mobil ayarlar > konum).
