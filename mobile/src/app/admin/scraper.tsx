@@ -92,7 +92,7 @@ export default function AdminScraperScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [runningAll, setRunningAll] = useState(false);
-  const [runningSource, setRunningSource] = useState<string | null>(null);
+  const [runningSet, setRunningSet] = useState<Set<string>>(new Set());
   const [summary, setSummary] = useState<string | null>(null);
 
   const email = user?.email ?? "";
@@ -125,26 +125,50 @@ export default function AdminScraperScreen() {
     successH();
   }, []);
 
+  // "Tümünü çalıştır": tek dev istek (504 verirdi) yerine HER kaynağı ayrı kısa
+  // istekle, eşzamanlılık sınırıyla çalıştır. Her item kendi loading'ini gösterir.
   const runAll = useCallback(async () => {
-    if (!email || runningAll || runningSource) return;
+    if (!email || runningAll || runningSet.size > 0) return;
     impactH();
     setRunningAll(true);
     setSummary(null);
-    try {
-      const r = await triggerScraper(email);
-      showSummary(r);
-      await load();
-    } catch (e) {
-      setSummary((e as AdminApiError)?.message ?? "Çalıştırılamadı.");
-    } finally {
-      setRunningAll(false);
-    }
-  }, [email, runningAll, runningSource, showSummary, load]);
+    const sources = items.map((s) => s.source);
+    let success = 0;
+    let written = 0;
+    let done = 0;
+    let idx = 0;
+    const CONCURRENCY = 4;
+    const worker = async () => {
+      while (idx < sources.length) {
+        const src = sources[idx++];
+        setRunningSet((prev) => new Set(prev).add(src));
+        try {
+          const r = await triggerScraper(email, src);
+          if (r.results[0]?.success) success++;
+          written += r.totalWritten;
+        } catch {
+          /* tek kaynak hatasını yut, diğerleri devam etsin */
+        }
+        done++;
+        setRunningSet((prev) => {
+          const n = new Set(prev);
+          n.delete(src);
+          return n;
+        });
+        setSummary(`${done}/${sources.length} çalıştı · ${written} kayıt`);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, sources.length) }, worker));
+    setSummary(`${success}/${sources.length} başarılı · ${written} kayıt yazıldı`);
+    successH();
+    setRunningAll(false);
+    await load();
+  }, [email, runningAll, runningSet, items, load]);
 
   const runOne = useCallback(async (source: string) => {
-    if (!email || runningAll || runningSource) return;
+    if (!email || runningAll || runningSet.has(source)) return;
     tapH();
-    setRunningSource(source);
+    setRunningSet((prev) => new Set(prev).add(source));
     setSummary(null);
     try {
       const r = await triggerScraper(email, source);
@@ -159,16 +183,20 @@ export default function AdminScraperScreen() {
     } catch (e) {
       setSummary((e as AdminApiError)?.message ?? "Çalıştırılamadı.");
     } finally {
-      setRunningSource(null);
+      setRunningSet((prev) => {
+        const n = new Set(prev);
+        n.delete(source);
+        return n;
+      });
     }
-  }, [email, runningAll, runningSource, showSummary, load]);
+  }, [email, runningAll, runningSet, showSummary, load]);
 
   if (!isAdmin(user)) {
     router.replace("/");
     return null;
   }
 
-  const anyBusy = runningAll || runningSource !== null;
+  const anyBusy = runningAll || runningSet.size > 0;
 
   return (
     <View style={[styles.root, { backgroundColor: T.bg }]}>
@@ -193,12 +221,12 @@ export default function AdminScraperScreen() {
       >
         {/* Tümünü çalıştır */}
         <Animated.View entering={FadeInDown.duration(420)}>
-          <Pressable onPress={runAll} disabled={anyBusy} style={{ borderRadius: Radius.lg, overflow: "hidden", opacity: runningSource ? 0.6 : 1 }}>
+          <Pressable onPress={runAll} disabled={anyBusy} style={{ borderRadius: Radius.lg, overflow: "hidden", opacity: anyBusy ? 0.6 : 1 }}>
             <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.bigBtn}>
               {runningAll ? (
                 <>
                   <ActivityIndicator color="#fff" />
-                  <Text style={[Type.title, { color: "#fff" }]}>Çalışıyor… (uzun sürebilir)</Text>
+                  <Text style={[Type.title, { color: "#fff" }]}>Çalışıyor… {runningSet.size > 0 ? `(${runningSet.size} aktif)` : ""}</Text>
                 </>
               ) : (
                 <>
@@ -245,7 +273,7 @@ export default function AdminScraperScreen() {
                 T={T}
                 s={s}
                 i={i}
-                busy={runningSource === s.source}
+                busy={runningSet.has(s.source)}
                 onTrigger={() => void runOne(s.source)}
               />
             ))}
