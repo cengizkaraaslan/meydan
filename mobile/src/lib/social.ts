@@ -144,3 +144,67 @@ export async function markNotifsRead(): Promise<void> {
   const deviceId = await getOrCreateDeviceId();
   await send("POST", "/api/v1/social/notifs", { deviceId }, {});
 }
+
+// ─── Görsel yükleme (R2) + DB story ──────────────────────────────────────────
+export interface MobileStoryView {
+  id: string;
+  deviceId: string;
+  name: string | null;
+  avatar: string | null;
+  imageUrl: string;
+  caption: string | null;
+  eventSlug: string | null;
+  eventTitle: string | null;
+  createdAt: string;
+}
+
+function guessType(uri: string): { type: string; ext: string } {
+  const u = uri.toLowerCase();
+  if (u.endsWith(".png")) return { type: "image/png", ext: "png" };
+  if (u.endsWith(".webp")) return { type: "image/webp", ext: "webp" };
+  if (u.endsWith(".gif")) return { type: "image/gif", ext: "gif" };
+  return { type: "image/jpeg", ext: "jpg" };
+}
+
+/** Yerel görseli R2'ye yükler, public URL döner (başarısızsa null). kind: "story"|"post". */
+export async function uploadImage(uri: string, kind: "story" | "post" = "post"): Promise<string | null> {
+  try {
+    const { type, ext } = guessType(uri);
+    const form = new FormData();
+    // RN FormData dosya formatı
+    form.append("file", { uri, name: `img.${ext}`, type } as unknown as Blob);
+    form.append("kind", kind);
+    const res = await fetch(`${API_BASE}/api/v1/social/upload`, { method: "POST", body: form });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { ok?: boolean; url?: string };
+    return data.ok && data.url ? data.url : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function createStory(input: {
+  imageUrl: string; caption?: string; eventSlug?: string; eventTitle?: string; name?: string; avatar?: string;
+}): Promise<MobileStoryView | null> {
+  const deviceId = await getOrCreateDeviceId();
+  const r = await send<{ ok?: boolean; story?: MobileStoryView }>("POST", "/api/v1/social/stories", { deviceId, ...input }, {});
+  return r.story ?? null;
+}
+
+export async function fetchMyStories(): Promise<MobileStoryView[]> {
+  const deviceId = await getOrCreateDeviceId();
+  const r = await getJson<{ data?: MobileStoryView[] }>(`/api/v1/social/stories?deviceId=${encodeURIComponent(deviceId)}`, {});
+  return r.data ?? [];
+}
+
+export async function fetchStoriesFor(deviceIds: string[]): Promise<MobileStoryView[]> {
+  if (deviceIds.length === 0) return [];
+  const r = await getJson<{ data?: MobileStoryView[] }>(`/api/v1/social/stories?ids=${encodeURIComponent(deviceIds.join(","))}`, {});
+  return r.data ?? [];
+}
+
+export async function deleteStoryRemote(id: string): Promise<boolean> {
+  const deviceId = await getOrCreateDeviceId();
+  const r = await send<{ ok?: boolean }>("DELETE", "/api/v1/social/stories", { id, deviceId }, {});
+  return !!r.ok;
+}

@@ -158,6 +158,22 @@ export default function PersonScreen() {
 
         {/* İçerik */}
         <View style={{ paddingHorizontal: 16, gap: 14, marginTop: 6 }}>
+          {/* Katıldığı etkinliklerin hareketleri — rakamsal (görünür) */}
+          <Animated.View entering={FadeInDown.delay(120).duration(460)} style={styles.statsRow}>
+            <View style={[styles.statBox, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+              <Text style={[Type.h1, { color: T.cyan }]}>{detailedStats.attended}</Text>
+              <Text style={[Type.label, { color: T.textFaint, marginTop: 2 }]}>🎉 Etkinlik</Text>
+            </View>
+            <View style={[styles.statBox, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+              <Text style={[Type.h1, { color: T.pink }]}>{detailedStats.reactions}</Text>
+              <Text style={[Type.label, { color: T.textFaint, marginTop: 2 }]}>❤️ Tepki</Text>
+            </View>
+            <View style={[styles.statBox, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+              <Text style={[Type.h1, { color: T.gold }]}>{detailedStats.comments}</Text>
+              <Text style={[Type.label, { color: T.textFaint, marginTop: 2 }]}>💬 Yorum</Text>
+            </View>
+          </Animated.View>
+
           {/* Hakkında */}
           <Animated.View entering={FadeInDown.delay(160).duration(460)}>
             <View style={[styles.card, { backgroundColor: T.surface, borderColor: T.hairline }]}>
