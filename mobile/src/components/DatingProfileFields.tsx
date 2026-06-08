@@ -257,23 +257,27 @@ export function DatingProfileFields() {
         {renderSingle(EDUCATION, profile.education, (education) => update({ education }))}
       </Section>
 
-      {/* 9. İçki (tek) */}
-      <View>
-        <Header title="İçki" />
-        {renderSingle(DRINKING, profile.drinking, (drinking) => update({ drinking }))}
-      </View>
-
-      {/* 10. Sigara (tek) */}
-      <View>
-        <Header title="Sigara" />
-        {renderSingle(SMOKING, profile.smoking, (smoking) => update({ smoking }))}
-      </View>
-
-      {/* 11. Egzersiz (tek) */}
-      <View>
-        <Header title="Egzersiz" />
-        {renderSingle(EXERCISE, profile.exercise, (exercise) => update({ exercise }))}
-      </View>
+      {/* 9-11. Alışkanlıklar (içki/sigara/egzersiz) — tek katlanabilir bölüm */}
+      <Section
+        id="habits"
+        title="Alışkanlıklar"
+        summary={[profile.drinking, profile.smoking, profile.exercise].filter(Boolean).join(" · ") || "Seç"}
+      >
+        <View style={{ gap: Space.lg }}>
+          <View>
+            <Header title="İçki" />
+            {renderSingle(DRINKING, profile.drinking, (drinking) => update({ drinking }))}
+          </View>
+          <View>
+            <Header title="Sigara" />
+            {renderSingle(SMOKING, profile.smoking, (smoking) => update({ smoking }))}
+          </View>
+          <View>
+            <Header title="Egzersiz" />
+            {renderSingle(EXERCISE, profile.exercise, (exercise) => update({ exercise }))}
+          </View>
+        </View>
+      </Section>
 
       {/* Yaşı gizleme onayı */}
       <Modal visible={confirmHide} transparent animationType="fade" onRequestClose={() => setConfirmHide(false)}>

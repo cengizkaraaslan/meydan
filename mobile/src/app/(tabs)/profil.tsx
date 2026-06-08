@@ -27,7 +27,7 @@ import { useT } from "@/lib/i18n";
 import { showAuthPrompt } from "@/lib/authPrompt";
 import { syncProfile } from "@/lib/profileSync";
 import { uploadImage } from "@/lib/social";
-import { useDProfile } from "@/lib/dprofile";
+import { useDProfile, ageFromBirthDate } from "@/lib/dprofile";
 import { useActiveCity, ALL_CITIES, districtsFor } from "@/lib/location";
 import { tapH, impactH, successH } from "@/lib/haptics";
 
@@ -90,6 +90,8 @@ export default function ProfileScreen() {
   const [captionDraft, setCaptionDraft] = useState("");
   const [listView, setListView] = useState<null | "upcoming" | "past" | "fav">(null);
   const [socialOpen, setSocialOpen] = useState(false);
+  // "Başkalarının gözünden profilim" — public önizleme modalı.
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // Sosyal hesaplar (yerelde saklanır; görünürlük toggle'lı).
   const [social, setSocial] = useState<SocialMap>(EMPTY_SOCIAL);
@@ -155,6 +157,29 @@ export default function ProfileScreen() {
     const next = { ...social, [key]: { ...social[key], pub: !social[key].pub } };
     saveSocial(next);
     showToast(next[key].pub ? `${label} artık herkese açık 👀` : `${label} gizlendi 🔒`);
+  };
+
+  // Profil değişiklikleri zaten anında yerelde + debounce'lı senkron; bu buton hemen
+  // sunucuya yazar ve net "kaydedildi" geri bildirimi verir.
+  const saveProfile = () => {
+    impactH();
+    void syncProfile({
+      bio: dprof.about,
+      birthDate: dprof.birthDate || null,
+      showAge: dprof.showAge,
+      heightCm: dprof.heightCm,
+      weightKg: dprof.weightKg,
+      interests: dprof.interests.join(","),
+      goal: dprof.goal,
+      languages: dprof.languages.join(","),
+      zodiac: dprof.zodiac,
+      education: dprof.education,
+      drinking: dprof.drinking,
+      smoking: dprof.smoking,
+      exercise: dprof.exercise,
+    });
+    successH();
+    showToast("Profil kaydedildi ✓");
   };
 
   // Profil fotoğrafı — kullanıcı kendi seçtiği görseli ayarlayabilir (yerelde + DB'ye senkron).
@@ -309,9 +334,12 @@ export default function ProfileScreen() {
     <View style={[styles.root, { backgroundColor: T.bg }]}>
       <AuroraBackground />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 160, paddingHorizontal: 16 }}>
-        {/* Üst bar — başlık + ayarlar */}
+        {/* Üst bar — sol 👁️ önizleme · başlık · sağ ⚙️ ayarlar */}
         <View style={styles.topBar}>
-          <Text style={[Type.h2, { color: T.text }]}>{t("tab_profile")}</Text>
+          <Pressable onPress={() => { tapH(); setPreviewOpen(true); }} hitSlop={10} style={[styles.circleBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+            <Text style={{ fontSize: 18 }}>👁️</Text>
+          </Pressable>
+          <Text style={[Type.h2, { color: T.text, flex: 1, textAlign: "center" }]}>{t("tab_profile")}</Text>
           <Pressable onPress={() => { tapH(); router.push("/ayarlar"); }} hitSlop={10} style={[styles.circleBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
             <Text style={{ fontSize: 18 }}>⚙️</Text>
           </Pressable>
@@ -616,6 +644,107 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
+      {/* 👁️ Başkalarının gözünden profilim — public, salt-okunur önizleme */}
+      <Modal visible={previewOpen} animationType="slide" statusBarTranslucent onRequestClose={() => setPreviewOpen(false)}>
+        <View style={[styles.previewRoot, { backgroundColor: T.bg }]}>
+          <AuroraBackground />
+          {(() => {
+            // Sadece HERKESE AÇIK (pub=true) ve handle dolu sosyal hesaplar.
+            const publicSocials = SOCIALS.filter((s) => social[s.key]?.pub && social[s.key].handle.trim());
+            // Yaş: yalnızca showAge true ise göster (birthDate'ten, yoksa basit age girişinden).
+            const previewAge = dprof.showAge
+              ? (ageFromBirthDate(dprof.birthDate) ?? (dprof.age.trim() ? Number(dprof.age) : null))
+              : null;
+            const interests = dprof.interests.filter((i) => i.trim());
+            return (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 40, paddingHorizontal: 16 }}
+              >
+                {/* Bilgi şeridi + kapat */}
+                <View style={styles.previewBar}>
+                  <View style={[styles.previewBadge, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+                    <Text style={[Type.label, { color: T.textDim }]} numberOfLines={1}>👁️ Önizleme — profilini görenler bunu görür</Text>
+                  </View>
+                  <Pressable onPress={() => { tapH(); setPreviewOpen(false); }} hitSlop={10} style={[styles.circleBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+                    <Text style={{ fontSize: 18, color: T.text }}>✕</Text>
+                  </Pressable>
+                </View>
+
+                {/* Public kart: avatar + ad (+ yaş) */}
+                <Animated.View entering={FadeIn.duration(300)} style={[styles.previewCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+                  <View style={styles.previewHeader}>
+                    <StoryAvatar uri={resolveAvatar(photoUri, user?.name, gender)} name={user?.name ?? "✦"} size={104} hasStory={stories.length > 0} />
+                    <Text style={[Type.h1, { color: T.text, marginTop: Space.md, textAlign: "center" }]}>
+                      {user?.name ?? "Sen"}{previewAge != null ? `, ${previewAge}` : ""}
+                    </Text>
+                  </View>
+
+                  {/* Story şeridi — yalnızca story varsa */}
+                  {stories.length > 0 && (
+                    <View style={{ marginTop: Space.lg }}>
+                      <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>Story'ler</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Space.md, paddingVertical: 2 }}>
+                        {stories.map((s) => (
+                          <View key={s.ts} style={styles.previewStoryItem}>
+                            <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.storyRing}>
+                              <Image source={{ uri: s.uri }} style={[styles.storyThumb, { borderColor: T.bg }]} contentFit="cover" transition={200} />
+                            </LinearGradient>
+                            {s.caption ? (
+                              <Text style={[Type.micro, { color: T.textDim, maxWidth: 64, textAlign: "center" }]} numberOfLines={1}>{s.caption}</Text>
+                            ) : null}
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+
+                  {/* Hakkımda (bio) — public */}
+                  {dprof.about.trim() ? (
+                    <View style={{ marginTop: Space.lg }}>
+                      <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>Hakkımda</Text>
+                      <Text style={[Type.body, { color: T.text }]}>{dprof.about.trim()}</Text>
+                    </View>
+                  ) : null}
+
+                  {/* İlgi alanları — public */}
+                  {interests.length > 0 && (
+                    <View style={{ marginTop: Space.lg }}>
+                      <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>İlgi alanları</Text>
+                      <View style={styles.previewChips}>
+                        {interests.map((i) => (
+                          <View key={i} style={[styles.previewChip, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+                            <Text style={[Type.label, { color: T.textDim }]}>{i}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Herkese açık sosyal hesaplar (pub=true) */}
+                  <View style={{ marginTop: Space.lg }}>
+                    <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>Sosyal hesaplar</Text>
+                    {publicSocials.length > 0 ? (
+                      publicSocials.map((s) => (
+                        <View key={s.key} style={[styles.previewSocialRow, { borderColor: T.hairline }]}>
+                          <Text style={{ fontSize: 18 }}>{s.icon}</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[Type.title, { color: T.text }]}>{s.label}</Text>
+                            <Text style={[Type.label, { color: T.textFaint }]} numberOfLines={1}>{social[s.key].handle.trim()}</Text>
+                          </View>
+                        </View>
+                      ))
+                    ) : (
+                      <Text style={[Type.label, { color: T.textFaint }]}>Herkese açık hesap yok</Text>
+                    )}
+                  </View>
+                </Animated.View>
+              </ScrollView>
+            );
+          })()}
+        </View>
+      </Modal>
+
       {/* Profil fotoğrafı kırpma ekranı (kare) */}
       <ImageEditor uri={cropUri} aspect={1} outWidth={512} title="Profil fotoğrafı" onDone={saveAvatar} onCancel={() => setCropUri(null)} />
 
@@ -694,4 +823,14 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center",
     ...glow("#000", 16, 0.3),
   },
+  // 👁️ Önizleme modalı
+  previewRoot: { flex: 1 },
+  previewBar: { flexDirection: "row", alignItems: "center", gap: Space.sm, marginBottom: Space.lg },
+  previewBadge: { flex: 1, paddingHorizontal: Space.md, paddingVertical: 10, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
+  previewCard: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: Space.lg },
+  previewHeader: { alignItems: "center" },
+  previewStoryItem: { alignItems: "center", gap: 6, width: 72 },
+  previewChips: { flexDirection: "row", flexWrap: "wrap", gap: Space.sm },
+  previewChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
+  previewSocialRow: { flexDirection: "row", alignItems: "center", gap: Space.md, paddingVertical: Space.md, borderBottomWidth: StyleSheet.hairlineWidth },
 });

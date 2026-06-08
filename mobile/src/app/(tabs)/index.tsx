@@ -217,10 +217,7 @@ export default function DiscoverScreen() {
                 </View>
               ) : null}
             </Pressable>
-            <Pressable onPress={() => { tapH(); router.push("/ara"); }} style={[styles.searchBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-              <Text style={{ fontSize: 18 }}>🔍</Text>
-            </Pressable>
-            {/* Profil — alt bardan kaldırıldı, büyütecin yanında avatar olarak */}
+            {/* Profil — alt bardan kaldırıldı, başlıkta avatar olarak */}
             <Pressable onPress={() => { tapH(); router.push("/profil"); }} style={[styles.searchBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline, overflow: "hidden", padding: 0 }]}>
               <Image source={{ uri: resolveAvatar(photoUri, user?.name, gender) }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
             </Pressable>
