@@ -691,3 +691,19 @@ model MobileNotif {
 
   @@index([deviceId, createdAt])
 }
+
+/// Mobil story (deviceId bazlı, görsel R2'de). Profil/Meydan story barı + silme buradan.
+model MobileStory {
+  id         String   @id @default(cuid())
+  deviceId   String
+  name       String?
+  avatar     String?  @db.Text
+  imageUrl   String   @db.Text
+  caption    String?  @db.Text
+  eventSlug  String?
+  eventTitle String?
+  createdAt  DateTime @default(now())
+
+  @@index([deviceId, createdAt])
+  @@index([createdAt])
+}

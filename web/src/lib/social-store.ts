@@ -256,3 +256,59 @@ export async function syncSystemPostsForEvents(events: SystemEventInput[]): Prom
     return 0;
   }
 }
+
+// ─── Mobil story'ler (deviceId bazlı, R2 görsel) ─────────────────────────────
+export interface MobileStoryView {
+  id: string;
+  deviceId: string;
+  name: string | null;
+  avatar: string | null;
+  imageUrl: string;
+  caption: string | null;
+  eventSlug: string | null;
+  eventTitle: string | null;
+  createdAt: string;
+}
+
+function toStoryView(s: {
+  id: string; deviceId: string; name: string | null; avatar: string | null;
+  imageUrl: string; caption: string | null; eventSlug: string | null; eventTitle: string | null; createdAt: Date;
+}): MobileStoryView {
+  return {
+    id: s.id, deviceId: s.deviceId, name: s.name, avatar: s.avatar, imageUrl: s.imageUrl,
+    caption: s.caption, eventSlug: s.eventSlug, eventTitle: s.eventTitle, createdAt: s.createdAt.toISOString(),
+  };
+}
+
+/** Bir veya birden çok deviceId'nin story'lerini döner (yeni→eski). */
+export async function listMobileStories(deviceIds: string[]): Promise<MobileStoryView[]> {
+  if (!isDbConfigured || deviceIds.length === 0) return [];
+  const rows = await db.mobileStory.findMany({
+    where: { deviceId: { in: deviceIds } },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+  return rows.map(toStoryView);
+}
+
+export async function createMobileStory(input: {
+  deviceId: string; imageUrl: string; caption?: string | null;
+  eventSlug?: string | null; eventTitle?: string | null; name?: string | null; avatar?: string | null;
+}): Promise<MobileStoryView> {
+  const s = await db.mobileStory.create({
+    data: {
+      deviceId: input.deviceId, imageUrl: input.imageUrl,
+      caption: input.caption ?? null, eventSlug: input.eventSlug ?? null, eventTitle: input.eventTitle ?? null,
+      name: input.name ?? null, avatar: input.avatar ?? null,
+    },
+  });
+  return toStoryView(s);
+}
+
+/** Kendi story'ni sil (deviceId sahiplik kontrolü). */
+export async function deleteMobileStory(input: { id: string; deviceId: string }): Promise<{ ok: boolean }> {
+  const s = await db.mobileStory.findUnique({ where: { id: input.id } });
+  if (!s || s.deviceId !== input.deviceId) return { ok: false };
+  await db.mobileStory.delete({ where: { id: input.id } });
+  return { ok: true };
+}
