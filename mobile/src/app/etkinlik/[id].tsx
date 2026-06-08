@@ -28,6 +28,8 @@ import { StoryAvatar } from "@/components/StoryAvatar";
 import { AttendeeListModal } from "@/components/AttendeeListModal";
 import { EventStoryStrip, mockStoryContributors, personToGroup } from "@/components/EventStoryStrip";
 import { EventStoryViewer, type StoryGroup } from "@/components/EventStoryViewer";
+import { EventTweets } from "@/components/EventTweets";
+import { ZoomableImage } from "@/components/ZoomableImage";
 import { showAuthPrompt } from "@/lib/authPrompt";
 import { tapH, impactH, successH } from "@/lib/haptics";
 import { getEventWeather, type DayWeather } from "@/lib/weather";
@@ -128,6 +130,8 @@ export default function EventDetail() {
   const ownerId = user?.id ?? user?.email?.toLowerCase() ?? "";
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [imgFailed, setImgFailed] = useState(false);
+  // Hero kapak görseline dokununca açılan tam ekran pinch-zoom modal'ı.
+  const [zoom, setZoom] = useState(false);
 
   // #18 — hava durumu
   const [weather, setWeather] = useState<DayWeather | null>(null);
@@ -585,13 +589,15 @@ export default function EventDetail() {
               <Text style={{ fontSize: 90 }}>{c.emoji}</Text>
             </LinearGradient>
           ) : (
-            <Image
-              source={{ uri: heroUri }}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-              transition={350}
-              onError={() => setImgFailed(true)}
-            />
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => { tapH(); setZoom(true); }}>
+              <Image
+                source={{ uri: heroUri }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                transition={350}
+                onError={() => setImgFailed(true)}
+              />
+            </Pressable>
           )}
           <LinearGradient colors={["rgba(8,7,13,0.5)", "transparent", "rgba(8,7,13,0.6)", T.bg]} locations={[0, 0.3, 0.7, 1]} style={StyleSheet.absoluteFill} />
           {/* Üst bar */}
@@ -670,7 +676,7 @@ export default function EventDetail() {
 
           {/* Story şeridi + paylaş (Instagram tarzı) */}
           <Animated.View entering={FadeInDown.duration(450).delay(180)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
-            <Text style={[Type.label, { color: T.textFaint, marginBottom: 12 }]}>✨ Story'ler</Text>
+            <Text style={[Type.label, { color: T.textFaint, marginBottom: 12 }]}>✨ Bu etkinlik story'leri</Text>
             <EventStoryStrip
               myGroup={myGroup}
               mockGroups={mockGroups}
@@ -705,11 +711,32 @@ export default function EventDetail() {
 
           {/* #14 — Etkinliğe katılacaklar — sekmeli filtre (going/maybe/interested) */}
           <Animated.View entering={FadeInDown.duration(450).delay(200)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
-            {/* Sekmeler */}
+            {/* Sekmeler — 3'ü tek satırda eşit dağılır (flex:1), taşmaz */}
             <View style={styles.rsvpRow}>
-              <Pill label="👥 Katılacaklar" active={attTab === "going"} gradient={c.gradient} onPress={() => { tapH(); setAttTab("going"); }} />
-              <Pill label="🤔 Belki" active={attTab === "maybe"} gradient={c.gradient} onPress={() => { tapH(); setAttTab("maybe"); }} />
-              <Pill label="✨ İlgileniyorum" active={attTab === "interested"} gradient={c.gradient} onPress={() => { tapH(); setAttTab("interested"); }} />
+              {([
+                ["going", "👥 Katılacak"],
+                ["maybe", "🤔 Belki"],
+                ["interested", "✨ İlgili"],
+              ] as [Rsvp, string][]).map(([key, label]) => {
+                const active = attTab === key;
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => { tapH(); setAttTab(key); }}
+                    style={{ flex: 1, borderRadius: Radius.pill, overflow: "hidden" }}
+                  >
+                    {active ? (
+                      <LinearGradient colors={c.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.attTab}>
+                        <Text style={[Type.label, { color: "#fff", fontSize: 11 }]} numberOfLines={1}>{label}</Text>
+                      </LinearGradient>
+                    ) : (
+                      <View style={[styles.attTab, { backgroundColor: T.surfaceStrong, borderWidth: StyleSheet.hairlineWidth * 2, borderColor: T.hairline }]}>
+                        <Text style={[Type.label, { color: T.textDim, fontSize: 11 }]} numberOfLines={1}>{label}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
             </View>
 
             {/* Seçili kategorinin kişileri */}
@@ -741,9 +768,11 @@ export default function EventDetail() {
                             <Text style={[Type.label, { color: T.textDim }]}>+{extra}</Text>
                           </View>
                         ) : null}
-                        <Text style={[Type.label, { color: T.textDim, marginLeft: 10 }]}>{catCount(attTab)}</Text>
                       </View>
-                      <Text style={[Type.label, { color: T.primary }]}>tümünü gör →</Text>
+                      {/* "+N" rozeti — dokununca tüm liste modalı açılır */}
+                      <View style={[styles.plusBadge, { backgroundColor: T.primary + "22", borderColor: T.primary }]}>
+                        <Text style={[Type.label, { color: T.primary, fontWeight: "800" }]}>+{catCount(attTab)}</Text>
+                      </View>
                     </Pressable>
                   )}
 
@@ -763,7 +792,7 @@ export default function EventDetail() {
 
           {/* #14 — Yorumlar */}
           <Animated.View entering={FadeInDown.duration(450).delay(240)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
-            <Text style={[Type.label, { color: T.textFaint, marginBottom: 12 }]}>{t("comments")}</Text>
+            <Text style={[Type.label, { color: T.textFaint, marginBottom: 12 }]}>Bu etkinlik yorumları</Text>
             {comments.length === 0 ? (
               <Text style={[Type.body, { color: T.textFaint, marginBottom: 14 }]}>{t("no_comments")}</Text>
             ) : (
@@ -863,6 +892,9 @@ export default function EventDetail() {
               </ScrollView>
             ) : null}
           </Animated.View>
+
+          {/* 𝕏 (Twitter) — sayfanın EN ALTI: bu etkinlik X'te konuşuluyor mu? */}
+          <EventTweets title={event.title} />
 
           {guest ? <View style={{ height: 2 }} /> : null}
         </View>
@@ -964,6 +996,11 @@ export default function EventDetail() {
           startIndex={viewerStart}
           onClose={() => setViewerGroups(null)}
         />
+      ) : null}
+
+      {/* Hero kapak görseli — tam ekran pinch/çift-dokunuş zoom modal'ı */}
+      {!imgFailed ? (
+        <ZoomableImage uri={heroUri} visible={zoom} onClose={() => setZoom(false)} />
       ) : null}
 
       {/* Avatar fotoğrafını büyütme modal'ı (dokun/basılı tut) */}
@@ -1081,7 +1118,9 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: "row", gap: 14, alignItems: "center", paddingVertical: 6 },
   dateBadge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
   sep: { height: StyleSheet.hairlineWidth * 2, marginVertical: 6 },
-  rsvpRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  rsvpRow: { flexDirection: "row", gap: 6 },
+  attTab: { paddingHorizontal: 6, paddingVertical: 9, alignItems: "center", justifyContent: "center" },
+  plusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
   countRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 11, borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2 },
   countBadge: { minWidth: 28, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center", justifyContent: "center" },
   joinBtn: { marginTop: 14, alignSelf: "flex-start", paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
