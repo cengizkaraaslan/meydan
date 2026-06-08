@@ -77,7 +77,7 @@ export function MovieSection() {
 }
 
 const styles = StyleSheet.create({
-  root: { marginTop: Space.lg },
+  root: { marginTop: Space.xl },
   header: {
     flexDirection: "row",
     alignItems: "center",

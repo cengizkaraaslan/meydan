@@ -137,7 +137,7 @@ export function PastEventsSection() {
   if (!ready || items.length === 0) return null;
 
   return (
-    <View style={{ marginBottom: Space.xl }}>
+    <View style={{ marginTop: Space.xl, marginBottom: Space.xl }}>
       <SectionHeader
         title="Biten Etkinlikler"
         accent={T.gold}

@@ -158,7 +158,7 @@ export function CourseSection() {
   const shown = rows.slice(0, 5);
 
   return (
-    <View style={{ marginBottom: Space.xl }}>
+    <View style={{ marginTop: Space.xl, marginBottom: Space.xl }}>
       <SectionHeader
         title="Ücretsiz Kurslar"
         action={

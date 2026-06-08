@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Dimensions, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { ChatBubble } from "@/components/ChatBubble";
@@ -33,9 +33,12 @@ export default function DiscoverScreen() {
   const { city, status, setCity } = useActiveCity();
   const { user } = useAuth();
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
-  useEffect(() => {
-    AsyncStorage.getItem("meydanfest:avatar").then(setAvatarOverride);
-  }, []);
+  // Profilde avatar değişince anasayfaya dönüldüğünde güncellensin (her odakta yeniden oku).
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem("meydanfest:avatar").then(setAvatarOverride);
+    }, []),
+  );
   const photoUri = avatarOverride ?? user?.photo;
   const [cityModal, setCityModal] = useState(false);
   const [featured, setFeatured] = useState<ApiEvent[]>([]);

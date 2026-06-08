@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -12,6 +13,7 @@ import {
 } from "react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraBackground } from "@/components/AuroraBackground";
@@ -20,13 +22,15 @@ import { PostCard } from "@/components/PostCard";
 import { CommentsModal } from "@/components/CommentsModal";
 import { PostActionsModal } from "@/components/PostActionsModal";
 import { StoryViewer } from "@/components/StoryViewer";
+import { EventStoryViewer, type StoryGroup } from "@/components/EventStoryViewer";
 import { StoryAvatar } from "@/components/StoryAvatar";
 import { Loader, SectionHeader, EmptyState } from "@/ui/atoms";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
-import { tapH, mediumH, successH } from "@/lib/haptics";
+import { tapH, mediumH, successH, impactH } from "@/lib/haptics";
 import { getOrCreateDeviceId } from "@/lib/device";
-import { useStories } from "@/lib/stories";
+import { useStories, addStory } from "@/lib/stories";
+import { useAuth } from "@/lib/auth";
 import { PEOPLE, getPerson, type Person } from "@/lib/people";
 import { fetchEvents, type ApiEvent } from "@/lib/api";
 import {
@@ -50,29 +54,17 @@ const EDIT_WINDOW_MS = 10 * 60 * 1000;
 /** Feed'de her N gönderide bir etkinlik serpiştir. */
 const EVENT_EVERY = 4;
 
-/** Kendi (yerel) story'lerini Person benzeri sanal profile çevirir → StoryViewer ile gösterilir. */
-function myStoryPerson(uri: string): Person {
-  return {
-    id: "me",
-    name: "Senin story'n",
-    age: 0,
-    city: "",
-    distanceKm: 0,
-    online: true,
-    avatar: uri,
-    bio: "",
-    interests: [],
-    gender: "other" as Person["gender"],
-    hasStory: true,
-  };
-}
-
 type FeedItem = { kind: "post"; post: FeedPost } | { kind: "event"; event: ApiEvent };
 
 export default function MeydanScreen() {
   const insets = useSafeAreaInsets();
   const { t: T } = useTheme();
-  const { stories } = useStories();
+  const { user } = useAuth();
+  const { stories, reload: reloadStories, remove: removeStory } = useStories();
+  // Profil avatarı (kendi story halkam için): "meydanfest:avatar" ?? user?.photo
+  const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
+  // Kendi story'lerimi gerçek görselle gösteren izleyici (açıkken grup dolu).
+  const [myStoryOpen, setMyStoryOpen] = useState(false);
 
   const [filter, setFilter] = useState<WallFilter>("all");
   const [filterReady, setFilterReady] = useState(false);
@@ -102,6 +94,18 @@ export default function MeydanScreen() {
   useEffect(() => {
     void getOrCreateDeviceId().then(setDeviceId);
   }, []);
+
+  // Kendi story halkam için profil avatarını yükle.
+  useEffect(() => {
+    void AsyncStorage.getItem("meydanfest:avatar").then((v) => setAvatarOverride(v ?? null));
+  }, []);
+
+  // Ekran her odaklandığında profil avatarını yeniden oku (profilde değişince burada da güncellensin).
+  useFocusEffect(
+    useCallback(() => {
+      void AsyncStorage.getItem("meydanfest:avatar").then((v) => setAvatarOverride(v ?? null));
+    }, []),
+  );
 
   // Son seçilen filtreyi yükle (yoksa "Genel").
   useEffect(() => {
@@ -195,6 +199,100 @@ export default function MeydanScreen() {
   }, [followSet]);
 
   const myStoryUri = stories[0]?.uri ?? null;
+  // Hiç story var mı? (myStoryUri yok ve stories boş → "+" ekle butonu göster)
+  const hasOwnStory = !!myStoryUri || stories.length > 0;
+  // Story barı avatarı = profil avatarı (override ?? user.photo); story görseli değil.
+  const myAvatar = avatarOverride || user?.photo || null;
+  const myName = user?.name || "Sen";
+
+  // Seçilen görseli kendi story'me ekle + şeridi yenile + onay.
+  const addStoryFromUri = useCallback(
+    async (uri: string) => {
+      await addStory({ uri, caption: "", eventSlug: "", ts: Date.now() });
+      reloadStories();
+      successH();
+    },
+    [reloadStories],
+  );
+
+  // Kamera ile story çek.
+  const shareFromCamera = useCallback(async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Kamera izni gerekli", "Story çekmek için kamera iznine ihtiyaç var.");
+      return;
+    }
+    const res = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+    if (res.canceled || !res.assets?.length) return;
+    await addStoryFromUri(res.assets[0].uri);
+  }, [addStoryFromUri]);
+
+  // Galeriden story seç.
+  const shareFromLibrary = useCallback(async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Galeri izni gerekli", "Story seçmek için galeri iznine ihtiyaç var.");
+      return;
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7 });
+    if (res.canceled || !res.assets?.length) return;
+    await addStoryFromUri(res.assets[0].uri);
+  }, [addStoryFromUri]);
+
+  // Kamera rozeti / (story yokken) avatar → kaynak seç.
+  const onShareStory = useCallback(() => {
+    impactH();
+    Alert.alert("Story paylaş", "Fotoğraf kaynağını seç", [
+      { text: "📷 Kamera", onPress: () => { void shareFromCamera(); } },
+      { text: "🖼️ Galeri", onPress: () => { void shareFromLibrary(); } },
+      { text: "İptal", style: "cancel" },
+    ]);
+  }, [shareFromCamera, shareFromLibrary]);
+
+  // Story varsa avatara dokun → kendi story'lerini gerçek görselle göster.
+  const onOpenMyStory = useCallback(() => {
+    tapH();
+    if (myStoryUri) setMyStoryOpen(true);
+    else onShareStory();
+  }, [myStoryUri, onShareStory]);
+
+  // Avatara uzun bas → silme menüsü (tek/çok story'e göre).
+  const onLongPressMyStory = useCallback(() => {
+    if (stories.length === 0) return;
+    mediumH();
+    if (stories.length === 1) {
+      const ts = stories[0].ts;
+      Alert.alert("Story", "Story'ni silmek istiyor musun?", [
+        { text: "Vazgeç", style: "cancel" },
+        { text: "Sil", style: "destructive", onPress: () => { void removeStory(ts); } },
+      ]);
+    } else {
+      const lastTs = stories[0].ts;
+      Alert.alert("Story", `${stories.length} story'n var.`, [
+        { text: "Vazgeç", style: "cancel" },
+        { text: "En sonuncuyu sil", onPress: () => { void removeStory(lastTs); } },
+        {
+          text: "Tümünü sil",
+          style: "destructive",
+          onPress: async () => {
+            for (const s of stories) await removeStory(s.ts);
+          },
+        },
+      ]);
+    }
+  }, [stories, removeStory]);
+
+  // Kendi story'lerim → EventStoryViewer için tek grup.
+  const myStoryGroup = useMemo<StoryGroup>(
+    () => ({
+      id: "me",
+      name: "Senin story'n",
+      avatar: myAvatar ?? "",
+      isMe: true,
+      segments: stories.map((s) => ({ uri: s.uri, caption: s.caption })),
+    }),
+    [myAvatar, stories],
+  );
 
   // Reaksiyon: önce optimistik güncelle, sonra sunucu sonucuyla düzelt.
   const onReact = useCallback(async (postId: string, emoji: string) => {
@@ -408,26 +506,41 @@ export default function MeydanScreen() {
         contentContainerStyle={styles.storyBar}
         style={{ marginBottom: 16 }}
       >
-        {/* Senin story'n */}
-        <Pressable
-          style={styles.storyItem}
-          onPress={() => {
-            tapH();
-            if (myStoryUri) setStoryPerson(myStoryPerson(myStoryUri));
-          }}
-        >
-          <View>
-            <StoryAvatar uri={myStoryUri} name="Sen" size={58} hasStory={!!myStoryUri} />
-            {!myStoryUri ? (
-              <View style={[styles.plusBadge, { backgroundColor: T.primary, borderColor: T.bg }]}>
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 13 }}>+</Text>
-              </View>
-            ) : null}
-          </View>
-          <Text style={[Type.micro, { color: T.textDim, maxWidth: 64 }]} numberOfLines={1}>
-            Senin story'n
-          </Text>
-        </Pressable>
+        {/* Senin story'n — story yoksa "+" ekle butonu, varsa avatar+rozet */}
+        {hasOwnStory ? (
+          <Pressable
+            style={styles.storyItem}
+            onPress={onOpenMyStory}
+            onLongPress={onLongPressMyStory}
+            delayLongPress={350}
+          >
+            <View>
+              <StoryAvatar uri={myAvatar} name={myName} size={58} hasStory={!!myStoryUri} />
+              {/* Kamera rozeti: dokununca story paylaş (kamera/galeri). */}
+              <Pressable
+                onPress={onShareStory}
+                hitSlop={8}
+                style={[styles.camBadge, { backgroundColor: T.primary, borderColor: T.bg }]}
+              >
+                <Text style={{ fontSize: 11 }}>📷</Text>
+              </Pressable>
+            </View>
+            <Text style={[Type.micro, { color: T.textDim, maxWidth: 64 }]} numberOfLines={1}>
+              Senin story'n
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable style={styles.storyItem} onPress={onShareStory}>
+            <View
+              style={[styles.addStoryCircle, { backgroundColor: T.primary, borderColor: T.bg }, glow(T.primary, 12, 0.4)]}
+            >
+              <Text style={styles.addStoryPlus}>+</Text>
+            </View>
+            <Text style={[Type.micro, { color: T.textDim, maxWidth: 64, textAlign: "center" }]} numberOfLines={2}>
+              Senin story'n{"\n"}Ekle
+            </Text>
+          </Pressable>
+        )}
 
         {storyPeople.map((p) => (
           <Pressable key={p.id} style={styles.storyItem} onPress={() => { tapH(); setStoryPerson(getPerson(p.id) ?? p); }}>
@@ -524,6 +637,10 @@ export default function MeydanScreen() {
         onDelete={onDeletePost}
       />
       <StoryViewer person={storyPerson} onClose={() => setStoryPerson(null)} />
+      {/* Kendi story'lerim — gerçek görselle (çoklu segment). */}
+      {myStoryOpen && stories.length > 0 ? (
+        <EventStoryViewer groups={[myStoryGroup]} startIndex={0} onClose={() => setMyStoryOpen(false)} />
+      ) : null}
 
       {/* İlk paylaşım ipucu (1 kez) + hata bilgisi — solid arka plan, okunaklı. */}
       <TipModal
@@ -581,7 +698,9 @@ const styles = StyleSheet.create({
   filterUnderline: { height: 3, borderRadius: 2, alignSelf: "stretch" },
   storyBar: { paddingHorizontal: 16, gap: 14, alignItems: "flex-start" },
   storyItem: { alignItems: "center", gap: 6, width: 72 },
-  plusBadge: { position: "absolute", right: -2, bottom: 14, width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", borderWidth: 2 },
+  camBadge: { position: "absolute", right: 0, bottom: 0, width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", borderWidth: 2 },
+  addStoryCircle: { width: 58, height: 58, borderRadius: 29, alignItems: "center", justifyContent: "center", borderWidth: 2 },
+  addStoryPlus: { color: "#fff", fontSize: 34, fontWeight: "700", lineHeight: 38, marginTop: -2 },
   composer: { marginHorizontal: 16, marginBottom: 18, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 12, gap: 10 },
   composeInput: { borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 14, paddingVertical: 10, minHeight: 46, maxHeight: 120, ...Type.body },
   shareBtn: { alignSelf: "flex-end", borderRadius: Radius.pill, paddingHorizontal: 22, paddingVertical: 10, minWidth: 90, alignItems: "center", justifyContent: "center" },
