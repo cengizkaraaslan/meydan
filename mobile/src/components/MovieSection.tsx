@@ -1,39 +1,31 @@
 import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useActiveCity } from "@/lib/location";
 import { tapH } from "@/lib/haptics";
+import { MoviePoster } from "@/components/MoviePoster";
 import { fetchMovies, type Movie } from "@/lib/cinema";
 
 const CARD_W = 132;
 const CARD_H = 198;
 
 function MovieCard({ m, T, index }: { m: Movie; T: Palette; index: number }) {
-  const [err, setErr] = useState(false);
   return (
     <Animated.View entering={FadeInDown.duration(420).delay(index * 70)}>
       <Pressable
-        onPress={() => { tapH(); router.push("/vizyon"); }}
+        onPress={() => { tapH(); router.push(`/film/${m.slug}`); }}
         style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
       >
         <View style={[styles.poster, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }, glow(T.primary, 14, 0.25)]}>
-          {err ? (
-            <View style={[styles.posterPlaceholder, { backgroundColor: T.surface }]}>
-              <Text style={{ fontSize: 32 }}>🎬</Text>
-            </View>
-          ) : (
-            <Image
-              source={{ uri: m.posterUrl }}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-              transition={200}
-              onError={() => setErr(true)}
-            />
-          )}
+          <MoviePoster
+            posterUrl={m.posterUrl}
+            backdropUrl={m.backdropUrl}
+            title={m.title}
+            style={StyleSheet.absoluteFill}
+          />
         </View>
         <Text style={[Type.label, { color: T.text, marginTop: Space.sm }]} numberOfLines={1}>
           {m.title}
@@ -102,5 +94,4 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth * 2,
     overflow: "hidden",
   },
-  posterPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
 });

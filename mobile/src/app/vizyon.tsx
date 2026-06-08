@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import * as Location from "expo-location";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraBackground } from "@/components/AuroraBackground";
+import { MoviePoster } from "@/components/MoviePoster";
 import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useActiveCity } from "@/lib/location";
@@ -14,26 +14,6 @@ import { fetchMovies, haversineKm, type Movie, type Showtime } from "@/lib/cinem
 
 interface NearbyShowtime extends Showtime {
   distanceKm: number | null;
-}
-
-function PosterThumb({ uri, T }: { uri: string; T: Palette }) {
-  const [err, setErr] = useState(false);
-  if (err) {
-    return (
-      <View style={[styles.poster, styles.posterPlaceholder, { backgroundColor: T.surface, borderColor: T.hairline }]}>
-        <Text style={{ fontSize: 30 }}>🎬</Text>
-      </View>
-    );
-  }
-  return (
-    <Image
-      source={{ uri }}
-      style={[styles.poster, { borderColor: T.hairline }]}
-      contentFit="cover"
-      transition={200}
-      onError={() => setErr(true)}
-    />
-  );
 }
 
 function MovieBlock({
@@ -75,8 +55,13 @@ function MovieBlock({
       entering={FadeInDown.duration(420).delay(delay)}
       style={[styles.block, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
     >
-      <View style={styles.blockHead}>
-        <PosterThumb uri={m.posterUrl} T={T} />
+      <Pressable
+        onPress={() => { tapH(); router.push(`/film/${m.slug}`); }}
+        style={({ pressed }) => [styles.blockHead, pressed && { opacity: 0.85 }]}
+      >
+        <View style={[styles.poster, { borderColor: T.hairline }]}>
+          <MoviePoster posterUrl={m.posterUrl} backdropUrl={m.backdropUrl} title={m.title} style={StyleSheet.absoluteFill} />
+        </View>
         <View style={{ flex: 1 }}>
           <Text style={[Type.title, { color: T.text }]} numberOfLines={2}>{m.title}</Text>
           <Text style={[Type.micro, { color: T.gold, marginTop: 4 }]}>⭐ {m.rating.toFixed(1)}</Text>
@@ -85,7 +70,7 @@ function MovieBlock({
           </Text>
           <Text style={[Type.label, { color: T.textFaint, marginTop: 2 }]}>{m.durationMin} dk · {m.ageRating}</Text>
         </View>
-      </View>
+      </Pressable>
 
       {theaters.length > 0 && (
         <View style={{ marginTop: Space.md, gap: Space.sm }}>
@@ -211,8 +196,7 @@ const styles = StyleSheet.create({
   circleBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2 },
   block: { padding: Space.md, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2 },
   blockHead: { flexDirection: "row", gap: Space.md },
-  poster: { width: 84, height: 126, borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2 },
-  posterPlaceholder: { alignItems: "center", justifyContent: "center" },
+  poster: { width: 84, height: 126, borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2, overflow: "hidden" },
   theaterRow: { padding: Space.sm, borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2 },
   theaterHead: { flexDirection: "row", alignItems: "center", gap: Space.sm },
   times: { flexDirection: "row", flexWrap: "wrap", gap: Space.xs, marginTop: Space.sm },
