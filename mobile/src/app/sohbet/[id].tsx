@@ -3,6 +3,7 @@ import { Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, Styl
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from "react-native-reanimated";
@@ -40,6 +41,10 @@ export default function ChatScreen() {
   const [text, setText] = useState("");
   const [editing, setEditing] = useState<Msg | null>(null);
   const [tipVisible, setTipVisible] = useState(false);
+  // Mesaja uzun basınca açılan action-sheet için seçili mesaj (null = kapalı).
+  const [actionMsg, setActionMsg] = useState<Msg | null>(null);
+  // Action-sheet içinde "Sil" onayı görünür mü?
+  const [confirmDel, setConfirmDel] = useState(false);
   // Yalnızca yeni gönderdiğim balona giriş animasyonu uygulamak için son gönderim zamanını tutuyoruz.
   const [lastSentAt, setLastSentAt] = useState(0);
   const listRef = useRef<FlatList<Msg>>(null);
@@ -135,45 +140,40 @@ export default function ChatScreen() {
   const onLongPressMsg = (m: Msg) => {
     if (!canEditMsg(m)) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const isImage = !!m.imageUri;
-    const buttons: { text: string; style?: "cancel" | "destructive" | "default"; onPress?: () => void }[] = [];
-    if (!isImage) {
-      buttons.push({
-        text: "Düzenle",
-        onPress: () => {
-          setEditing(m);
-          setText(m.text);
-        },
-      });
-    }
-    buttons.push({
-      text: "Sil",
-      style: "destructive",
-      onPress: () => {
-        Alert.alert("Mesajı sil", "Bu mesaj silinsin mi?", [
-          { text: "İptal", style: "cancel" },
-          {
-            text: "Sil",
-            style: "destructive",
-            onPress: () => {
-              void (async () => {
-                const r = await deleteMessage(m.id);
-                if (!r.ok) {
-                  Alert.alert(
-                    "Silinemedi",
-                    r.reason === "expired"
-                      ? "Bu mesajın silme süresi (10 dk) doldu."
-                      : "Mesaj silinemedi, tekrar dene.",
-                  );
-                }
-              })();
-            },
-          },
-        ]);
-      },
-    });
-    buttons.push({ text: "İptal", style: "cancel" });
-    Alert.alert(isImage ? "Fotoğraf" : "Mesaj", undefined, buttons);
+    setConfirmDel(false);
+    setActionMsg(m);
+  };
+
+  const closeActionSheet = () => {
+    setActionMsg(null);
+    setConfirmDel(false);
+  };
+
+  const onEditFromSheet = () => {
+    const m = actionMsg;
+    if (!m) return;
+    tapH();
+    closeActionSheet();
+    setEditing(m);
+    setText(m.text);
+  };
+
+  const onDeleteFromSheet = () => {
+    const m = actionMsg;
+    if (!m) return;
+    tapH();
+    closeActionSheet();
+    void (async () => {
+      const r = await deleteMessage(m.id);
+      if (!r.ok) {
+        Alert.alert(
+          "Silinemedi",
+          r.reason === "expired"
+            ? "Bu mesajın silme süresi (10 dk) doldu."
+            : "Mesaj silinemedi, tekrar dene.",
+        );
+      }
+    })();
   };
 
   const cancelEdit = () => {
@@ -260,18 +260,72 @@ export default function ChatScreen() {
           <Pressable onPress={onSend}>
             <Animated.View style={sendBtnStyle}>
               <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.send}>
-                <Text style={{ fontSize: 18, color: "#fff" }}>↑</Text>
+                <Ionicons name="send" size={20} color="#fff" />
               </LinearGradient>
             </Animated.View>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
 
+      {/* Mesaj uzun-bas action-sheet (tema uyumlu, alttan açılır) */}
+      <Modal visible={!!actionMsg} transparent animationType="slide" onRequestClose={closeActionSheet}>
+        <Pressable style={styles.sheetScrim} onPress={closeActionSheet}>
+          <Pressable
+            style={[styles.sheetCard, { backgroundColor: T.bgElevated, borderColor: T.hairline, paddingBottom: (insets.bottom || 12) + 8 }]}
+            onPress={() => { /* kart içine dokunma kapanmasın */ }}
+          >
+            <View style={[styles.sheetHandle, { backgroundColor: T.hairline }]} />
+            <Text style={[Type.label, { color: T.textDim, textAlign: "center", marginBottom: 6 }]}>
+              {actionMsg?.imageUri ? "Fotoğraf" : "Mesaj"}
+            </Text>
+
+            {confirmDel ? (
+              <>
+                <Text style={[Type.body, { color: T.text, textAlign: "center", marginTop: 4, marginBottom: 14 }]}>
+                  Bu mesaj silinsin mi?
+                </Text>
+                <View style={styles.sheetConfirmRow}>
+                  <Pressable
+                    onPress={() => { tapH(); setConfirmDel(false); }}
+                    style={[styles.sheetRow, styles.sheetRowHalf, { backgroundColor: T.surfaceStrong }]}
+                  >
+                    <Text style={[Type.body, { color: T.text, fontWeight: "600" }]}>Vazgeç</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={onDeleteFromSheet}
+                    style={[styles.sheetRow, styles.sheetRowHalf, { backgroundColor: "rgba(255,59,48,0.14)" }]}
+                  >
+                    <Text style={[Type.body, { color: "#FF3B30", fontWeight: "700" }]}>Sil</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                {actionMsg && !actionMsg.imageUri ? (
+                  <Pressable onPress={onEditFromSheet} style={[styles.sheetRow, { backgroundColor: T.surfaceStrong }]}>
+                    <Text style={[Type.body, { color: T.text }]}>✏️  Düzenle</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  onPress={() => { tapH(); setConfirmDel(true); }}
+                  style={[styles.sheetRow, { backgroundColor: T.surfaceStrong, marginTop: 8 }]}
+                >
+                  <Text style={[Type.body, { color: "#FF3B30", fontWeight: "600" }]}>🗑️  Sil</Text>
+                </Pressable>
+                <Pressable onPress={closeActionSheet} style={[styles.sheetRow, styles.sheetCancel, { borderColor: T.hairline }]}>
+                  <Text style={[Type.body, { color: T.textDim, fontWeight: "600" }]}>İptal</Text>
+                </Pressable>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* İlk mesaj ipucu (ömür boyu 1 kez) */}
       <Modal visible={tipVisible} transparent animationType="fade" onRequestClose={() => setTipVisible(false)}>
         <View style={styles.tipBackdrop}>
-          <View style={[styles.tipCard, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-            <Text style={[Type.body, { color: T.text, textAlign: "center" }]}>
+          <View style={[styles.tipCard, { backgroundColor: T.bgElevated, borderColor: T.hairline }]}>
+            <Text style={[Type.body, { color: T.text, textAlign: "center", lineHeight: 22 }]}>
               💬 İpucu: Gönderdiğin mesajı 10 dakika içinde düzenleyebilir veya silebilirsin — mesaja basılı tut.
             </Text>
             <Pressable onPress={() => { tapH(); setTipVisible(false); }} style={{ marginTop: 18 }}>
@@ -386,4 +440,14 @@ const styles = StyleSheet.create({
   tipBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
   tipCard: { width: "100%", borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 22 },
   tipBtn: { borderRadius: Radius.md, alignItems: "center", justifyContent: "center", paddingVertical: 12 },
+  sheetScrim: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  sheetCard: {
+    borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 16, paddingTop: 10,
+  },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 12 },
+  sheetRow: { borderRadius: Radius.md, paddingVertical: 14, alignItems: "center", justifyContent: "center" },
+  sheetCancel: { marginTop: 10, backgroundColor: "transparent", borderWidth: StyleSheet.hairlineWidth * 2 },
+  sheetConfirmRow: { flexDirection: "row", gap: 10 },
+  sheetRowHalf: { flex: 1 },
 });

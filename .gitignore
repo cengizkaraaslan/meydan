@@ -19,3 +19,5 @@ mobile/ios/
 # misc
 **/.DS_Store
 **/*.tsbuildinfo
+
+.vercel

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { Linking, Pressable, Text, View } from "react-native";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -8,9 +9,9 @@ import { useTheme, type Palette } from "@/lib/theme";
 import { useActiveCity } from "@/lib/location";
 import { tapH } from "@/lib/haptics";
 import { SectionHeader } from "@/ui/atoms";
-import { fetchCourseGroups, courseEmoji, type CourseGroup } from "@/lib/courses";
+import { fetchCourseGroups, courseEmoji, type Course, type CourseGroup } from "@/lib/courses";
 
-/** Belediyeye göre dönüşümlü canlı gradientler (görselsiz kartları renklendirir). */
+/** Kurs sırasına göre dönüşümlü canlı gradientler (görselsiz kutuları renklendirir). */
 function gradientFor(T: Palette, idx: number): readonly [string, string] {
   const palettes: readonly (readonly [string, string])[] = [
     [T.violet, T.blue],
@@ -23,70 +24,102 @@ function gradientFor(T: Palette, idx: number): readonly [string, string] {
   return palettes[idx % palettes.length];
 }
 
-const CARD_W = 200;
+interface Row {
+  key: string;
+  course: Course;
+  providerName: string;
+  url?: string;
+  gradIdx: number;
+}
 
-function CourseCard({
+/** Tek bir kurs satırı: solda görsel/emoji kutusu, sağda ad + merkez + saat + belediye. */
+export function CourseRow({
   course,
   providerName,
+  url,
   grad,
+  T,
   delay,
 }: {
-  course: { name: string; center?: string };
+  course: Course;
   providerName: string;
+  url?: string;
   grad: readonly [string, string];
+  T: Palette;
   delay: number;
 }) {
+  const open = () => {
+    tapH();
+    if (url) Linking.openURL(url).catch(() => {});
+    else router.push("/kurslar");
+  };
   return (
-    <Animated.View entering={FadeInDown.duration(420).delay(delay)}>
+    <Animated.View entering={FadeInDown.duration(380).delay(delay)}>
       <Pressable
-        onPress={() => { tapH(); router.push("/kurslar"); }}
-        style={({ pressed }) => [{ width: CARD_W }, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
+        onPress={open}
+        style={({ pressed }) => [
+          {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: Space.md,
+            padding: Space.sm,
+            borderRadius: Radius.lg,
+            backgroundColor: T.surface,
+            borderWidth: 1,
+            borderColor: T.hairline,
+          },
+          pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] },
+        ]}
       >
-        <LinearGradient
-          colors={grad}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[
-            {
-              height: 142,
-              borderRadius: Radius.lg,
-              padding: Space.md,
-              justifyContent: "space-between",
-            },
-            glow(grad[0], 16, 0.45),
-          ]}
-        >
-          <Text style={{ fontSize: 30 }}>{courseEmoji(course.name)}</Text>
-          <View>
-            <Text style={[Type.title, { color: "#fff" }]} numberOfLines={2}>
-              {course.name}
+        {/* Görsel ya da gradient + emoji kutusu */}
+        {course.image ? (
+          <Image
+            source={{ uri: course.image }}
+            style={{ width: 64, height: 64, borderRadius: Radius.md, backgroundColor: T.surfaceStrong }}
+            contentFit="cover"
+            transition={200}
+          />
+        ) : (
+          <LinearGradient
+            colors={grad}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              { width: 64, height: 64, borderRadius: Radius.md, alignItems: "center", justifyContent: "center" },
+              glow(grad[0], 10, 0.4),
+            ]}
+          >
+            <Text style={{ fontSize: 30 }}>{courseEmoji(course.name)}</Text>
+          </LinearGradient>
+        )}
+
+        {/* Bilgiler */}
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={[Type.title, { color: T.text }]} numberOfLines={2}>
+            {course.name}
+          </Text>
+          {course.center ? (
+            <Text style={[Type.body, { color: T.textDim }]} numberOfLines={1}>
+              📍 {course.center}
             </Text>
-            {course.center ? (
-              <Text style={[Type.micro, { color: "rgba(255,255,255,0.85)", marginTop: 4 }]} numberOfLines={1}>
-                📍 {course.center}
-              </Text>
-            ) : null}
-            <Text style={[Type.micro, { color: "rgba(255,255,255,0.75)", marginTop: 2 }]} numberOfLines={1}>
-              {providerName}
+          ) : null}
+          {course.schedule ? (
+            <Text style={[Type.body, { color: T.textDim }]} numberOfLines={1}>
+              🕐 {course.schedule}
             </Text>
-          </View>
-        </LinearGradient>
+          ) : null}
+          <Text style={[Type.micro, { color: T.textFaint, marginTop: 1 }]} numberOfLines={1}>
+            {providerName}
+          </Text>
+        </View>
       </Pressable>
     </Animated.View>
   );
 }
 
-interface FlatCourse {
-  key: string;
-  name: string;
-  center?: string;
-  providerName: string;
-  gradIdx: number;
-}
-
 /**
- * Anasayfa "Ücretsiz Kurslar" bölümü — aktif şehre göre belediye branşlarını
- * yatay, animasyonlu kart şeridi olarak gösterir. Kurs yoksa hiç render etmez.
+ * Anasayfa "Ücretsiz Kurslar" bölümü — SADECE aktif şehrin belediye kurslarını
+ * dikey liste (kart satırları) olarak gösterir. Bu şehirde kurs yoksa hiç render etmez.
  */
 export function CourseSection() {
   const { t: T } = useTheme();
@@ -103,23 +136,26 @@ export function CourseSection() {
     };
   }, [city]);
 
-  // Grupları tek bir yatay listeye düzleştir (belediye sırası → renk çeşitliliği).
-  const cards: FlatCourse[] = [];
+  // Grupları tek bir dikey listeye düzleştir (belediye sırası → renk çeşitliliği).
+  const rows: Row[] = [];
   groups.forEach((g, gi) => {
-    g.courses.slice(0, 12).forEach((c, ci) => {
-      cards.push({
+    const providerName = g.provider.name.split("—")[0]?.trim() || g.provider.name;
+    const url = g.provider.registerUrl ?? g.provider.listUrl;
+    g.courses.forEach((c, ci) => {
+      rows.push({
         key: `${g.provider.key}-${ci}-${c.name}`,
-        name: c.name,
-        center: c.center,
-        providerName: g.provider.name.split("—")[0]?.trim() || g.provider.name,
-        gradIdx: gi,
+        course: c,
+        providerName,
+        url,
+        gradIdx: gi + ci,
       });
     });
   });
 
-  if (cards.length === 0) return null;
+  // Bu şehirde hiç kurs yoksa bölümü tamamen gizle.
+  if (rows.length === 0) return null;
 
-  const shown = cards.slice(0, 24);
+  const shown = rows.slice(0, 5);
 
   return (
     <View style={{ marginBottom: Space.xl }}>
@@ -131,21 +167,19 @@ export function CourseSection() {
           </Pressable>
         }
       />
-      <FlatList
-        horizontal
-        data={shown}
-        keyExtractor={(it) => it.key}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: Space.md, paddingRight: Space.md }}
-        renderItem={({ item, index }) => (
-          <CourseCard
-            course={{ name: item.name, center: item.center }}
-            providerName={item.providerName}
-            grad={gradientFor(T, item.gradIdx)}
-            delay={Math.min(index, 8) * 60}
+      <View style={{ gap: Space.sm }}>
+        {shown.map((r, i) => (
+          <CourseRow
+            key={r.key}
+            course={r.course}
+            providerName={r.providerName}
+            url={r.url}
+            grad={gradientFor(T, r.gradIdx)}
+            T={T}
+            delay={Math.min(i, 6) * 60}
           />
-        )}
-      />
+        ))}
+      </View>
     </View>
   );
 }

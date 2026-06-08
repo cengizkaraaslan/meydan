@@ -14,6 +14,10 @@ export interface CourseProvider {
   key: string;
   name: string;
   city: string;
+  /** Branş/kurs listesinin bulunduğu belediye sayfası */
+  listUrl?: string;
+  /** Kullanıcının ön kayıt/başvuru yapacağı belediye sayfası */
+  registerUrl?: string;
 }
 
 /** Tek bir kurs/branş kaydı (web CourseItem ile uyumlu). */
