@@ -18,6 +18,7 @@ import { AuroraBackground } from "@/components/AuroraBackground";
 import { EventRow } from "@/components/EventCard";
 import { PostCard } from "@/components/PostCard";
 import { CommentsModal } from "@/components/CommentsModal";
+import { PostActionsModal } from "@/components/PostActionsModal";
 import { StoryViewer } from "@/components/StoryViewer";
 import { StoryAvatar } from "@/components/StoryAvatar";
 import { Loader, SectionHeader, EmptyState } from "@/ui/atoms";
@@ -35,11 +36,17 @@ import {
   followIdForPerson,
   createPost,
   reactPost,
+  editPost,
+  deletePost,
+  FEED_PAGE,
   type FeedPost,
 } from "@/lib/social";
 
 type WallFilter = "all" | "follow";
 const FILTER_KEY = "meydanfest:wallFilter";
+const WALL_TIP_KEY = "meydanfest:wallTipSeen";
+/** Kendi gönderiyi düzenle/sil penceresi (ms). */
+const EDIT_WINDOW_MS = 10 * 60 * 1000;
 /** Feed'de her N gönderide bir etkinlik serpiştir. */
 const EVENT_EVERY = 4;
 
@@ -60,6 +67,8 @@ function myStoryPerson(uri: string): Person {
   };
 }
 
+type FeedItem = { kind: "post"; post: FeedPost } | { kind: "event"; event: ApiEvent };
+
 export default function MeydanScreen() {
   const insets = useSafeAreaInsets();
   const { t: T } = useTheme();
@@ -74,11 +83,21 @@ export default function MeydanScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Sayfalama durumu.
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const offsetRef = useRef(0);
+  const loadingMoreRef = useRef(false);
+
   const [compose, setCompose] = useState("");
   const [composerOpen, setComposerOpen] = useState(false);
   const [posting, setPosting] = useState(false);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
+  const [actionsFor, setActionsFor] = useState<FeedPost | null>(null);
   const [storyPerson, setStoryPerson] = useState<Person | null>(null);
+  const [tipVisible, setTipVisible] = useState(false);
+  // Kısa bilgi (hata) mesajı — tip modalını yeniden kullanır.
+  const [tipMsg, setTipMsg] = useState<string | null>(null);
 
   useEffect(() => {
     void getOrCreateDeviceId().then(setDeviceId);
@@ -92,26 +111,53 @@ export default function MeydanScreen() {
     });
   }, []);
 
+  // İlk sayfa: gönderiler offset=0 + takip + etkinlikler.
   const load = useCallback(async (f: WallFilter) => {
     try {
       const [feed, follow, ev] = await Promise.all([
-        fetchFeed(f),
+        fetchFeed(f, 0),
         fetchFollowing(),
         fetchEvents({ pageSize: 12 }).then((r) => r.data).catch(() => [] as ApiEvent[]),
       ]);
       setPosts(feed);
       setFollowing(follow);
       setEvents(ev);
+      offsetRef.current = feed.length;
+      setHasMore(feed.length >= FEED_PAGE);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  // Filtre hazır olunca + değişince yükle.
+  // Sonraki 20'yi çek ve listeye ekle.
+  const loadMore = useCallback(async () => {
+    if (loadingMoreRef.current || !hasMore || loading || refreshing) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const next = await fetchFeed(filter, offsetRef.current);
+      if (next.length > 0) {
+        setPosts((prev) => {
+          const seen = new Set(prev.map((p) => p.id));
+          const merged = prev.concat(next.filter((p) => !seen.has(p.id)));
+          offsetRef.current = merged.length;
+          return merged;
+        });
+      }
+      if (next.length < FEED_PAGE) setHasMore(false);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [filter, hasMore, loading, refreshing]);
+
+  // Filtre hazır olunca + değişince ilk sayfayı yükle (offset sıfırla).
   useEffect(() => {
     if (!filterReady) return;
     setLoading(true);
+    setHasMore(true);
+    offsetRef.current = 0;
     void load(filter);
   }, [filter, filterReady, load]);
 
@@ -121,6 +167,8 @@ export default function MeydanScreen() {
     useCallback(() => {
       if (!filterReady) return;
       if (firstFocus.current) { firstFocus.current = false; return; }
+      setHasMore(true);
+      offsetRef.current = 0;
       void load(filter);
     }, [filter, filterReady, load]),
   );
@@ -134,6 +182,8 @@ export default function MeydanScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
+    setHasMore(true);
+    offsetRef.current = 0;
     void load(filter);
   }, [filter, load]);
 
@@ -168,6 +218,18 @@ export default function MeydanScreen() {
     if (!r.following) setFollowing((prev) => prev.filter((id) => id !== authorId));
   }, []);
 
+  // İlk paylaşımdan sonra (1 kez) düzenle/sil ipucu göster.
+  const maybeShowTip = useCallback(async () => {
+    try {
+      const seen = await AsyncStorage.getItem(WALL_TIP_KEY);
+      if (seen === "1") return;
+      await AsyncStorage.setItem(WALL_TIP_KEY, "1");
+      setTipVisible(true);
+    } catch {
+      /* yoksay */
+    }
+  }, []);
+
   const onComposeSend = useCallback(async () => {
     const trimmed = compose.trim();
     if (!trimmed || posting) return;
@@ -178,19 +240,64 @@ export default function MeydanScreen() {
         successH();
         setCompose("");
         setComposerOpen(false);
+        setHasMore(true);
+        offsetRef.current = 0;
         await load(filter);
+        void maybeShowTip();
       }
     } finally {
       setPosting(false);
     }
-  }, [compose, posting, filter, load]);
+  }, [compose, posting, filter, load, maybeShowTip]);
 
   const onCommentAdded = useCallback((postId: string) => {
     setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, commentCount: p.commentCount + 1 } : p)));
   }, []);
 
+  // Kendi gönderim mi + 10 dk içinde mi (düzenle/sil menüsü için).
+  const canEditPost = useCallback(
+    (post: FeedPost) =>
+      !!deviceId &&
+      post.authorId === deviceId &&
+      Date.now() - new Date(post.createdAt).getTime() <= EDIT_WINDOW_MS,
+    [deviceId],
+  );
+
+  // Düzenle → editPost → feed yenile (hata: kısa bilgi).
+  const onEditPost = useCallback(
+    async (id: string, text: string) => {
+      setActionsFor(null);
+      const r = await editPost(id, text);
+      if (r.ok) {
+        successH();
+        setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, text } : p)));
+      } else {
+        setTipMsg(r.reason === "expired" ? "Düzenleme süresi (10 dk) doldu." : "Gönderi düzenlenemedi, tekrar dene.");
+      }
+    },
+    [],
+  );
+
+  // Sil → deletePost → feed'den çıkar (hata: kısa bilgi).
+  const onDeletePost = useCallback(
+    async (id: string) => {
+      setActionsFor(null);
+      const r = await deletePost(id);
+      if (r.ok) {
+        successH();
+        setPosts((prev) => {
+          const merged = prev.filter((p) => p.id !== id);
+          offsetRef.current = merged.length;
+          return merged;
+        });
+      } else {
+        setTipMsg(r.reason === "expired" ? "Silme süresi (10 dk) doldu." : "Gönderi silinemedi, tekrar dene.");
+      }
+    },
+    [],
+  );
+
   // Gönderi + etkinlik serpiştirilmiş feed öğeleri.
-  type FeedItem = { kind: "post"; post: FeedPost } | { kind: "event"; event: ApiEvent };
   const feedItems = useMemo<FeedItem[]>(() => {
     const items: FeedItem[] = [];
     let ei = 0;
@@ -207,165 +314,260 @@ export default function MeydanScreen() {
     return items;
   }, [posts, events]);
 
+  const keyExtractor = useCallback(
+    (item: FeedItem, i: number) => (item.kind === "post" ? item.post.id : `ev-${item.event.id}-${i}`),
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: FeedItem; index: number }) => (
+      <Animated.View entering={FadeInDown.delay(Math.min(index, 8) * 45).duration(380).springify()}>
+        {item.kind === "event" ? (
+          <View style={[styles.eventWrap, { borderColor: T.hairline }]}>
+            <Text style={[Type.label, { color: T.gold, marginBottom: 8 }]}>✨ Yeni etkinlik</Text>
+            <EventRow event={item.event} />
+          </View>
+        ) : (
+          <View style={{ paddingHorizontal: 16 }}>
+            <PostCard
+              post={item.post}
+              isMine={!!deviceId && item.post.authorId === deviceId}
+              following={followSet.has(item.post.authorId)}
+              canEdit={canEditPost(item.post)}
+              onReact={(emoji) => onReact(item.post.id, emoji)}
+              onOpenComments={() => setCommentsFor(item.post.id)}
+              onToggleFollow={() => onToggleFollow(item.post.authorId)}
+              onOpenActions={() => setActionsFor(item.post)}
+            />
+          </View>
+        )}
+      </Animated.View>
+    ),
+    [T.hairline, T.gold, deviceId, followSet, canEditPost, onReact, onToggleFollow],
+  );
+
+  // Üst sabit içerik (başlık + filtre + story barı + composer) — FlatList header'ı.
+  const ListHeader = (
+    <>
+      {/* Başlık + paylaş toggle */}
+      <Animated.View entering={FadeInDown.duration(420)} style={styles.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={[Type.h1, { color: T.text }]}>Meydan</Text>
+          <Text style={[Type.label, { color: T.textFaint }]}>Topluluk duvarı</Text>
+        </View>
+        <Pressable
+          onPress={() => { tapH(); setComposerOpen((v) => !v); }}
+          style={[
+            styles.composeToggle,
+            composerOpen
+              ? { backgroundColor: T.surfaceStrong, borderColor: T.hairline }
+              : [{ backgroundColor: T.primary }, glow(T.primary, 12, 0.4)],
+          ]}
+          hitSlop={8}
+        >
+          <Text style={[styles.composeToggleIcon, { color: composerOpen ? T.textDim : "#fff" }]}>
+            {composerOpen ? "×" : "+"}
+          </Text>
+        </Pressable>
+      </Animated.View>
+
+      {/* Filtre — yazı tab (underline indicator) */}
+      <View style={styles.filterRow}>
+        {([
+          { key: "all", label: "Genel" },
+          { key: "follow", label: "Takip ettiklerim" },
+        ] as { key: WallFilter; label: string }[]).map((f) => {
+          const active = filter === f.key;
+          return (
+            <Pressable key={f.key} onPress={() => changeFilter(f.key)} style={styles.filterTab} hitSlop={8}>
+              <Text
+                style={[
+                  Type.title,
+                  { color: active ? T.text : T.textFaint, fontWeight: active ? "800" : "600" },
+                ]}
+              >
+                {f.label}
+              </Text>
+              {active ? (
+                <Animated.View
+                  entering={FadeIn.duration(220)}
+                  style={[styles.filterUnderline, { backgroundColor: T.primary }, glow(T.primary, 8, 0.5)]}
+                />
+              ) : (
+                <View style={styles.filterUnderline} />
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Story barı */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.storyBar}
+        style={{ marginBottom: 16 }}
+      >
+        {/* Senin story'n */}
+        <Pressable
+          style={styles.storyItem}
+          onPress={() => {
+            tapH();
+            if (myStoryUri) setStoryPerson(myStoryPerson(myStoryUri));
+          }}
+        >
+          <View>
+            <StoryAvatar uri={myStoryUri} name="Sen" size={58} hasStory={!!myStoryUri} />
+            {!myStoryUri ? (
+              <View style={[styles.plusBadge, { backgroundColor: T.primary, borderColor: T.bg }]}>
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 13 }}>+</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={[Type.micro, { color: T.textDim, maxWidth: 64 }]} numberOfLines={1}>
+            Senin story'n
+          </Text>
+        </Pressable>
+
+        {storyPeople.map((p) => (
+          <Pressable key={p.id} style={styles.storyItem} onPress={() => { tapH(); setStoryPerson(getPerson(p.id) ?? p); }}>
+            <StoryAvatar uri={p.avatar} name={p.name} size={58} hasStory online={p.online} />
+            <Text style={[Type.micro, { color: T.textDim, maxWidth: 64 }]} numberOfLines={1}>{p.name}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      {/* Paylaş kutusu — varsayılan gizli, "+" ile açılır */}
+      {composerOpen ? (
+        <Animated.View
+          entering={FadeInDown.duration(260)}
+          style={[styles.composer, { backgroundColor: T.surface, borderColor: T.hairline }]}
+        >
+          <TextInput
+            value={compose}
+            onChangeText={setCompose}
+            placeholder="Meydan'da ne paylaşmak istersin? 🎉"
+            placeholderTextColor={T.textFaint}
+            style={[styles.composeInput, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+            multiline
+            autoFocus
+          />
+          <Pressable
+            onPress={onComposeSend}
+            disabled={!compose.trim() || posting}
+            style={[styles.shareBtn, { backgroundColor: compose.trim() ? T.primary : T.surfaceStrong }, compose.trim() ? glow(T.primary, 10, 0.4) : undefined]}
+          >
+            {posting ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={[Type.label, { color: compose.trim() ? "#fff" : T.textFaint }]}>Paylaş</Text>
+            )}
+          </Pressable>
+        </Animated.View>
+      ) : null}
+
+      {/* Akış başlığı */}
+      {!loading && feedItems.length > 0 ? (
+        <View style={{ paddingHorizontal: 16, marginBottom: 4 }}>
+          <SectionHeader title={filter === "follow" ? "Takip ettiklerin" : "Akış"} accent={T.primary} />
+        </View>
+      ) : null}
+    </>
+  );
+
+  const ListFooter = loadingMore ? (
+    <View style={{ paddingVertical: 22 }}>
+      <ActivityIndicator color={T.primary} />
+    </View>
+  ) : !hasMore && feedItems.length > 0 ? (
+    <Text style={[Type.label, { color: T.textFaint, textAlign: "center", paddingVertical: 22 }]}>
+      Hepsi yüklendi ✨
+    </Text>
+  ) : (
+    <View style={{ height: 12 }} />
+  );
+
   return (
     <View style={{ flex: 1 }}>
       <AuroraBackground />
-      <ScrollView
+      <FlatList
+        data={loading ? [] : feedItems}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        ListHeaderComponent={ListHeader}
+        ListFooterComponent={loading ? null : ListFooter}
+        ListEmptyComponent={
+          loading ? (
+            <Loader label="Yükleniyor…" />
+          ) : (
+            <EmptyState emoji="🌌" title="Henüz gönderi yok" sub="İlk paylaşan sen ol!" />
+          )
+        }
         contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: 150 }}
+        style={{ flex: 1 }}
+        ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.primary} />}
-      >
-        {/* Başlık + paylaş toggle */}
-        <Animated.View entering={FadeInDown.duration(420)} style={styles.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={[Type.h1, { color: T.text }]}>Meydan</Text>
-            <Text style={[Type.label, { color: T.textFaint }]}>Topluluk duvarı</Text>
-          </View>
-          <Pressable
-            onPress={() => { tapH(); setComposerOpen((v) => !v); }}
-            style={[
-              styles.composeToggle,
-              composerOpen
-                ? { backgroundColor: T.surfaceStrong, borderColor: T.hairline }
-                : [{ backgroundColor: T.primary }, glow(T.primary, 12, 0.4)],
-            ]}
-            hitSlop={8}
-          >
-            <Text style={[styles.composeToggleIcon, { color: composerOpen ? T.textDim : "#fff" }]}>
-              {composerOpen ? "×" : "+"}
-            </Text>
-          </Pressable>
-        </Animated.View>
-
-        {/* Filtre — yazı tab (underline indicator) */}
-        <View style={styles.filterRow}>
-          {([
-            { key: "all", label: "Genel" },
-            { key: "follow", label: "Takip ettiklerim" },
-          ] as { key: WallFilter; label: string }[]).map((f) => {
-            const active = filter === f.key;
-            return (
-              <Pressable key={f.key} onPress={() => changeFilter(f.key)} style={styles.filterTab} hitSlop={8}>
-                <Text
-                  style={[
-                    Type.title,
-                    { color: active ? T.text : T.textFaint, fontWeight: active ? "800" : "600" },
-                  ]}
-                >
-                  {f.label}
-                </Text>
-                {active ? (
-                  <Animated.View
-                    entering={FadeIn.duration(220)}
-                    style={[styles.filterUnderline, { backgroundColor: T.primary }, glow(T.primary, 8, 0.5)]}
-                  />
-                ) : (
-                  <View style={styles.filterUnderline} />
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {/* Story barı */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.storyBar}
-          style={{ marginBottom: 16 }}
-        >
-          {/* Senin story'n */}
-          <Pressable
-            style={styles.storyItem}
-            onPress={() => {
-              tapH();
-              if (myStoryUri) setStoryPerson(myStoryPerson(myStoryUri));
-            }}
-          >
-            <View>
-              <StoryAvatar uri={myStoryUri} name="Sen" size={58} hasStory={!!myStoryUri} />
-              {!myStoryUri ? (
-                <View style={[styles.plusBadge, { backgroundColor: T.primary, borderColor: T.bg }]}>
-                  <Text style={{ color: "#fff", fontWeight: "800", fontSize: 13 }}>+</Text>
-                </View>
-              ) : null}
-            </View>
-            <Text style={[Type.micro, { color: T.textDim, maxWidth: 64 }]} numberOfLines={1}>
-              Senin story'n
-            </Text>
-          </Pressable>
-
-          {storyPeople.map((p) => (
-            <Pressable key={p.id} style={styles.storyItem} onPress={() => { tapH(); setStoryPerson(getPerson(p.id) ?? p); }}>
-              <StoryAvatar uri={p.avatar} name={p.name} size={58} hasStory online={p.online} />
-              <Text style={[Type.micro, { color: T.textDim, maxWidth: 64 }]} numberOfLines={1}>{p.name}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        {/* Paylaş kutusu — varsayılan gizli, "+" ile açılır */}
-        {composerOpen ? (
-          <Animated.View
-            entering={FadeInDown.duration(260)}
-            style={[styles.composer, { backgroundColor: T.surface, borderColor: T.hairline }]}
-          >
-            <TextInput
-              value={compose}
-              onChangeText={setCompose}
-              placeholder="Meydan'da ne paylaşmak istersin? 🎉"
-              placeholderTextColor={T.textFaint}
-              style={[styles.composeInput, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
-              multiline
-              autoFocus
-            />
-            <Pressable
-              onPress={onComposeSend}
-              disabled={!compose.trim() || posting}
-              style={[styles.shareBtn, { backgroundColor: compose.trim() ? T.primary : T.surfaceStrong }, compose.trim() ? glow(T.primary, 10, 0.4) : undefined]}
-            >
-              {posting ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={[Type.label, { color: compose.trim() ? "#fff" : T.textFaint }]}>Paylaş</Text>
-              )}
-            </Pressable>
-          </Animated.View>
-        ) : null}
-
-        {/* Feed */}
-        {loading ? (
-          <Loader label="Yükleniyor…" />
-        ) : feedItems.length === 0 ? (
-          <EmptyState emoji="🌌" title="Henüz gönderi yok" sub="İlk paylaşan sen ol!" />
-        ) : (
-          <View style={{ paddingHorizontal: 16, gap: 14, marginTop: 4 }}>
-            <SectionHeader title={filter === "follow" ? "Takip ettiklerin" : "Akış"} accent={T.primary} />
-            {feedItems.map((item, i) => (
-              <Animated.View key={item.kind === "post" ? item.post.id : `ev-${item.event.id}-${i}`} entering={FadeInDown.delay(Math.min(i, 8) * 45).duration(380)}>
-                {item.kind === "event" ? (
-                  <View style={[styles.eventWrap, { borderColor: T.hairline }]}>
-                    <Text style={[Type.label, { color: T.gold, marginBottom: 8 }]}>✨ Yeni etkinlik</Text>
-                    <EventRow event={item.event} />
-                  </View>
-                ) : (
-                  <PostCard
-                    post={item.post}
-                    isMine={!!deviceId && item.post.authorId === deviceId}
-                    following={followSet.has(item.post.authorId)}
-                    onReact={(emoji) => onReact(item.post.id, emoji)}
-                    onOpenComments={() => setCommentsFor(item.post.id)}
-                    onToggleFollow={() => onToggleFollow(item.post.authorId)}
-                  />
-                )}
-              </Animated.View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+        onEndReachedThreshold={0.5}
+        onEndReached={loadMore}
+        removeClippedSubviews
+        windowSize={9}
+      />
 
       <CommentsModal postId={commentsFor} onClose={() => setCommentsFor(null)} onAdded={onCommentAdded} />
+      <PostActionsModal
+        postId={actionsFor?.id ?? null}
+        initialText={actionsFor?.text ?? ""}
+        onClose={() => setActionsFor(null)}
+        onEdit={onEditPost}
+        onDelete={onDeletePost}
+      />
       <StoryViewer person={storyPerson} onClose={() => setStoryPerson(null)} />
+
+      {/* İlk paylaşım ipucu (1 kez) + hata bilgisi — solid arka plan, okunaklı. */}
+      <TipModal
+        visible={tipVisible || !!tipMsg}
+        title={tipMsg ? "Bilgi" : "💡 İpucu"}
+        body={tipMsg ?? "Paylaştığın gönderiyi 10 dakika içinde düzenleyebilir veya silebilirsin."}
+        onClose={() => { tapH(); setTipVisible(false); setTipMsg(null); }}
+        T={T}
+      />
+    </View>
+  );
+}
+
+/** Solid arka planlı küçük bilgi/ipucu modalı. */
+function TipModal({
+  visible,
+  title,
+  body,
+  onClose,
+  T,
+}: {
+  visible: boolean;
+  title: string;
+  body: string;
+  onClose: () => void;
+  T: ReturnType<typeof useTheme>["t"];
+}) {
+  if (!visible) return null;
+  return (
+    <View style={styles.tipScrim} pointerEvents="box-none">
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <Animated.View
+        entering={FadeInDown.duration(240).springify()}
+        style={[styles.tipCard, { backgroundColor: T.bgElevated, borderColor: T.hairline }, glow("#000", 20, 0.35)]}
+      >
+        <Text style={[Type.title, { color: T.text, marginBottom: 8 }]}>{title}</Text>
+        <Text style={[Type.body, { color: T.textDim, marginBottom: 16 }]}>{body}</Text>
+        <Pressable
+          onPress={onClose}
+          style={[styles.tipBtn, { backgroundColor: T.primary }, glow(T.primary, 10, 0.4)]}
+        >
+          <Text style={[Type.label, { color: "#fff" }]}>Anladım</Text>
+        </Pressable>
+      </Animated.View>
     </View>
   );
 }
@@ -383,5 +585,8 @@ const styles = StyleSheet.create({
   composer: { marginHorizontal: 16, marginBottom: 18, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 12, gap: 10 },
   composeInput: { borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 14, paddingVertical: 10, minHeight: 46, maxHeight: 120, ...Type.body },
   shareBtn: { alignSelf: "flex-end", borderRadius: Radius.pill, paddingHorizontal: 22, paddingVertical: 10, minWidth: 90, alignItems: "center", justifyContent: "center" },
-  eventWrap: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, borderStyle: "dashed", padding: 12 },
+  eventWrap: { marginHorizontal: 16, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, borderStyle: "dashed", padding: 12 },
+  tipScrim: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 28 },
+  tipCard: { width: "100%", maxWidth: 360, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 20 },
+  tipBtn: { alignSelf: "flex-end", borderRadius: Radius.pill, paddingHorizontal: 22, paddingVertical: 10, alignItems: "center", justifyContent: "center" },
 });

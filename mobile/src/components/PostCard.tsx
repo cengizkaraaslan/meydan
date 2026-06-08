@@ -32,18 +32,75 @@ interface Props {
   isMine: boolean;
   /** Yazarı takip ediyor muyum (takip butonu durumu). */
   following: boolean;
+  /** Benim gönderim ve 10 dk içinde → düzenle/sil aksiyon menüsü göster. */
+  canEdit?: boolean;
   onReact: (emoji: string) => void;
   onOpenComments: () => void;
   onToggleFollow: () => void;
+  /** "⋯" / uzun bas → aksiyon menüsünü aç (yalnız canEdit ise tetiklenir). */
+  onOpenActions?: () => void;
 }
 
 /** Instagram-tarzı sosyal gönderi kartı: yazar + içerik + tepki + yorum. */
-export function PostCard({ post, isMine, following, onReact, onOpenComments, onToggleFollow }: Props) {
+export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComments, onToggleFollow, onOpenActions }: Props) {
   const { t: T } = useTheme();
   const [busy, setBusy] = useState(false);
   const [picker, setPicker] = useState(false);
 
   const isSystem = post.authorId === "system";
+
+  // Tepki göstergesi + yorum satırı (hem normal hem sistem kartında ortak kullanılır).
+  const renderFooter = () => (
+    <View style={[styles.footer, picker ? { zIndex: 10 } : undefined]}>
+      <View style={{ position: "relative" }}>
+        {picker ? (
+          <View style={styles.pickerWrap} pointerEvents="box-none">
+            <ReactionPicker myReaction={post.myReaction} onPick={doReact} />
+          </View>
+        ) : null}
+
+        <Pressable
+          disabled={busy}
+          hitSlop={8}
+          onPress={() => { tapH(); setPicker((v) => !v); }}
+          onLongPress={() => { impactH(); setPicker(true); }}
+          style={[
+            styles.likeBtn,
+            {
+              backgroundColor: post.myReaction ? T.surfaceStrong : "transparent",
+              borderColor: post.myReaction ? T.primary : T.hairline,
+            },
+          ]}
+        >
+          {post.myReaction ? (
+            <>
+              <Animated.Text key={post.myReaction} entering={FadeIn} style={{ fontSize: 16 }}>
+                {post.myReaction}
+              </Animated.Text>
+              <Text style={[Type.label, { color: T.primary }]}>Sen</Text>
+            </>
+          ) : (
+            <Text style={[Type.label, { color: T.textDim }]}>👍 Beğen</Text>
+          )}
+
+          {topEmojis.length > 0 ? (
+            <View style={styles.summary}>
+              {topEmojis.map((e) => (
+                <Text key={e} style={styles.summaryEmoji}>{e}</Text>
+              ))}
+            </View>
+          ) : null}
+          {post.reactionTotal > 0 ? (
+            <Text style={[Type.label, { color: T.textFaint }]}>{post.reactionTotal}</Text>
+          ) : null}
+        </Pressable>
+      </View>
+
+      <Pressable onPress={() => { tapH(); onOpenComments(); }} hitSlop={8}>
+        <Text style={[Type.label, { color: T.textDim }]}>💬 {post.commentCount} yorum</Text>
+      </Pressable>
+    </View>
+  );
 
   // En çok kullanılan 1-3 emoji özeti (büyükten küçüğe).
   const topEmojis = useMemo(() => {
@@ -66,44 +123,55 @@ export function PostCard({ post, isMine, following, onReact, onOpenComments, onT
   };
 
   // ── Sistem / etkinlik duyurusu: sade, metin odaklı, küçük resim + 📣 rozet ──
+  // Takip butonu YOK ama tepki + yorum normal gönderilerle aynı çalışır.
   if (isSystem) {
     return (
-      <Pressable
-        onPress={openEvent}
-        disabled={!post.eventSlug}
-        style={[styles.sysCard, { backgroundColor: T.surface, borderColor: T.hairline }]}
-      >
-        <View style={styles.sysHead}>
-          <Text style={styles.sysIcon}>📣</Text>
-          <View style={[styles.sysBadge, { backgroundColor: T.surfaceStrong, borderColor: T.primary }]}>
-            <Text style={[Type.micro, { color: T.primary }]}>SİSTEM</Text>
+      <View style={[styles.sysCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+        <Pressable onPress={openEvent} disabled={!post.eventSlug} style={{ gap: 8 }}>
+          <View style={styles.sysHead}>
+            <Text style={styles.sysIcon}>📣</Text>
+            <View style={[styles.sysBadge, { backgroundColor: T.surfaceStrong, borderColor: T.primary }]}>
+              <Text style={[Type.micro, { color: T.primary }]}>SİSTEM</Text>
+            </View>
+            <Text style={[Type.label, { color: T.textFaint, marginLeft: "auto" }]}>{relTime(post.createdAt)}</Text>
           </View>
-          <Text style={[Type.label, { color: T.textFaint, marginLeft: "auto" }]}>{relTime(post.createdAt)}</Text>
-        </View>
 
-        {post.eventTitle ? (
-          <Text style={[Type.label, { color: T.primary }]} numberOfLines={1}>🎟 {post.eventTitle}</Text>
+          {post.eventTitle ? (
+            <Text style={[Type.label, { color: T.primary }]} numberOfLines={1}>🎟 {post.eventTitle}</Text>
+          ) : null}
+
+          <View style={styles.sysBody}>
+            {post.imageUrl ? (
+              <Image source={{ uri: post.imageUrl }} style={styles.sysThumb} contentFit="cover" transition={200} />
+            ) : null}
+            {post.text ? (
+              <Text style={[Type.body, { color: T.text, flex: 1 }]} numberOfLines={6}>{post.text}</Text>
+            ) : null}
+          </View>
+
+          {post.eventSlug ? (
+            <Text style={[Type.label, { color: T.primary }]}>Etkinliğe git →</Text>
+          ) : null}
+        </Pressable>
+
+        {/* Popup açıkken dışına dokununca kapatan görünmez katman */}
+        {picker ? (
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setPicker(false)} />
         ) : null}
 
-        <View style={styles.sysBody}>
-          {post.imageUrl ? (
-            <Image source={{ uri: post.imageUrl }} style={styles.sysThumb} contentFit="cover" transition={200} />
-          ) : null}
-          {post.text ? (
-            <Text style={[Type.body, { color: T.text, flex: 1 }]} numberOfLines={6}>{post.text}</Text>
-          ) : null}
-        </View>
-
-        {post.eventSlug ? (
-          <Text style={[Type.label, { color: T.primary }]}>Etkinliğe git →</Text>
-        ) : null}
-      </Pressable>
+        {/* Tepki + yorum satırı (normal gönderilerle aynı) */}
+        {renderFooter()}
+      </View>
     );
   }
 
   return (
-    <View style={[styles.card, { backgroundColor: T.surface, borderColor: T.hairline }]}>
-      {/* Üst: avatar + ad + zaman + takip */}
+    <Pressable
+      onLongPress={canEdit ? () => { impactH(); onOpenActions?.(); } : undefined}
+      delayLongPress={300}
+      style={[styles.card, { backgroundColor: T.surface, borderColor: T.hairline }]}
+    >
+      {/* Üst: avatar + ad + zaman + takip / aksiyon */}
       <View style={styles.head}>
         <StoryAvatar uri={post.authorAvatar} name={post.authorName ?? "✦"} size={38} />
         <View style={{ flex: 1 }}>
@@ -126,8 +194,19 @@ export function PostCard({ post, isMine, following, onReact, onOpenComments, onT
             </Pressable>
           )
         ) : (
-          <View style={[styles.followPill, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}>
-            <Text style={[Type.label, { color: T.textFaint }]}>Sen</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={[styles.followPill, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}>
+              <Text style={[Type.label, { color: T.textFaint }]}>Sen</Text>
+            </View>
+            {canEdit ? (
+              <Pressable
+                onPress={() => { tapH(); onOpenActions?.(); }}
+                hitSlop={10}
+                style={[styles.moreBtn, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}
+              >
+                <Text style={{ color: T.textDim, fontSize: 18, lineHeight: 18, fontWeight: "800" }}>⋯</Text>
+              </Pressable>
+            ) : null}
           </View>
         )}
       </View>
@@ -153,58 +232,8 @@ export function PostCard({ post, isMine, following, onReact, onOpenComments, onT
       ) : null}
 
       {/* Aksiyon satırı: tek "beğen" göstergesi + yorum */}
-      <View style={[styles.footer, picker ? { zIndex: 10 } : undefined]}>
-        <View style={{ position: "relative" }}>
-          {/* Popup — göstergenin üstünde */}
-          {picker ? (
-            <View style={styles.pickerWrap} pointerEvents="box-none">
-              <ReactionPicker myReaction={post.myReaction} onPick={doReact} />
-            </View>
-          ) : null}
-
-          <Pressable
-            disabled={busy}
-            hitSlop={8}
-            onPress={() => { tapH(); setPicker((v) => !v); }}
-            onLongPress={() => { impactH(); setPicker(true); }}
-            style={[
-              styles.likeBtn,
-              {
-                backgroundColor: post.myReaction ? T.surfaceStrong : "transparent",
-                borderColor: post.myReaction ? T.primary : T.hairline,
-              },
-            ]}
-          >
-            {post.myReaction ? (
-              <>
-                <Animated.Text key={post.myReaction} entering={FadeIn} style={{ fontSize: 16 }}>
-                  {post.myReaction}
-                </Animated.Text>
-                <Text style={[Type.label, { color: T.primary }]}>Sen</Text>
-              </>
-            ) : (
-              <Text style={[Type.label, { color: T.textDim }]}>👍 Beğen</Text>
-            )}
-
-            {/* Özet emoji'ler + toplam */}
-            {topEmojis.length > 0 ? (
-              <View style={styles.summary}>
-                {topEmojis.map((e) => (
-                  <Text key={e} style={styles.summaryEmoji}>{e}</Text>
-                ))}
-              </View>
-            ) : null}
-            {post.reactionTotal > 0 ? (
-              <Text style={[Type.label, { color: T.textFaint }]}>{post.reactionTotal}</Text>
-            ) : null}
-          </Pressable>
-        </View>
-
-        <Pressable onPress={() => { tapH(); onOpenComments(); }} hitSlop={8}>
-          <Text style={[Type.label, { color: T.textDim }]}>💬 {post.commentCount} yorum</Text>
-        </Pressable>
-      </View>
-    </View>
+      {renderFooter()}
+    </Pressable>
   );
 }
 
@@ -212,6 +241,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 14, gap: 10, ...glow("#000", 10, 0.15) },
   head: { flexDirection: "row", alignItems: "center", gap: 10 },
   followPill: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6 },
+  moreBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2 },
   eventTag: { alignSelf: "flex-start", borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, maxWidth: "100%" },
   media: { width: "100%", height: 220, borderRadius: Radius.md, marginTop: 2 },
   footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 2 },
