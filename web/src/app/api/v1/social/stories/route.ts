@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { listMobileStories, createMobileStory, deleteMobileStory } from "@/lib/social-store";
+import { listMobileStories, createMobileStory, deleteMobileStory, updateMobileStory } from "@/lib/social-store";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +35,21 @@ export async function POST(request: NextRequest) {
     avatar: (body.avatar as string) ?? null,
   });
   return NextResponse.json({ ok: true, story });
+}
+
+// PATCH /api/v1/social/stories  {id, deviceId, caption}  — story başlığını düzenle
+export async function PATCH(request: NextRequest) {
+  let body: { id?: string; deviceId?: string; caption?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const id = body.id?.trim();
+  const deviceId = body.deviceId?.trim();
+  if (!id || !deviceId) return NextResponse.json({ error: "id/deviceId zorunlu" }, { status: 400 });
+  const res = await updateMobileStory({ id, deviceId, caption: (body.caption ?? "").trim() });
+  return NextResponse.json(res, { status: res.ok ? 200 : 403 });
 }
 
 // DELETE /api/v1/social/stories  {id, deviceId}

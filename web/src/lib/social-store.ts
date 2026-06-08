@@ -312,3 +312,11 @@ export async function deleteMobileStory(input: { id: string; deviceId: string })
   await db.mobileStory.delete({ where: { id: input.id } });
   return { ok: true };
 }
+
+/** Kendi story'nin başlığını/caption'ını güncelle (deviceId sahiplik). */
+export async function updateMobileStory(input: { id: string; deviceId: string; caption: string }): Promise<{ ok: boolean }> {
+  const s = await db.mobileStory.findUnique({ where: { id: input.id } });
+  if (!s || s.deviceId !== input.deviceId) return { ok: false };
+  await db.mobileStory.update({ where: { id: input.id }, data: { caption: input.caption.slice(0, 300) } });
+  return { ok: true };
+}
