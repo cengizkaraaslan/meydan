@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -75,6 +75,7 @@ export default function MeydanScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [compose, setCompose] = useState("");
+  const [composerOpen, setComposerOpen] = useState(false);
   const [posting, setPosting] = useState(false);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
   const [storyPerson, setStoryPerson] = useState<Person | null>(null);
@@ -176,6 +177,7 @@ export default function MeydanScreen() {
       if (ok) {
         successH();
         setCompose("");
+        setComposerOpen(false);
         await load(filter);
       }
     } finally {
@@ -214,13 +216,29 @@ export default function MeydanScreen() {
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={T.primary} />}
       >
-        {/* Başlık */}
+        {/* Başlık + paylaş toggle */}
         <Animated.View entering={FadeInDown.duration(420)} style={styles.header}>
-          <Text style={[Type.h1, { color: T.text }]}>Meydan</Text>
-          <Text style={[Type.label, { color: T.textFaint }]}>Topluluk duvarı</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[Type.h1, { color: T.text }]}>Meydan</Text>
+            <Text style={[Type.label, { color: T.textFaint }]}>Topluluk duvarı</Text>
+          </View>
+          <Pressable
+            onPress={() => { tapH(); setComposerOpen((v) => !v); }}
+            style={[
+              styles.composeToggle,
+              composerOpen
+                ? { backgroundColor: T.surfaceStrong, borderColor: T.hairline }
+                : [{ backgroundColor: T.primary }, glow(T.primary, 12, 0.4)],
+            ]}
+            hitSlop={8}
+          >
+            <Text style={[styles.composeToggleIcon, { color: composerOpen ? T.textDim : "#fff" }]}>
+              {composerOpen ? "×" : "+"}
+            </Text>
+          </Pressable>
         </Animated.View>
 
-        {/* Filtre */}
+        {/* Filtre — yazı tab (underline indicator) */}
         <View style={styles.filterRow}>
           {([
             { key: "all", label: "Genel" },
@@ -228,17 +246,23 @@ export default function MeydanScreen() {
           ] as { key: WallFilter; label: string }[]).map((f) => {
             const active = filter === f.key;
             return (
-              <Pressable
-                key={f.key}
-                onPress={() => changeFilter(f.key)}
-                style={[
-                  styles.filterBtn,
-                  active
-                    ? [{ backgroundColor: T.primary }, glow(T.primary, 12, 0.4)]
-                    : { backgroundColor: T.surfaceStrong, borderWidth: StyleSheet.hairlineWidth * 2, borderColor: T.hairline },
-                ]}
-              >
-                <Text style={[Type.label, { color: active ? "#fff" : T.textDim }]}>{f.label}</Text>
+              <Pressable key={f.key} onPress={() => changeFilter(f.key)} style={styles.filterTab} hitSlop={8}>
+                <Text
+                  style={[
+                    Type.title,
+                    { color: active ? T.text : T.textFaint, fontWeight: active ? "800" : "600" },
+                  ]}
+                >
+                  {f.label}
+                </Text>
+                {active ? (
+                  <Animated.View
+                    entering={FadeIn.duration(220)}
+                    style={[styles.filterUnderline, { backgroundColor: T.primary }, glow(T.primary, 8, 0.5)]}
+                  />
+                ) : (
+                  <View style={styles.filterUnderline} />
+                )}
               </Pressable>
             );
           })}
@@ -280,28 +304,34 @@ export default function MeydanScreen() {
           ))}
         </ScrollView>
 
-        {/* Paylaş kutusu */}
-        <View style={[styles.composer, { backgroundColor: T.surface, borderColor: T.hairline }]}>
-          <TextInput
-            value={compose}
-            onChangeText={setCompose}
-            placeholder="Meydan'da ne paylaşmak istersin? 🎉"
-            placeholderTextColor={T.textFaint}
-            style={[styles.composeInput, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
-            multiline
-          />
-          <Pressable
-            onPress={onComposeSend}
-            disabled={!compose.trim() || posting}
-            style={[styles.shareBtn, { backgroundColor: compose.trim() ? T.primary : T.surfaceStrong }, compose.trim() ? glow(T.primary, 10, 0.4) : undefined]}
+        {/* Paylaş kutusu — varsayılan gizli, "+" ile açılır */}
+        {composerOpen ? (
+          <Animated.View
+            entering={FadeInDown.duration(260)}
+            style={[styles.composer, { backgroundColor: T.surface, borderColor: T.hairline }]}
           >
-            {posting ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={[Type.label, { color: compose.trim() ? "#fff" : T.textFaint }]}>Paylaş</Text>
-            )}
-          </Pressable>
-        </View>
+            <TextInput
+              value={compose}
+              onChangeText={setCompose}
+              placeholder="Meydan'da ne paylaşmak istersin? 🎉"
+              placeholderTextColor={T.textFaint}
+              style={[styles.composeInput, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+              multiline
+              autoFocus
+            />
+            <Pressable
+              onPress={onComposeSend}
+              disabled={!compose.trim() || posting}
+              style={[styles.shareBtn, { backgroundColor: compose.trim() ? T.primary : T.surfaceStrong }, compose.trim() ? glow(T.primary, 10, 0.4) : undefined]}
+            >
+              {posting ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={[Type.label, { color: compose.trim() ? "#fff" : T.textFaint }]}>Paylaş</Text>
+              )}
+            </Pressable>
+          </Animated.View>
+        ) : null}
 
         {/* Feed */}
         {loading ? (
@@ -341,9 +371,12 @@ export default function MeydanScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: 16, marginBottom: 14, gap: 2 },
-  filterRow: { flexDirection: "row", gap: 10, paddingHorizontal: 16, marginBottom: 16 },
-  filterBtn: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 11, borderRadius: Radius.pill },
+  header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, marginBottom: 14 },
+  composeToggle: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2, borderColor: "transparent" },
+  composeToggleIcon: { fontSize: 26, fontWeight: "700", lineHeight: 30, marginTop: -2 },
+  filterRow: { flexDirection: "row", gap: 22, paddingHorizontal: 16, marginBottom: 16 },
+  filterTab: { alignItems: "center", gap: 6, paddingVertical: 4 },
+  filterUnderline: { height: 3, borderRadius: 2, alignSelf: "stretch" },
   storyBar: { paddingHorizontal: 16, gap: 14, alignItems: "flex-start" },
   storyItem: { alignItems: "center", gap: 6, width: 72 },
   plusBadge: { position: "absolute", right: -2, bottom: 14, width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", borderWidth: 2 },
