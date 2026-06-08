@@ -210,7 +210,7 @@ export default function DiscoverScreen() {
           <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
             {/* Bildirim zili — okunmamış sayacı rozetiyle */}
             <Pressable onPress={() => { tapH(); router.push("/bildirimler"); }} style={[styles.searchBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-              <Text style={{ fontSize: 18 }}>🔔</Text>
+              <Text style={{ fontSize: 15 }}>🔔</Text>
               {unread > 0 ? (
                 <View style={[styles.badge, { backgroundColor: "#EF4444", borderColor: T.bg }]}>
                   <Text style={styles.badgeText}>{unread > 9 ? "9+" : String(unread)}</Text>
@@ -404,7 +404,7 @@ export default function DiscoverScreen() {
 const styles = StyleSheet.create({
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, marginBottom: 20 },
   searchBtn: {
-    width: 46, height: 46, borderRadius: Radius.md, alignItems: "center", justifyContent: "center",
+    width: 38, height: 38, borderRadius: Radius.md, alignItems: "center", justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth * 2,
   },
   badge: {

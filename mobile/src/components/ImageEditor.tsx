@@ -205,36 +205,44 @@ interface Props {
   aspect?: number;
   outWidth?: number;
   title?: string;
+  /** true → kırpma adımını ATLA; görselin kendi oranı korunur (story zoom sorununu çözer). */
+  noCrop?: boolean;
   onDone: (uri: string) => void;
   onCancel: () => void;
 }
 
 /**
  * Tam resim düzenleyici: önce kırp (ImageCropper), sonra filtre/renk (Skia).
- * Çağıran sadece uri verir; nihai (kırpılmış + filtreli) uri'yi onDone ile alır.
+ * noCrop=true ise kırpma atlanır → görsel kendi oranıyla doğrudan filtre adımına gider.
  */
-export function ImageEditor({ uri, aspect = 1, outWidth = 1080, title, onDone, onCancel }: Props) {
+export function ImageEditor({ uri, aspect = 1, outWidth = 1080, title, noCrop, onDone, onCancel }: Props) {
   const [cropped, setCropped] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!uri) setCropped(null);
-  }, [uri]);
+    if (!uri) {
+      setCropped(null);
+      return;
+    }
+    if (noCrop) setCropped(uri); // kırpmayı atla → doğrudan filtre (oran korunur, zoom yok)
+  }, [uri, noCrop]);
 
   return (
     <>
-      <ImageCropper
-        uri={cropped ? null : uri}
-        aspect={aspect}
-        outWidth={outWidth}
-        title={title}
-        onDone={setCropped}
-        onCancel={onCancel}
-      />
+      {!noCrop ? (
+        <ImageCropper
+          uri={cropped ? null : uri}
+          aspect={aspect}
+          outWidth={outWidth}
+          title={title}
+          onDone={setCropped}
+          onCancel={onCancel}
+        />
+      ) : null}
       <ImageAdjust
         uri={cropped}
         outWidth={outWidth}
         onDone={(u) => { setCropped(null); onDone(u); }}
-        onBack={() => setCropped(null)}
+        onBack={() => { if (noCrop) { setCropped(null); onCancel(); } else setCropped(null); }}
         onCancel={() => { setCropped(null); onCancel(); }}
       />
     </>

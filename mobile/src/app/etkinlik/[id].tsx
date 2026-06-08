@@ -1157,9 +1157,9 @@ export default function EventDetail() {
       {storyUri ? (
         <ImageEditor
           uri={storyUri}
-          aspect={9 / 16}
           outWidth={1080}
           title="Story"
+          noCrop
           onDone={(u) => { void onStoryEdited(u); }}
           onCancel={() => setStoryUri(null)}
         />
