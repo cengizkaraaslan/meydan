@@ -1,5 +1,6 @@
 import "server-only";
 import { db, isDbConfigured } from "../db";
+import { syncSystemPostsForEvents } from "../social-store";
 import { slugify } from "../utils";
 import type { EventCategory, EventListItem, EventSource, ScrapedEvent } from "../types";
 
