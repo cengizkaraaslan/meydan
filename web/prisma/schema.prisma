@@ -327,6 +327,9 @@ model MobileProfile {
   city       String?
   /// Şehre bağlı ilçe (mobil ayarlar > konum).
   district   String?
+  /// Kullanıcının gerçek (GPS) konumu — profilde "tam konumumu kaydet".
+  lat        Float?
+  lng        Float?
   /// Kullanıcının seçtiği profil fotoğrafı URL'i (Google foto override'ı).
   avatar     String?  @db.Text
   lang       String?

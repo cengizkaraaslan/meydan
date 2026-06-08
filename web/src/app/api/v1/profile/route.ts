@@ -43,6 +43,8 @@ interface ProfileBody {
   photos?: string;
   avatar?: string | null;
   name?: string;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 /** Boş/whitespace string'i null'a indirger (alan temizleme için). */
@@ -50,6 +52,13 @@ function strOrNull(v: unknown): string | null {
   if (v == null) return null;
   const s = String(v).trim();
   return s.length ? s : null;
+}
+
+/** Sayıya çevirir; geçersiz/boşsa null. */
+function numOrNull(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 export async function POST(request: NextRequest) {
@@ -83,6 +92,8 @@ export async function POST(request: NextRequest) {
   if ("lookingFor" in body) data.lookingFor = normalizeLookingFor(body.lookingFor);
   if ("photos" in body) data.photos = strOrNull(body.photos);
   if ("avatar" in body) data.avatar = strOrNull(body.avatar);
+  if ("lat" in body) data.lat = numOrNull(body.lat);
+  if ("lng" in body) data.lng = numOrNull(body.lng);
 
   // district/avatar yeni kolonlar — `prisma generate` (Vercel build) sonrası tipler
   // güncellenir; yerel stale client'ta derlensin diye unknown üzerinden cast.
@@ -103,6 +114,8 @@ export async function POST(request: NextRequest) {
     const rest = { ...data };
     delete rest.district;
     delete rest.avatar;
+    delete rest.lat;
+    delete rest.lng;
     try {
       const profile = await run(rest);
       return NextResponse.json({ ok: true, profile });
