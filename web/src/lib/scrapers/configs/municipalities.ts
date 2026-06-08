@@ -19,6 +19,23 @@ export const MUNICIPALITY_CONFIGS: MunicipalityConfig[] = [
       link: "a.stretched-link",
     },
   },
+  // tepebasi.bel.tr/Etkinlikler — SSR HTML, .card.card-has-bg.click-col kartları;
+  // .info ul li span'leri sırayla tarih ("15 Mayıs 2026 Cuma") / saat / mekan. (Eskişehir ilçe belediyesi)
+  {
+    source: "MUNI_TEPEBASI",
+    displayName: "Tepebaşı Belediyesi",
+    baseUrl: "https://www.tepebasi.bel.tr",
+    eventListPath: "/Etkinlikler",
+    city: "Eskişehir",
+    selectors: {
+      card: ".card.card-has-bg.click-col",
+      title: "h4.card-title a",
+      date: ".event-header .info ul li:first-child span",
+      venue: ".event-header .info ul li:last-child span",
+      image: "img.card-img",
+      link: "h4.card-title a",
+    },
+  },
   // NOT: antalya.bel.tr/tr/etkinlikler — Vue.js v-for ile dinamik render, SSR'da event yok. Playwright/headless gerek.
   { source: "MUNI_ANTALYA",       displayName: "Antalya BB",        baseUrl: "https://www.antalya.bel.tr",          eventListPath: "/tr/etkinlikler",     city: "Antalya" },
   // MUNI_ADANA: Kasıtlı boş — etkinlik yayınlamıyor (sadece /tr/haberler).
