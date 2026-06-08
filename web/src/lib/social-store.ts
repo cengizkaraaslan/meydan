@@ -25,9 +25,12 @@ export async function listFollowingIds(deviceId: string): Promise<string[]> {
   return rows.map((r) => r.followingId);
 }
 
-export async function listFeed(input: { deviceId: string; filter: "all" | "follow" }): Promise<FeedPost[]> {
+const PAGE = 20;
+
+export async function listFeed(input: { deviceId: string; filter: "all" | "follow"; offset?: number }): Promise<FeedPost[]> {
   if (!isDbConfigured) return [];
   const { deviceId, filter } = input;
+  const offset = Math.max(0, input.offset ?? 0);
 
   let where: Record<string, unknown> = {};
   if (filter === "follow") {
@@ -36,7 +39,7 @@ export async function listFeed(input: { deviceId: string; filter: "all" | "follo
     where = { authorId: { in: [...ids, deviceId, "system"] } };
   }
 
-  const posts = await db.mobilePost.findMany({ where, orderBy: { createdAt: "desc" }, take: 60 });
+  const posts = await db.mobilePost.findMany({ where, orderBy: { createdAt: "desc" }, skip: offset, take: PAGE });
   if (posts.length === 0) return [];
   const ids = posts.map((p) => p.id);
 
@@ -95,6 +98,31 @@ export async function createPost(input: {
       eventTitle: input.eventTitle ?? null,
     },
   });
+}
+
+export const POST_EDIT_WINDOW_MS = 10 * 60 * 1000;
+export type PostMutReason = "notfound" | "forbidden" | "expired";
+
+/** Kendi gönderini 10 dk içinde düzenle. */
+export async function editPost(input: { id: string; authorId: string; text: string }): Promise<{ ok: boolean; reason?: PostMutReason }> {
+  const p = await db.mobilePost.findUnique({ where: { id: input.id } });
+  if (!p) return { ok: false, reason: "notfound" };
+  if (p.authorId !== input.authorId || p.authorId === "system") return { ok: false, reason: "forbidden" };
+  if (Date.now() - p.createdAt.getTime() > POST_EDIT_WINDOW_MS) return { ok: false, reason: "expired" };
+  await db.mobilePost.update({ where: { id: input.id }, data: { text: input.text.slice(0, 2000) } });
+  return { ok: true };
+}
+
+/** Kendi gönderini 10 dk içinde sil (tepki + yorumlarıyla). */
+export async function deletePost(input: { id: string; authorId: string }): Promise<{ ok: boolean; reason?: PostMutReason }> {
+  const p = await db.mobilePost.findUnique({ where: { id: input.id } });
+  if (!p) return { ok: false, reason: "notfound" };
+  if (p.authorId !== input.authorId || p.authorId === "system") return { ok: false, reason: "forbidden" };
+  if (Date.now() - p.createdAt.getTime() > POST_EDIT_WINDOW_MS) return { ok: false, reason: "expired" };
+  await db.postReaction.deleteMany({ where: { postId: input.id } });
+  await db.postComment.deleteMany({ where: { postId: input.id } });
+  await db.mobilePost.delete({ where: { id: input.id } });
+  return { ok: true };
 }
 
 export async function follow(input: { followerDeviceId: string; followingId: string; actorName?: string | null }) {

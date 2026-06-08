@@ -1,16 +1,44 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { listFeed, createPost } from "@/lib/social-store";
+import { listFeed, createPost, editPost, deletePost, type PostMutReason } from "@/lib/social-store";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/v1/social/feed?deviceId=...&filter=all|follow
+function statusForReason(reason?: PostMutReason): number {
+  return reason === "forbidden" ? 403 : reason === "expired" ? 409 : reason === "notfound" ? 404 : 400;
+}
+
+// GET /api/v1/social/feed?deviceId=...&filter=all|follow&offset=0  (20'şer sayfalama)
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
   const deviceId = sp.get("deviceId")?.trim();
   if (!deviceId) return NextResponse.json({ error: "deviceId zorunlu" }, { status: 400 });
   const filter = sp.get("filter") === "follow" ? "follow" : "all";
-  const data = await listFeed({ deviceId, filter });
+  const offset = Number(sp.get("offset") ?? "0") || 0;
+  const data = await listFeed({ deviceId, filter, offset });
   return NextResponse.json({ ok: true, data });
+}
+
+// PATCH /api/v1/social/feed  {id, authorId, text}  — kendi gönderini 10 dk içinde düzenle
+export async function PATCH(request: NextRequest) {
+  let body: { id?: string; authorId?: string; text?: string };
+  try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+  const id = body.id?.trim();
+  const authorId = body.authorId?.trim();
+  const text = body.text?.trim();
+  if (!id || !authorId || !text) return NextResponse.json({ error: "id/authorId/text zorunlu" }, { status: 400 });
+  const res = await editPost({ id, authorId, text });
+  return NextResponse.json(res, { status: res.ok ? 200 : statusForReason(res.reason) });
+}
+
+// DELETE /api/v1/social/feed  {id, authorId}  — kendi gönderini 10 dk içinde sil
+export async function DELETE(request: NextRequest) {
+  let body: { id?: string; authorId?: string };
+  try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+  const id = body.id?.trim();
+  const authorId = body.authorId?.trim();
+  if (!id || !authorId) return NextResponse.json({ error: "id/authorId zorunlu" }, { status: 400 });
+  const res = await deletePost({ id, authorId });
+  return NextResponse.json(res, { status: res.ok ? 200 : statusForReason(res.reason) });
 }
 
 // POST /api/v1/social/feed — gönderi oluştur

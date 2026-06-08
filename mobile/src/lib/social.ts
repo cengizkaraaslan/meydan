@@ -65,10 +65,27 @@ async function send<T>(method: string, path: string, body: unknown, fallback: T)
   }
 }
 
-export async function fetchFeed(filter: "all" | "follow"): Promise<FeedPost[]> {
+export const FEED_PAGE = 20;
+
+export async function fetchFeed(filter: "all" | "follow", offset = 0): Promise<FeedPost[]> {
   const deviceId = await getOrCreateDeviceId();
-  const r = await getJson<{ data?: FeedPost[] }>(`/api/v1/social/feed?deviceId=${encodeURIComponent(deviceId)}&filter=${filter}`, {});
+  const r = await getJson<{ data?: FeedPost[] }>(
+    `/api/v1/social/feed?deviceId=${encodeURIComponent(deviceId)}&filter=${filter}&offset=${offset}`,
+    {},
+  );
   return r.data ?? [];
+}
+
+/** Kendi gönderini 10 dk içinde düzenle. */
+export async function editPost(id: string, text: string): Promise<{ ok: boolean; reason?: string }> {
+  const authorId = await getOrCreateDeviceId();
+  return send("PATCH", "/api/v1/social/feed", { id, authorId, text }, { ok: false, reason: "network" });
+}
+
+/** Kendi gönderini 10 dk içinde sil. */
+export async function deletePost(id: string): Promise<{ ok: boolean; reason?: string }> {
+  const authorId = await getOrCreateDeviceId();
+  return send("DELETE", "/api/v1/social/feed", { id, authorId }, { ok: false, reason: "network" });
 }
 
 export async function createPost(input: {
