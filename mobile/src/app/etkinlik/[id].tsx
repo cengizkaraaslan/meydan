@@ -594,7 +594,8 @@ export default function EventDetail() {
     interests: [],
     gender: gender ?? "male",
   });
-  const meAttendee: Person | null = rsvp === "going" && user ? buildMePerson() : null;
+  // "Going" dersen avatarınla katılımcılara eklen — misafir olsan da (user şart değil).
+  const meAttendee: Person | null = rsvp === "going" ? buildMePerson() : null;
   const attendeeList = meAttendee ? [meAttendee, ...PEOPLE] : PEOPLE;
   const attendees = attendeeList.slice(0, 6);
   const extraAttendees = Math.max(0, attendeeList.length - attendees.length);
@@ -660,8 +661,10 @@ export default function EventDetail() {
   };
   // katılacaklar listesinden bir kişiye mesaj — sohbet için giriş zorunlu (uygulama kuralı)
   const messagePerson = (pid: string) => {
+    if (pid === "__me") return; // kendinle mesajlaşma yok
     impactH();
     setListOpen(false);
+    setCatOpen(null);
     if (!user) {
       showAuthPrompt(t("lock_chat_title"));
       return;
@@ -1045,6 +1048,7 @@ export default function EventDetail() {
         meLabel={rsvp === "going" ? `✓ ${t("rsvp_going")}` : null}
         onClose={() => setCatOpen(null)}
         onPressPerson={openPerson}
+        onMessagePerson={messagePerson}
       />
       <AttendeeListModal
         visible={catOpen === "maybe"}
@@ -1055,6 +1059,7 @@ export default function EventDetail() {
         meLabel={rsvp === "maybe" ? `🤔 ${t("rsvp_maybe")}` : null}
         onClose={() => setCatOpen(null)}
         onPressPerson={openPerson}
+        onMessagePerson={messagePerson}
       />
       <AttendeeListModal
         visible={catOpen === "interested"}
@@ -1065,6 +1070,7 @@ export default function EventDetail() {
         meLabel={rsvp === "interested" ? `✨ ${t("rsvp_interested")}` : null}
         onClose={() => setCatOpen(null)}
         onPressPerson={openPerson}
+        onMessagePerson={messagePerson}
       />
 
       {/* Story editör — kaynak seçilince açılır; 'Bitir'de ANINDA paylaşır (caption yok, geri yok). */}

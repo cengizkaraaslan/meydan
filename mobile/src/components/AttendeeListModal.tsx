@@ -20,6 +20,8 @@ interface Props {
   meLabel?: string | null;
   onClose: () => void;
   onPressPerson: (id: string) => void;
+  /** Kişiyle mesajlaşma (sohbet) — verilirse 💬 butonu ve satır dokunuşu mesaja gider. */
+  onMessagePerson?: (id: string) => void;
 }
 
 /**
@@ -27,7 +29,7 @@ interface Props {
  * Kişiye dokununca onPressPerson çağrılır (profil aç). Tema renkleriyle çizilir,
  * hardcoded siyah yok (scrim hariç — overlay).
  */
-export function AttendeeListModal({ visible, title, people, gradient, bottomInset, meLabel, onClose, onPressPerson }: Props) {
+export function AttendeeListModal({ visible, title, people, gradient, bottomInset, meLabel, onClose, onPressPerson, onMessagePerson }: Props) {
   const { t: T } = useTheme();
   const canSeeAges = useCanSeeAges();
   const total = people.length + (meLabel ? 1 : 0);
@@ -67,18 +69,28 @@ export function AttendeeListModal({ visible, title, people, gradient, bottomInse
             ) : null}
 
             {people.map((p) => (
-              <Pressable
+              <View
                 key={p.id}
-                onPress={() => onPressPerson(p.id)}
                 style={[styles.row, { backgroundColor: T.surface, borderColor: T.hairline }]}
               >
-                <StoryAvatar uri={p.avatar} name={p.name} size={48} hasStory={p.hasStory} online={p.online} />
-                <View style={{ flex: 1 }}>
+                {/* Avatar → profil */}
+                <Pressable onPress={() => { tapH(); onPressPerson(p.id); }} hitSlop={6}>
+                  <StoryAvatar uri={p.avatar} name={p.name} size={48} hasStory={p.hasStory} online={p.online} />
+                </Pressable>
+                {/* İsim/şehir → mesajlaş (varsa) yoksa profil */}
+                <Pressable style={{ flex: 1 }} onPress={() => { tapH(); (onMessagePerson ?? onPressPerson)(p.id); }}>
                   <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>{canSeeAges ? `${p.name}, ${p.age}` : p.name}</Text>
                   <Text style={[Type.label, { color: T.textFaint }]} numberOfLines={1}>📍 {p.city} · {p.distanceKm} km</Text>
-                </View>
-                <Text style={[Type.label, { color: T.primary }]}>→</Text>
-              </Pressable>
+                </Pressable>
+                {/* 💬 Mesaj */}
+                {onMessagePerson ? (
+                  <Pressable onPress={() => { tapH(); onMessagePerson(p.id); }} hitSlop={8} style={[styles.msgBtn, { borderColor: T.hairline }]}>
+                    <Text style={{ fontSize: 16 }}>💬</Text>
+                  </Pressable>
+                ) : (
+                  <Text style={[Type.label, { color: T.primary }]}>→</Text>
+                )}
+              </View>
             ))}
           </ScrollView>
         )}
@@ -93,5 +105,6 @@ const styles = StyleSheet.create({
   handle: { alignSelf: "center", width: 40, height: 5, borderRadius: 3, marginBottom: 14 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 12 },
   row: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2 },
+  msgBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2 },
   meAvatar: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
 });
