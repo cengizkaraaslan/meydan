@@ -79,12 +79,14 @@ export class TicketmasterScraper extends TicketingScraper {
     const all: ScrapedEvent[] = [];
     const seen = new Set<string>();
 
+    // Yabancı ülkeleri ÖNE al: timeout olsa bile dünya etkinlikleri yazılsın
+    // (sıralı yazımda baştakiler kalıcı olur; TR zaten diğer kaynaklardan da geliyor).
     const requests: Array<{ cc: string; size: number; page: number }> = [];
-    for (let p = 0; p < TR_PAGES; p++) {
-      requests.push({ cc: "TR", size: TR_SIZE, page: p });
-    }
     for (const cc of WORLD_COUNTRIES) {
       requests.push({ cc, size: WORLD_SIZE, page: 0 });
+    }
+    for (let p = 0; p < TR_PAGES; p++) {
+      requests.push({ cc: "TR", size: TR_SIZE, page: p });
     }
 
     // Tüm istekleri PARALEL çalıştır (ardışık olursa 11 istek 60sn maxDuration'ı aşıyordu).

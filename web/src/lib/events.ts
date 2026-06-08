@@ -256,18 +256,31 @@ export async function getEvents(filters: EventFilters = {}): Promise<EventQueryR
     ...(and.length && { AND: and }),
   };
 
-  const total = await db.event.count({ where });
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const page = Math.min(Math.max(1, rawPage), totalPages); // boş sayfada kalma
-  const rows = await db.event.findMany({
+  // Kaynaklar-arası dedup: aynı etkinlik (başlık+gün+şehir) birden çok kaynaktan
+  // (Biletix+Ticketmaster+Passo…) gelebilir → tek kayıt göster. Eşleşen pencereyi
+  // çekip JS'te tekilleştir, sonra sayfala.
+  const allRows = await db.event.findMany({
     where,
     orderBy: { startsAt: "asc" },
-    skip: (page - 1) * pageSize,
-    take: pageSize,
+    take: 1000,
     include: {
       _count: { select: { attendances: true, comments: true } },
     },
   });
+  const normTitle = (s: string) => foldTr(s).replace(/[^a-z0-9]/g, "");
+  const score = (x: (typeof allRows)[number]) => (x.imageUrl ? 1 : 0) + (x.ticketUrl ? 1 : 0);
+  const byKey = new Map<string, (typeof allRows)[number]>();
+  for (const r of allRows) {
+    const key = `${normTitle(r.title)}|${r.startsAt.toISOString().slice(0, 10)}|${foldTr(r.city)}`;
+    const prev = byKey.get(key);
+    if (!prev || score(r) > score(prev)) byKey.set(key, r);
+  }
+  const deduped = [...byKey.values()].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+
+  const total = deduped.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(Math.max(1, rawPage), totalPages); // boş sayfada kalma
+  const rows = deduped.slice((page - 1) * pageSize, page * pageSize);
 
   return {
     events: rows.map((r) => ({

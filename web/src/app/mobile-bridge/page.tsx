@@ -56,8 +56,11 @@ export default async function MobileBridge() {
         <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.3px" }}>
           Meydan<span style={{ color: "#A855F7" }}>Fest</span>
         </div>
-        <div style={{ fontSize: 14, color: "#B9B4D0", animation: "mf-pulse 1.6s ease-in-out infinite", maxWidth: 280 }}>
-          Google ile güvenli giriş açılıyor…
+        <div style={{ fontSize: 15, color: "#EDE9FF", fontWeight: 600, maxWidth: 300 }}>
+          Google hesabına yönlendiriliyorsun…
+        </div>
+        <div style={{ fontSize: 13, color: "#B9B4D0", animation: "mf-pulse 1.6s ease-in-out infinite", maxWidth: 300 }}>
+          Birkaç saniye sürebilir. Açılmazsa aşağıdaki butona dokun.
         </div>
         <AutoGoogle />
       </body>
