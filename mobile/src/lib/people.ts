@@ -14,10 +14,19 @@ export interface Person {
   interests: string[]; // kategori etiketleri
   gender: "male" | "female"; // dating eşleştirme için
   hasStory?: boolean; // aktif story → avatarda Instagram-tarzı halka
+  tiktok?: string; // TikTok kullanıcı adı (@...) — mock, isimden türetilmiş
 }
 
 /** Şu an story'si olan (mock) kişiler — listelerde halka gösterilir. */
 const STORY_IDS = new Set(["u1", "u3", "u5", "u7", "u9", "u12", "u13"]);
+
+/** Türkçe ismi ASCII kullanıcı-adı parçasına çevirir. */
+function handleSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[ışğüöçİ]/g, (c) => ({ ı: "i", ş: "s", ğ: "g", ü: "u", ö: "o", ç: "c", İ: "i" }[c] ?? c))
+    .replace(/[^a-z0-9]/g, "");
+}
 
 const P = (id: string, name: string, age: number, city: string, distanceKm: number, online: boolean, sex: "men" | "women", n: number, bio: string, interests: string[]): Person => ({
   id, name, age, city, distanceKm, online,
@@ -25,6 +34,7 @@ const P = (id: string, name: string, age: number, city: string, distanceKm: numb
   avatar: `https://i.pravatar.cc/600?img=${(n % 70) + 1}`,
   bio, interests,
   gender: sex === "men" ? "male" : "female",
+  tiktok: `@${handleSlug(name)}_${city ? handleSlug(city).slice(0, 3) : "tr"}${n % 100}`,
 });
 
 export const PEOPLE: Person[] = [

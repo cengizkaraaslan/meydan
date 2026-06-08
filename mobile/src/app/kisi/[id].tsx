@@ -1,5 +1,5 @@
 import React from "react";
-import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Dimensions, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -165,6 +165,17 @@ export default function PersonScreen() {
                 {t("person_about").toUpperCase()}
               </Text>
               <Text style={[Type.body, { color: T.text, lineHeight: 21 }]}>{person.bio}</Text>
+              {/* TikTok hesabı (mock) */}
+              {person.tiktok ? (
+                <Pressable
+                  onPress={() => { tapH(); Linking.openURL(`https://www.tiktok.com/${person.tiktok}`); }}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 }}
+                  hitSlop={6}
+                >
+                  <Text style={{ fontSize: 15 }}>🎵</Text>
+                  <Text style={[Type.body, { color: T.primary, fontWeight: "700" }]}>TikTok {person.tiktok}</Text>
+                </Pressable>
+              ) : null}
             </View>
           </Animated.View>
 

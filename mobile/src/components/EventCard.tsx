@@ -9,7 +9,7 @@ import { useTheme } from "../lib/theme";
 import { useAuth } from "@/lib/auth";
 import { useT } from "../lib/i18n";
 import { catMeta } from "../lib/categories";
-import { fmtDay, fmtPrice, relativeDayLabel } from "../lib/format";
+import { fmtDay, priceLabel, isUniversitySource, relativeDayLabel } from "../lib/format";
 import { imageFor, type ApiEvent } from "../lib/api";
 import { toggleFavorite, useFavorites } from "../lib/favorites";
 import { Badge } from "../ui/atoms";
@@ -87,7 +87,7 @@ export function HeroCard({ event, width }: { event: ApiEvent; width: number }) {
               );
             })()}
             <View style={[styles.dot, { backgroundColor: T.textFaint }]} />
-            <Text style={[Type.body, { color: event.is_free ? T.success : T.gold }]}>{fmtPrice(event)}</Text>
+            <Text style={[Type.body, { color: isUniversitySource(event.source) ? T.cyan : event.is_free ? T.success : T.gold }]}>{priceLabel(event)}</Text>
           </View>
         </View>
       </View>
@@ -128,7 +128,7 @@ export function EventRow({ event }: { event: ApiEvent }) {
         <View style={styles.metaRow}>
           <Text style={[Type.label, { color: c.gradient[0] }]}>{c.emoji} {c.label}</Text>
           <View style={[styles.dot, { backgroundColor: T.textFaint }]} />
-          <Text style={[Type.label, { color: event.is_free ? T.success : T.gold }]}>{fmtPrice(event)}</Text>
+          <Text style={[Type.label, { color: isUniversitySource(event.source) ? T.cyan : event.is_free ? T.success : T.gold }]}>{priceLabel(event)}</Text>
         </View>
       </View>
       <Heart event={event} />

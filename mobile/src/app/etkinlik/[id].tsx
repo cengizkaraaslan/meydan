@@ -11,7 +11,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { catMeta } from "@/lib/categories";
-import { fmtLong, fmtPrice } from "@/lib/format";
+import { fmtLong, priceLabel, isUniversitySource } from "@/lib/format";
 import { API_BASE, fetchEventById, imageFor, type ApiEvent } from "@/lib/api";
 import { getDeviceId } from "@/lib/profileSync";
 import { toggleFavorite, useFavorites } from "@/lib/favorites";
@@ -637,12 +637,12 @@ export default function EventDetail() {
             <View style={[styles.sep, { backgroundColor: T.hairline }]} />
             <InfoRow
               T={T}
-              icon="🎟️"
-              label={t("ticket")}
-              value={fmtPrice(event)}
-              valueColor={event.is_free ? T.success : T.gold}
+              icon={isUniversitySource(event.source) ? "🎓" : "🎟️"}
+              label={isUniversitySource(event.source) ? "Erişim" : t("ticket")}
+              value={priceLabel(event)}
+              valueColor={isUniversitySource(event.source) ? T.cyan : event.is_free ? T.success : T.gold}
               onPress={event.ticket_url ? openTicket : undefined}
-              actionLabel={event.ticket_url ? (event.is_free ? t("go_detail") : t("buy_ticket")) : undefined}
+              actionLabel={event.ticket_url ? (isUniversitySource(event.source) || event.is_free ? t("go_detail") : t("buy_ticket")) : undefined}
             />
             {event.artist ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="🎤" label={t("artist")} value={event.artist} /></>) : null}
           </Animated.View>
