@@ -60,3 +60,26 @@ export function weekendRange(): { from: string; to: string } {
   sun.setHours(23, 59, 59, 0);
   return { from: sat.toISOString(), to: sun.toISOString() };
 }
+
+/** "Bugün" / "Yarın" / "Bu hafta sonu" göreli etiketi; uymuyorsa null (normal tarih gösterilir). */
+export function relativeDayLabel(iso: string): string | null {
+  const d = parseDate(iso);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  const sod = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((sod(d) - sod(now)) / 86400000);
+  if (diff === 0) return "Bugün";
+  if (diff === 1) return "Yarın";
+  const wd = d.getDay(); // 0 Paz, 6 Cmt
+  if ((wd === 6 || wd === 0) && diff >= 0 && diff <= 7) return "Bu hafta sonu";
+  return null;
+}
+
+/** Etkinlik günü bugünden önce mi (geçmiş)? */
+export function isPastDay(iso: string): boolean {
+  const d = parseDate(iso);
+  if (isNaN(d.getTime())) return false;
+  const now = new Date();
+  const sod = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  return sod(d) < sod(now);
+}

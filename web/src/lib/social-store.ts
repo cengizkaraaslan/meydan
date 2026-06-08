@@ -32,8 +32,8 @@ export async function listFeed(input: { deviceId: string; filter: "all" | "follo
   let where: Record<string, unknown> = {};
   if (filter === "follow") {
     const ids = await listFollowingIds(deviceId);
-    // Kendi gönderilerini + takip ettiklerini göster.
-    where = { authorId: { in: [...ids, deviceId] } };
+    // Kendi gönderilerin + takip ettiklerin + Sistem (etkinlik duyuruları her zaman görünür).
+    where = { authorId: { in: [...ids, deviceId, "system"] } };
   }
 
   const posts = await db.mobilePost.findMany({ where, orderBy: { createdAt: "desc" }, take: 60 });
@@ -99,7 +99,8 @@ export async function createPost(input: {
 
 export async function follow(input: { followerDeviceId: string; followingId: string; actorName?: string | null }) {
   const { followerDeviceId, followingId } = input;
-  if (followerDeviceId === followingId) return { following: true, followsBack: false };
+  // Sistem (etkinlik duyuru hesabı) takip edilemez.
+  if (followingId === "system" || followerDeviceId === followingId) return { following: false, followsBack: false };
   await db.follow.upsert({
     where: { followerDeviceId_followingId: { followerDeviceId, followingId } },
     create: { followerDeviceId, followingId },
@@ -172,4 +173,58 @@ export async function listNotifs(deviceId: string) {
 export async function markNotifsRead(deviceId: string) {
   await db.mobileNotif.updateMany({ where: { deviceId, read: false }, data: { read: true } });
   return { ok: true };
+}
+
+// ─── Sistem (etkinlik) gönderileri ───────────────────────────────────────────
+const CAT_LABEL: Record<string, string> = {
+  KONSER: "konser", FESTIVAL: "festival", TIYATRO: "tiyatro", STANDUP: "stand-up",
+  SPOR: "spor", SERGI: "sergi", ATOLYE: "atölye", COCUK: "çocuk", DIGER: "etkinlik",
+};
+
+export interface SystemEventInput {
+  slug: string;
+  title: string;
+  city: string;
+  category: string;
+  imageUrl?: string | null;
+}
+
+function systemPostText(e: SystemEventInput): string {
+  const label = CAT_LABEL[e.category] ?? "etkinlik";
+  if (e.category === "DIGER") return `${e.title} hakkında ${e.city}'de yeni bir etkinlik oluşturuldu 🎉`;
+  return `${e.title} hakkında ${e.city}'de ${label} alanında yeni bir etkinlik oluşturuldu 🎉`;
+}
+
+/**
+ * Verilen etkinlikler için "Sistem" gönderileri oluşturur (eventSlug ile idempotent —
+ * zaten gönderisi olan etkinlik atlanır). Scrape sonrası + seed için kullanılır.
+ */
+export async function syncSystemPostsForEvents(events: SystemEventInput[]): Promise<number> {
+  if (!isDbConfigured || events.length === 0) return 0;
+  const slugs = events.map((e) => e.slug).filter(Boolean);
+  if (slugs.length === 0) return 0;
+  try {
+    const existing = await db.mobilePost.findMany({
+      where: { authorId: "system", eventSlug: { in: slugs } },
+      select: { eventSlug: true },
+    });
+    const have = new Set(existing.map((x) => x.eventSlug));
+    const fresh = events.filter((e) => e.slug && !have.has(e.slug));
+    if (fresh.length === 0) return 0;
+    await db.mobilePost.createMany({
+      data: fresh.map((e) => ({
+        authorId: "system",
+        authorName: "Sistem",
+        authorAvatar: null,
+        text: systemPostText(e),
+        imageUrl: e.imageUrl ?? null,
+        eventSlug: e.slug,
+        eventTitle: e.title,
+      })),
+    });
+    return fresh.length;
+  } catch (err) {
+    console.warn("[social] syncSystemPostsForEvents başarısız:", err instanceof Error ? err.message : err);
+    return 0;
+  }
 }

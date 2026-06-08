@@ -77,6 +77,7 @@ function RootNavigator() {
         <Stack.Screen name="esles" options={{ animation: "slide_from_bottom" }} />
         <Stack.Screen name="olustur" options={{ animation: "slide_from_bottom" }} />
         <Stack.Screen name="ayarlar" options={{ animation: "slide_from_right" }} />
+        <Stack.Screen name="vizyon" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="admin" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="ara" options={{ presentation: "transparentModal", animation: "fade" }} />
       </Stack.Protected>

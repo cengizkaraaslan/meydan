@@ -5,13 +5,16 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { ChatBubble } from "@/components/ChatBubble";
-import { EventRow, HeroCard } from "@/components/EventCard";
-import { Loader, Pill, SectionHeader, EmptyState } from "@/ui/atoms";
+import { HeroCard } from "@/components/EventCard";
+import { CourseSection } from "@/components/CourseSection";
+import { MovieSection } from "@/components/MovieSection";
+import { PastEventsSection } from "@/components/PastEventsSection";
+import { Loader, Pill } from "@/ui/atoms";
 import { Radius, Type, Space } from "@/theme/aurora";
 import { CATEGORIES, CITIES } from "@/lib/categories";
 import { fetchEvents, type ApiEvent } from "@/lib/api";
 import { loadEventsCache, saveEventsCache } from "@/lib/eventCache";
-import { weekendRange, dayRange } from "@/lib/format";
+import { dayRange, isPastDay } from "@/lib/format";
 import { useActiveCity } from "@/lib/location";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
@@ -27,9 +30,6 @@ export default function DiscoverScreen() {
   const { city, status, setCity } = useActiveCity();
   const [cityModal, setCityModal] = useState(false);
   const [featured, setFeatured] = useState<ApiEvent[]>([]);
-  const [weekend, setWeekend] = useState<ApiEvent[]>([]);
-  const [feed, setFeed] = useState<ApiEvent[]>([]);
-  const [cityHit, setCityHit] = useState(false);
   const [cat, setCat] = useState<string | null>(null);
   const [day, setDay] = useState<"all" | "today" | "tomorrow" | "weekend">("all");
   const [loading, setLoading] = useState(true);
@@ -49,34 +49,23 @@ export default function DiscoverScreen() {
     if (cached) {
       const cachedImg = cached.filter((e) => e.image_url);
       setFeatured((cachedImg.length >= 5 ? cachedImg : cached).slice(0, 6));
-      setFeed(cached);
       setLoading(false);
     }
 
-    // 2) Ardından taze veriyi çek, ekranı güncelle ve cache'i yaz.
+    // 2) Ardından taze veriyi çek (hero için), ekranı güncelle ve cache'i yaz.
     try {
-      const { from, to } = weekendRange();
-      // Seçili güne göre ana feed tarih aralığı ("all" → aralık yok).
+      // Seçili güne göre tarih aralığı ("all" → aralık yok).
       const range = dayRange(useDay);
       // Öncelik: bulunduğun şehir. O şehirde sonuç yoksa → genel (random) feed.
       let feedRes = await fetchEvents({ city: useCity ?? undefined, category: category ?? undefined, from: range.from, to: range.to, pageSize: 30 });
-      let hit = Boolean(useCity) && feedRes.data.length > 0;
       if (useCity && feedRes.data.length === 0) {
         feedRes = await fetchEvents({ category: category ?? undefined, from: range.from, to: range.to, pageSize: 30 });
-        hit = false;
       }
-      const wkRes = await fetchEvents({ from, to, city: useCity ?? undefined, pageSize: 10 });
-      const weekendData = wkRes.data.length > 0 ? wkRes.data : (await fetchEvents({ from, to, pageSize: 10 })).data;
-
       const withImg = feedRes.data.filter((e) => e.image_url);
       setFeatured((withImg.length >= 5 ? withImg : feedRes.data).slice(0, 6));
-      setFeed(feedRes.data);
-      setWeekend(weekendData);
-      setCityHit(hit);
       void saveEventsCache(key, feedRes.data);
     } catch {
-      // Cache gösterilmediyse boşalt; gösterildiyse mevcut içeriği koru.
-      if (!cached) setFeed([]);
+      /* cache gösterildiyse koru */
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -134,7 +123,7 @@ export default function DiscoverScreen() {
               <Animated.View entering={FadeInDown.delay(55).duration(420)}>
                 <FlatList
                   horizontal
-                  data={featured}
+                  data={featured.filter((e) => !isPastDay(e.starts_at))}
                   keyExtractor={(e) => e.id}
                   showsHorizontalScrollIndicator={false}
                   snapToInterval={HERO_W + 12}
@@ -181,41 +170,14 @@ export default function DiscoverScreen() {
               />
             </Animated.View>
 
-            {/* Bu hafta sonu */}
-            {weekend.length > 0 && (
-              <Animated.View entering={FadeInDown.delay(165).duration(420)} style={{ marginBottom: 26 }}>
-                <View style={{ paddingHorizontal: 16 }}>
-                  <SectionHeader title={t("weekend")} accent={T.pink} />
-                </View>
-                <FlatList
-                  horizontal
-                  data={weekend}
-                  keyExtractor={(e) => e.id}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
-                  renderItem={({ item }) => <HeroCard event={item} width={width * 0.72} />}
-                />
-              </Animated.View>
-            )}
+            {/* Ücretsiz kurslar (belediye scrape) */}
+            <CourseSection />
 
-            {/* Yaklaşan feed */}
-            <View style={{ paddingHorizontal: 16, gap: 12 }}>
-              <Animated.View entering={FadeInDown.delay(220).duration(420)}>
-                <SectionHeader
-                  title={cityHit ? t("in_city", { city: city ?? "" }) : cat ? t("filtered") : t("upcoming")}
-                  accent={T.cyan}
-                />
-              </Animated.View>
-              {feed.length === 0 ? (
-                <EmptyState emoji="🌌" title={t("no_result")} sub={t("try_another")} />
-              ) : (
-                feed.map((e, i) => (
-                  <Animated.View key={e.id} entering={FadeInDown.delay(Math.min(i, 8) * 55).duration(420)}>
-                    <EventRow event={e} />
-                  </Animated.View>
-                ))
-              )}
-            </View>
+            {/* Vizyondaki filmler (şehre göre + km) */}
+            <MovieSection />
+
+            {/* Biten etkinlikler (geçmiş + paylaşımlar) */}
+            <PastEventsSection />
           </>
         )}
       </ScrollView>

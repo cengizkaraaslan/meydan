@@ -9,7 +9,7 @@ import { useTheme } from "../lib/theme";
 import { useAuth } from "@/lib/auth";
 import { useT } from "../lib/i18n";
 import { catMeta } from "../lib/categories";
-import { fmtDay, fmtPrice } from "../lib/format";
+import { fmtDay, fmtPrice, relativeDayLabel } from "../lib/format";
 import { imageFor, type ApiEvent } from "../lib/api";
 import { toggleFavorite, useFavorites } from "../lib/favorites";
 import { Badge } from "../ui/atoms";
@@ -74,9 +74,18 @@ export function HeroCard({ event, width }: { event: ApiEvent; width: number }) {
             {event.title}
           </Text>
           <View style={styles.metaRow}>
-            <Text style={[Type.body, { color: T.textDim }]}>
-              {d.day} {d.month} · {event.city || "Türkiye"}
-            </Text>
+            {(() => {
+              const rel = relativeDayLabel(event.starts_at);
+              return rel ? (
+                <Text style={[Type.body, { color: c.gradient[0], fontWeight: "800" }]}>
+                  {rel} · {event.city || "Türkiye"}
+                </Text>
+              ) : (
+                <Text style={[Type.body, { color: T.textDim }]}>
+                  {d.day} {d.month} · {event.city || "Türkiye"}
+                </Text>
+              );
+            })()}
             <View style={[styles.dot, { backgroundColor: T.textFaint }]} />
             <Text style={[Type.body, { color: event.is_free ? T.success : T.gold }]}>{fmtPrice(event)}</Text>
           </View>

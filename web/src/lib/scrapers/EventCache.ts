@@ -119,6 +119,7 @@ export async function setEventsForSource(
   if (!isDbConfigured || events.length === 0) return 0;
   let written = 0;
   const now = new Date();
+  const writtenForFeed: { slug: string; title: string; city: string; category: string; imageUrl: string | null }[] = [];
   for (const e of events) {
     const data = {
       slug: buildSlug(e),
@@ -146,12 +147,19 @@ export async function setEventsForSource(
         update: data,
       });
       written++;
+      writtenForFeed.push({ slug: data.slug, title: data.title, city: data.city, category: String(data.category), imageUrl: data.imageUrl });
     } catch (err) {
       console.warn(
         `[EventCache] ${source} ${e.externalId} yazılamadı:`,
         err instanceof Error ? err.message : err,
       );
     }
+  }
+  // Meydan duvarına "Sistem" etkinlik gönderileri (eventSlug ile idempotent — yalnız yeniler eklenir).
+  try {
+    await syncSystemPostsForEvents(writtenForFeed);
+  } catch {
+    /* duvar gönderisi scrape'i bozmaz */
   }
   return written;
 }
