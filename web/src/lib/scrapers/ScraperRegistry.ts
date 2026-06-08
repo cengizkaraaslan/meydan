@@ -9,6 +9,7 @@ import { BiletinialScraper } from "./providers/BiletinialScraper";
 import { BugeceScraper } from "./providers/BugeceScraper";
 import { BiletinoScraper } from "./providers/BiletinoScraper";
 import { SongkickScraper } from "./providers/SongkickScraper";
+import { TicketmasterScraper } from "./providers/TicketmasterScraper";
 import { IBBScraper } from "./providers/IBBScraper";
 import { ZorluPsmScraper } from "./providers/ZorluPsmScraper";
 import { SehirTiyatrolariScraper } from "./providers/SehirTiyatrolariScraper";
@@ -67,6 +68,9 @@ scraperRegistry.register(new BiletinoScraper());
 
 // Konser API agregatörü (çok şehir, JSON — SONGKICK_API_KEY varsa aktif)
 scraperRegistry.register(new SongkickScraper());
+
+// Dünya geneli etkinlik API agregatörü (JSON — TICKETMASTER_API_KEY varsa aktif)
+scraperRegistry.register(new TicketmasterScraper());
 
 // Kültür kurumları (SSR concrete parse)
 scraperRegistry.register(new ZorluPsmScraper());

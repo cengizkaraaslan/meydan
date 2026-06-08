@@ -24,6 +24,7 @@ export type EventSource =
   | "ZORLU_PSM"
   | "SEHIR_TIYATROLARI"
   | "SONGKICK"
+  | "TICKETMASTER"
   | "IBB"
   | "ANKARA_BB"
   | "IZMIR_BB"
@@ -150,6 +151,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   ZORLU_PSM: "Zorlu PSM",
   SEHIR_TIYATROLARI: "İBB Şehir Tiyatroları",
   SONGKICK: "Songkick",
+  TICKETMASTER: "Ticketmaster",
   IBB: "İBB Kültür Sanat",
   ANKARA_BB: "Ankara BB",
   IZMIR_BB: "İzmir BB",
