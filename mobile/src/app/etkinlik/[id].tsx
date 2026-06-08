@@ -613,10 +613,11 @@ export default function EventDetail() {
     maybe: maybePeople,
     interested: interestedPeople,
   };
-  // Kategori sayımı: yapay "+1 ben" yok — yalnızca mock liste boyutu.
-  const catCount = (cat: Rsvp) => catPeople[cat].length;
-  // Bir kategorinin önizleme listesi: kendini başa ekleme (yapay +1 üretmesin).
-  const peopleForCat = (cat: Rsvp): Person[] => catPeople[cat];
+  // Kategori sayımı: o kategoriye KATILDIYSAM kendimi de say (avatarım listeye eklenir).
+  const catCount = (cat: Rsvp) => catPeople[cat].length + (rsvp === cat && user ? 1 : 0);
+  // Önizleme listesi: o kategoriye katıldıysam avatarımı başa ekle.
+  const peopleForCat = (cat: Rsvp): Person[] =>
+    rsvp === cat && user ? [buildMePerson(), ...catPeople[cat]] : catPeople[cat];
 
   // ── Story şeridi grupları ──
   // Benim bu etkinliğe ait story'lerim → tek grup (avatar: profil override ?? user.photo).
