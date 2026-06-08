@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -16,7 +16,7 @@ import { Image } from "expo-image";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { GlassCard } from "@/components/GlassCard";
 import { ImageEditor } from "@/components/ImageEditor";
@@ -28,6 +28,7 @@ import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { API_BASE } from "@/lib/api";
+import { getMyEvent, upsertMyEvent } from "@/lib/myEvents";
 import { tapH, impactH, successH } from "@/lib/haptics";
 
 /** Görseli 1200px genişliğe sığdırıp JPEG olarak sıkıştırır (SDK56 context API + fallback). */
@@ -61,6 +62,33 @@ export default function CreateEventScreen() {
   const [districts, setDistricts] = useState<string[]>([]);
   const [districtModal, setDistrictModal] = useState(false);
   const [districtQuery, setDistrictQuery] = useState("");
+  // Düzenleme modunda, şehir set edilince ilçe effect'i sıfırlamasın diye beklemedeki ilçe.
+  const pendingDistrict = useRef<string | null>(null);
+
+  // Düzenleme modu: ?id varsa o etkinliği yükleyip alanları doldur.
+  const { id: editId } = useLocalSearchParams<{ id?: string }>();
+  const isEditing = !!editId;
+  useEffect(() => {
+    if (!editId) return;
+    let alive = true;
+    getMyEvent(String(editId)).then((ev) => {
+      if (!alive || !ev) return;
+      setTitle(ev.title);
+      setVenue(ev.venue);
+      setDesc(ev.description);
+      setCategory(ev.category);
+      setWebsite(ev.website);
+      setInstagram(ev.instagram);
+      setFacebook(ev.facebook);
+      setTiktok(ev.tiktok);
+      setImage(ev.imageUri);
+      pendingDistrict.current = ev.district;
+      setCity(ev.city); // ilçe effect'ini tetikler → pendingDistrict uygulanır
+    });
+    return () => {
+      alive = false;
+    };
+  }, [editId]);
 
   const filteredCities = useMemo(() => {
     const q = cityQuery.trim().toLocaleLowerCase("tr-TR");
@@ -76,7 +104,9 @@ export default function CreateEventScreen() {
       return;
     }
     let alive = true;
-    setDistrict(null);
+    // Düzenleme yüklemesinde beklemedeki ilçeyi koru; normal şehir değişiminde sıfırla.
+    setDistrict(pendingDistrict.current);
+    pendingDistrict.current = null;
     // Önce yerel veriyle anında doldur (büyük şehirler), sonra API ile güncelle.
     setDistricts(districtsFor(city));
     (async () => {
@@ -178,6 +208,26 @@ export default function CreateEventScreen() {
     } catch {
       /* yut — best-effort */
     }
+    // Yerel "oluşturduğum etkinlikler" listesine kaydet (id varsa günceller).
+    try {
+      await upsertMyEvent({
+        id: editId ? String(editId) : undefined,
+        title: title.trim(),
+        category,
+        venue: venue.trim(),
+        city,
+        district,
+        description: desc.trim(),
+        website: website.trim(),
+        instagram: instagram.trim(),
+        facebook: facebook.trim(),
+        tiktok: tiktok.trim(),
+        imageUri: image,
+        startsAt: new Date().toISOString(),
+      });
+    } catch {
+      /* yut */
+    }
     successH();
     setPublished(true);
     setTimeout(() => router.back(), 1200);
@@ -234,7 +284,7 @@ export default function CreateEventScreen() {
           <Pressable onPress={() => { tapH(); router.back(); }} hitSlop={12} style={styles.backBtn}>
             <Text style={{ fontSize: 22, color: T.text }}>‹</Text>
           </Pressable>
-          <Text style={[Type.h1, { color: T.text }]}>{t("create_event")}</Text>
+          <Text style={[Type.h1, { color: T.text }]}>{isEditing ? t("create_event_edit") : t("create_event")}</Text>
           <View style={{ width: 38 }} />
         </View>
 

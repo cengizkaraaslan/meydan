@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
+import { countMyEvents } from "@/lib/myEvents";
 
 interface TabRoute { key: string; name: string }
 interface TabBarProps {
@@ -73,7 +74,11 @@ function AuroraTabBar({ state, navigation }: TabBarProps) {
               <Pressable
                 key="__create"
                 style={styles.createItem}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push("/olustur"); }}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  // Oluşturulmuş etkinlik varsa seçim menüsü; yoksa direkt oluştur ekranı.
+                  void countMyEvents().then((n) => router.push(n > 0 ? "/olusturmenu" : "/olustur"));
+                }}
               >
                 <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.createBtn, glow(T.primary, 14, 0.6)]}>
                   <Ionicons name="add" size={28} color="#fff" />
