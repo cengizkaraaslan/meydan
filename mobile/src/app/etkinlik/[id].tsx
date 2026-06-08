@@ -17,6 +17,7 @@ import { getDeviceId } from "@/lib/profileSync";
 import { toggleFavorite, useFavorites } from "@/lib/favorites";
 import { setAttending, mockAttendeesFor } from "@/lib/attending";
 import { addStory, useStories } from "@/lib/stories";
+import { uploadImage, createPost } from "@/lib/social";
 import { Badge, GradientButton, Loader, Pill } from "@/ui/atoms";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useCanSeeAges } from "@/lib/dprofile";
@@ -139,6 +140,8 @@ export default function EventDetail() {
   // story paylaşma akışı
   const [storyUri, setStoryUri] = useState<string | null>(null);
   const [storyCaption, setStoryCaption] = useState("");
+  // duvara (Meydan feed) foto paylaşma durumu
+  const [wallPosting, setWallPosting] = useState(false);
 
   // katılacaklar listesi modal'ı (eski tek liste — korunuyor)
   const [listOpen, setListOpen] = useState(false);
@@ -473,6 +476,76 @@ export default function EventDetail() {
     reloadStories(); // şerit anında güncellensin
   };
 
+  // 📷 Duvara paylaş: bu etkinlikte çekilen/seçilen fotoğraf Meydan duvarına (feed) düşer.
+  // Story paylaşımından AYRI bir aksiyon — mevcut akışı bozmaz.
+  const postPhotoToWall = async (uri: string) => {
+    if (!event) return;
+    setWallPosting(true);
+    try {
+      const imageUrl = await uploadImage(uri, "post");
+      if (!imageUrl) {
+        Alert.alert("Yüklenemedi", "Fotoğraf yüklenemedi, tekrar dene.");
+        return;
+      }
+      const avatar = await AsyncStorage.getItem("meydanfest:avatar");
+      const ok = await createPost({
+        imageUrl,
+        eventSlug: event.slug,
+        eventTitle: event.title,
+        authorName: user?.name || undefined,
+        authorAvatar: avatar || undefined,
+      });
+      if (ok) {
+        successH();
+        Alert.alert("Duvarda paylaşıldı ✓", "Fotoğrafın Meydan duvarına düştü.");
+      } else {
+        Alert.alert("Paylaşılamadı", "Gönderi paylaşılamadı, tekrar dene.");
+      }
+    } finally {
+      setWallPosting(false);
+    }
+  };
+
+  // Duvara paylaş: kaynak seç (Kamera / Galeri) → R2 → createPost.
+  const shareToWall = () => {
+    // Oturum açmayan duvara paylaşamaz → giriş modalı.
+    if (!user) {
+      showAuthPrompt(t("lock_photo_title"));
+      return;
+    }
+    if (wallPosting) return;
+    impactH();
+    Alert.alert("Duvarda paylaş", "Fotoğraf kaynağını seç", [
+      {
+        text: "📷 Kamera",
+        onPress: async () => {
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert("Kamera izni gerekli", "Fotoğraf çekmek için kamera iznine ihtiyaç var.");
+            return;
+          }
+          const res = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+          if (res.canceled || !res.assets?.length) return;
+          await postPhotoToWall(res.assets[0].uri);
+        },
+      },
+      {
+        text: "🖼️ Galeri",
+        onPress: async () => {
+          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert("Galeri izni gerekli", "Fotoğraf seçmek için galeri iznine ihtiyaç var.");
+            return;
+          }
+          const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7 });
+          if (res.canceled || !res.assets?.length) return;
+          await postPhotoToWall(res.assets[0].uri);
+        },
+      },
+      { text: "İptal", style: "cancel" },
+    ]);
+  };
+
   if (loading) return <View style={{ flex: 1, backgroundColor: T.bg }}><Loader /></View>;
   if (!event) {
     return (
@@ -707,6 +780,17 @@ export default function EventDetail() {
                 </View>
               </View>
             ) : null}
+
+            {/* 📷 Duvarda paylaş — story'den AYRI: fotoğraf Meydan duvarına (feed) düşer. */}
+            <Pressable
+              onPress={shareToWall}
+              disabled={wallPosting}
+              style={[styles.wallShareBtn, { borderColor: T.hairline, backgroundColor: T.surfaceStrong, opacity: wallPosting ? 0.6 : 1 }]}
+            >
+              <Text style={[Type.label, { color: T.text }]}>
+                {wallPosting ? "Yükleniyor…" : "📷 Duvarda paylaş"}
+              </Text>
+            </Pressable>
           </Animated.View>
 
           {/* #14 — Etkinliğe katılacaklar — sekmeli filtre (going/maybe/interested) */}
@@ -1139,6 +1223,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, borderRadius: Radius.pill, paddingHorizontal: 16, paddingVertical: 10, borderWidth: StyleSheet.hairlineWidth * 2, fontSize: 14 },
   sendBtn: { paddingHorizontal: 16, paddingVertical: 11, alignItems: "center", justifyContent: "center" },
   addPhoto: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
+  wallShareBtn: { marginTop: 14, paddingVertical: 11, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center", justifyContent: "center" },
   photo: { width: 100, height: 100, borderRadius: Radius.md },
   photoModalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center", padding: 16 },
   photoModalImg: { width: "94%", height: "78%", borderRadius: Radius.lg },

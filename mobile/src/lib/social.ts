@@ -177,7 +177,9 @@ export async function uploadImage(uri: string, kind: "story" | "post" = "post"):
     const res = await fetch(`${API_BASE}/api/v1/social/upload`, { method: "POST", body: form });
     if (!res.ok) return null;
     const data = (await res.json()) as { ok?: boolean; url?: string };
-    return data.ok && data.url ? data.url : null;
+    if (!data.ok || !data.url) return null;
+    // publicUrl göreli (/api/r2-image/...) dönebilir → mobilde render için mutlak yap.
+    return data.url.startsWith("http") ? data.url : `${API_BASE}${data.url}`;
   } catch {
     return null;
   }

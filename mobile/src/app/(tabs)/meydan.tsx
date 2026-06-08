@@ -42,6 +42,7 @@ import {
   reactPost,
   editPost,
   deletePost,
+  uploadImage,
   FEED_PAGE,
   type FeedPost,
 } from "@/lib/social";
@@ -84,6 +85,7 @@ export default function MeydanScreen() {
   const [compose, setCompose] = useState("");
   const [composerOpen, setComposerOpen] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [photoPosting, setPhotoPosting] = useState(false);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
   const [actionsFor, setActionsFor] = useState<FeedPost | null>(null);
   const [storyPerson, setStoryPerson] = useState<Person | null>(null);
@@ -348,6 +350,77 @@ export default function MeydanScreen() {
     }
   }, [compose, posting, filter, load, maybeShowTip]);
 
+  // 📷 Foto gönderi: seçilen görseli R2'ye yükle → createPost (opsiyonel composer metniyle) → feed yenile.
+  const postPhotoFromUri = useCallback(
+    async (uri: string) => {
+      setPhotoPosting(true);
+      try {
+        const imageUrl = await uploadImage(uri, "post");
+        if (!imageUrl) {
+          setTipMsg("Fotoğraf yüklenemedi, tekrar dene.");
+          return;
+        }
+        const avatar = await AsyncStorage.getItem("meydanfest:avatar");
+        const text = compose.trim();
+        const ok = await createPost({
+          imageUrl,
+          text: text || undefined,
+          authorName: user?.name || undefined,
+          authorAvatar: avatar || undefined,
+        });
+        if (ok) {
+          successH();
+          setCompose("");
+          setComposerOpen(false);
+          setHasMore(true);
+          offsetRef.current = 0;
+          await load(filter);
+          void maybeShowTip();
+        } else {
+          setTipMsg("Gönderi paylaşılamadı, tekrar dene.");
+        }
+      } finally {
+        setPhotoPosting(false);
+      }
+    },
+    [compose, user?.name, filter, load, maybeShowTip],
+  );
+
+  // Foto gönderi kaynağı seç (kamera/galeri).
+  const onPickPhotoPost = useCallback(() => {
+    if (photoPosting) return;
+    impactH();
+    Alert.alert("Fotoğraf paylaş", "Fotoğraf kaynağını seç", [
+      {
+        text: "📷 Kamera",
+        onPress: async () => {
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert("Kamera izni gerekli", "Fotoğraf çekmek için kamera iznine ihtiyaç var.");
+            return;
+          }
+          const res = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+          if (res.canceled || !res.assets?.length) return;
+          await postPhotoFromUri(res.assets[0].uri);
+        },
+      },
+      {
+        text: "🖼️ Galeri",
+        onPress: async () => {
+          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert("Galeri izni gerekli", "Fotoğraf seçmek için galeri iznine ihtiyaç var.");
+            return;
+          }
+          const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7 });
+          if (res.canceled || !res.assets?.length) return;
+          await postPhotoFromUri(res.assets[0].uri);
+        },
+      },
+      { text: "İptal", style: "cancel" },
+    ]);
+  }, [photoPosting, postPhotoFromUri]);
+
   const onCommentAdded = useCallback((postId: string) => {
     setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, commentCount: p.commentCount + 1 } : p)));
   }, []);
@@ -565,17 +638,33 @@ export default function MeydanScreen() {
             multiline
             autoFocus
           />
-          <Pressable
-            onPress={onComposeSend}
-            disabled={!compose.trim() || posting}
-            style={[styles.shareBtn, { backgroundColor: compose.trim() ? T.primary : T.surfaceStrong }, compose.trim() ? glow(T.primary, 10, 0.4) : undefined]}
-          >
-            {posting ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={[Type.label, { color: compose.trim() ? "#fff" : T.textFaint }]}>Paylaş</Text>
-            )}
-          </Pressable>
+          <View style={styles.composerActions}>
+            {/* 📷 Foto gönderi (kamera/galeri → R2 → createPost). Composer metni varsa altyazı olur. */}
+            <Pressable
+              onPress={onPickPhotoPost}
+              disabled={photoPosting || posting}
+              style={[styles.photoBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+              hitSlop={6}
+            >
+              {photoPosting ? (
+                <ActivityIndicator color={T.primary} size="small" />
+              ) : (
+                <Text style={{ fontSize: 18 }}>📷</Text>
+              )}
+            </Pressable>
+            <View style={{ flex: 1 }} />
+            <Pressable
+              onPress={onComposeSend}
+              disabled={!compose.trim() || posting || photoPosting}
+              style={[styles.shareBtn, { backgroundColor: compose.trim() ? T.primary : T.surfaceStrong }, compose.trim() ? glow(T.primary, 10, 0.4) : undefined]}
+            >
+              {posting ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={[Type.label, { color: compose.trim() ? "#fff" : T.textFaint }]}>Paylaş</Text>
+              )}
+            </Pressable>
+          </View>
         </Animated.View>
       ) : null}
 
@@ -714,7 +803,9 @@ const styles = StyleSheet.create({
   addStoryPlus: { color: "#fff", fontSize: 34, fontWeight: "700", lineHeight: 38, marginTop: -2 },
   composer: { marginHorizontal: 16, marginBottom: 18, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 12, gap: 10 },
   composeInput: { borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 14, paddingVertical: 10, minHeight: 46, maxHeight: 120, ...Type.body },
-  shareBtn: { alignSelf: "flex-end", borderRadius: Radius.pill, paddingHorizontal: 22, paddingVertical: 10, minWidth: 90, alignItems: "center", justifyContent: "center" },
+  composerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  photoBtn: { width: 44, height: 40, borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center", justifyContent: "center" },
+  shareBtn: { borderRadius: Radius.pill, paddingHorizontal: 22, paddingVertical: 10, minWidth: 90, alignItems: "center", justifyContent: "center" },
   eventWrap: { marginHorizontal: 16, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, borderStyle: "dashed", padding: 12 },
   tipScrim: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 28 },
   tipCard: { width: "100%", maxWidth: 360, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 20 },
