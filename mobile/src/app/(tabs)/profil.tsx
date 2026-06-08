@@ -26,11 +26,14 @@ import { showAuthPrompt } from "@/lib/authPrompt";
 import { syncProfile } from "@/lib/profileSync";
 import { tapH, impactH, successH } from "@/lib/haptics";
 
-function Stat({ value, label, color, T }: { value: string; label: string; color: string; T: Palette }) {
+/** Tek istatistik kartı — büyük rakam + altında etiket. Tema yüzeyiyle, rakam kesilmeyecek yükseklikte. */
+function StatCard({ value, label, color, T }: { value: string; label: string; color: string; T: Palette }) {
   return (
-    <View style={styles.stat}>
-      <Text style={[Type.h1, { color }]}>{value}</Text>
-      <Text style={[Type.label, { color: T.textFaint, marginTop: 6, textAlign: "center" }]} numberOfLines={2}>
+    <View style={[styles.statCard, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+      <Text style={[styles.statValue, { color }]} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </Text>
+      <Text style={[Type.label, { color: T.textFaint, marginTop: 8, textAlign: "center" }]} numberOfLines={2}>
         {label}
       </Text>
     </View>
@@ -166,17 +169,11 @@ export default function ProfileScreen() {
           </Animated.View>
         )}
 
-        {/* İstatistik */}
-        <Animated.View entering={FadeInDown.duration(450).delay(80)}>
-          <GlassCard glowColor={T.indigo} style={{ marginBottom: Space.xl }}>
-            <View style={styles.statsRow}>
-              <Stat T={T} value={String(upcoming.length)} label={t("my_upcoming")} color={T.cyan} />
-              <View style={[styles.vline, { backgroundColor: T.hairline }]} />
-              <Stat T={T} value={String(past.length)} label={t("my_past")} color={T.gold} />
-              <View style={[styles.vline, { backgroundColor: T.hairline }]} />
-              <Stat T={T} value={String(favs.length)} label={t("tab_favorites")} color={T.pink} />
-            </View>
-          </GlassCard>
+        {/* İstatistik — yan yana stat kartları (her kart kendi yüzeyinde, rakam tam görünür) */}
+        <Animated.View entering={FadeInDown.duration(450).delay(80)} style={styles.statsRow}>
+          <StatCard T={T} value={String(upcoming.length)} label={t("my_upcoming")} color={T.cyan} />
+          <StatCard T={T} value={String(past.length)} label={t("my_past")} color={T.gold} />
+          <StatCard T={T} value={String(favs.length)} label={t("tab_favorites")} color={T.pink} />
         </Animated.View>
 
         {/* Yönetim — sadece admin */}
@@ -262,9 +259,18 @@ const styles = StyleSheet.create({
   storyAdd: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 3 },
   storyRing: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", padding: 2 },
   storyThumb: { width: "100%", height: "100%", borderRadius: 30, borderWidth: 2 },
-  statsRow: { flexDirection: "row", alignItems: "stretch", justifyContent: "space-around", paddingVertical: 2 },
-  stat: { flex: 1, alignItems: "center", justifyContent: "flex-start", paddingHorizontal: 4, minHeight: 62 },
-  vline: { width: StyleSheet.hairlineWidth * 2, alignSelf: "stretch", marginVertical: 4 },
+  statsRow: { flexDirection: "row", gap: Space.md, marginBottom: Space.xl },
+  statCard: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Space.lg,
+    paddingHorizontal: Space.sm,
+    minHeight: 104,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+  },
+  statValue: { fontSize: 28, lineHeight: 34, fontWeight: "800", letterSpacing: -0.4 },
   emptyCard: { alignItems: "center", gap: 8, paddingVertical: Space.xl, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2 },
   adminRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   adminIcon: { width: 44, height: 44, borderRadius: Radius.md, alignItems: "center", justifyContent: "center" },

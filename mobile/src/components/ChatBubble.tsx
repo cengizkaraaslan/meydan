@@ -127,20 +127,20 @@ export function ChatBubble() {
               <ScrollView style={{ maxHeight: height * 0.55 }} showsVerticalScrollIndicator={false}>
                 {convos.map((c) => (
                   <Pressable
-                    key={c.person.id}
-                    onPress={() => goChat(c.person.id)}
+                    key={c.id}
+                    onPress={() => goChat(c.id)}
                     style={({ pressed }) => [
                       styles.row,
                       { borderColor: T.hairline, opacity: pressed ? 0.6 : 1 },
                     ]}
                   >
                     <View>
-                      <Image source={{ uri: c.person.avatar }} style={styles.av} contentFit="cover" />
-                      {c.person.online && <View style={[styles.dot, { backgroundColor: T.success, borderColor: T.bgElevated }]} />}
+                      <Image source={{ uri: c.avatar }} style={styles.av} contentFit="cover" />
+                      {c.online && <View style={[styles.dot, { backgroundColor: T.success, borderColor: T.bgElevated }]} />}
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>
-                        {c.person.name}
+                        {c.name}
                       </Text>
                       <Text
                         style={[
@@ -149,7 +149,7 @@ export function ChatBubble() {
                         ]}
                         numberOfLines={1}
                       >
-                        {c.last?.fromMe ? "Sen: " : ""}{c.last?.text ?? ""}
+                        {c.lastText ?? ""}
                       </Text>
                     </View>
                     {c.unread > 0 ? (

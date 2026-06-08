@@ -1,19 +1,29 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming } from "react-native-reanimated";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { AuroraBackground } from "@/components/AuroraBackground";
-import { getPerson, useChat, type ChatMessage } from "@/lib/people";
+import { getPerson } from "@/lib/people";
+import { useChat, type Msg } from "@/lib/chat";
 import { useAuth } from "@/lib/auth";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { SignInPrompt } from "@/components/SignInPrompt";
 import { tapH } from "@/lib/haptics";
 import { sndSend } from "@/lib/sound";
+
+const READ_BLUE = "#34B7F1";
+
+function hhmm(ms: number): string {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,9 +32,15 @@ export default function ChatScreen() {
   const { t: T } = useTheme();
   const { t } = useT();
   const person = getPerson(String(id));
-  const { messages, typing, send } = useChat(String(id));
+  const { messages, typing, send, sendImage } = useChat(String(id));
   const [text, setText] = useState("");
-  const listRef = useRef<FlatList<ChatMessage>>(null);
+  const listRef = useRef<FlatList<Msg>>(null);
+
+  // Karşı taraftan gelen en son mesajın zamanı → benim ondan ÖNCEKİ mesajlarım "okundu" (mavi tik).
+  const lastIncomingAt = useMemo(
+    () => messages.reduce((mx, m) => (!m.fromMe && m.at > mx ? m.at : mx), 0),
+    [messages],
+  );
 
   useEffect(() => {
     const tm = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
@@ -40,20 +56,15 @@ export default function ChatScreen() {
     );
   }
 
-  // #17: Sohbet yalnızca gerçek kullanıcıya açık. Misafir dahil oturumsuz ise
-  // sohbet içeriği yerine cezbedici giriş modalı; kapatınca geri dön.
+  // Sohbet yalnızca gerçek kullanıcıya açık.
   if (!user) {
     return (
       <View style={{ flex: 1, backgroundColor: T.bg }}>
         <AuroraBackground />
         <View style={styles.lock}>
           <Image source={{ uri: person.avatar }} style={styles.lockAvatar} contentFit="cover" transition={250} />
-          <Text style={[Type.h2, { color: T.text, marginTop: 16, textAlign: "center" }]}>
-            {t("lock_chat_title")}
-          </Text>
-          <Text style={[Type.body, { color: T.textFaint, marginTop: 8, textAlign: "center" }]}>
-            {t("lock_body")}
-          </Text>
+          <Text style={[Type.h2, { color: T.text, marginTop: 16, textAlign: "center" }]}>{t("lock_chat_title")}</Text>
+          <Text style={[Type.body, { color: T.textFaint, marginTop: 8, textAlign: "center" }]}>{t("lock_body")}</Text>
         </View>
         <SignInPrompt visible title={t("lock_chat_title")} onClose={() => router.back()} />
       </View>
@@ -64,8 +75,19 @@ export default function ChatScreen() {
     if (!text.trim()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     sndSend();
-    send(text);
+    void send(text);
     setText("");
+  };
+
+  const onPickImage = async () => {
+    tapH();
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7 });
+    if (res.canceled || !res.assets?.[0]?.uri) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    sndSend();
+    void sendImage(res.assets[0].uri);
   };
 
   return (
@@ -76,13 +98,15 @@ export default function ChatScreen() {
         <Pressable onPress={() => { tapH(); router.back(); }} hitSlop={10} style={[styles.back, { backgroundColor: T.surfaceStrong }]}>
           <Text style={{ color: "#fff", fontSize: 20 }}>←</Text>
         </Pressable>
-        <Image source={{ uri: person.avatar }} style={styles.hAvatar} contentFit="cover" />
-        <View style={{ flex: 1 }}>
+        <Pressable onPress={() => { tapH(); router.push(`/kisi/${person.id}`); }} style={styles.hAvatarWrap} hitSlop={6}>
+          <Image source={{ uri: person.avatar }} style={styles.hAvatar} contentFit="cover" />
+        </Pressable>
+        <Pressable style={{ flex: 1 }} onPress={() => { tapH(); router.push(`/kisi/${person.id}`); }}>
           <Text style={[Type.title, { color: T.text }]}>{person.name}, {person.age}</Text>
-          <Text style={[Type.label, { color: person.online ? T.success : T.textFaint }]}>
-            {typing ? t("typing") : person.online ? t("online") : `${person.distanceKm} km ${t("away")}`}
+          <Text style={[Type.label, { color: typing ? T.primary : person.online ? T.success : T.textFaint }]}>
+            {typing ? `${t("typing")}` : person.online ? t("online") : `${person.distanceKm} km ${t("away")}`}
           </Text>
-        </View>
+        </Pressable>
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -90,14 +114,17 @@ export default function ChatScreen() {
           ref={listRef}
           data={messages}
           keyExtractor={(m) => m.id}
-          contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 16 }}
+          contentContainerStyle={{ padding: 16, gap: 8, paddingBottom: 16 }}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => <Bubble T={T} m={item} />}
-          ListFooterComponent={typing ? <Bubble T={T} m={{ id: "typing", fromMe: false, text: "…", ts: 0 }} /> : null}
+          renderItem={({ item }) => <Bubble T={T} m={item} read={item.fromMe && !item.pending && item.at < lastIncomingAt} />}
+          ListFooterComponent={typing ? <TypingBubble T={T} /> : null}
         />
 
         {/* Girdi */}
         <View style={[styles.inputBar, { paddingBottom: insets.bottom ? insets.bottom : 12, borderTopColor: T.hairline }]}>
+          <Pressable onPress={onPickImage} hitSlop={8} style={[styles.attach, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+            <Text style={{ fontSize: 20 }}>📷</Text>
+          </Pressable>
           <TextInput
             value={text}
             onChangeText={setText}
@@ -118,19 +145,59 @@ export default function ChatScreen() {
   );
 }
 
-function Bubble({ T, m }: { T: Palette; m: ChatMessage }) {
+function Ticks({ read, pending }: { read: boolean; pending?: boolean }) {
+  if (pending) return <Text style={[styles.meta, { color: "rgba(255,255,255,0.65)" }]}>🕓</Text>;
+  return (
+    <Text style={[styles.ticks, { color: read ? READ_BLUE : "rgba(255,255,255,0.7)" }]}>✓✓</Text>
+  );
+}
+
+function Bubble({ T, m, read }: { T: Palette; m: Msg; read: boolean }) {
+  const isImage = !!m.imageUri;
   if (m.fromMe) {
     return (
-      <View style={{ alignSelf: "flex-end", maxWidth: "80%" }}>
-        <LinearGradient colors={T.primarySoft} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.bubble, styles.mine]}>
-          <Text style={[Type.body, { color: "#fff" }]}>{m.text}</Text>
+      <View style={{ alignSelf: "flex-end", maxWidth: "82%" }}>
+        <LinearGradient colors={T.primarySoft} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.bubble, styles.mine, isImage && styles.imgBubble]}>
+          {isImage ? (
+            <Image source={{ uri: m.imageUri }} style={styles.img} contentFit="cover" transition={150} />
+          ) : (
+            <Text style={[Type.body, { color: "#fff" }]}>{m.text}</Text>
+          )}
+          <View style={styles.metaRow}>
+            <Text style={[styles.meta, { color: "rgba(255,255,255,0.7)" }]}>{hhmm(m.at)}</Text>
+            <Ticks read={read} pending={m.pending} />
+          </View>
         </LinearGradient>
       </View>
     );
   }
   return (
-    <View style={[styles.bubble, styles.theirs, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-      <Text style={[Type.body, { color: T.text }]}>{m.text}</Text>
+    <View style={[styles.bubble, styles.theirs, isImage && styles.imgBubble, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+      {isImage ? (
+        <Image source={{ uri: m.imageUri }} style={styles.img} contentFit="cover" transition={150} />
+      ) : (
+        <Text style={[Type.body, { color: T.text }]}>{m.text}</Text>
+      )}
+      <Text style={[styles.meta, { color: T.textFaint, alignSelf: "flex-end" }]}>{hhmm(m.at)}</Text>
+    </View>
+  );
+}
+
+function Dot({ T, delay }: { T: Palette; delay: number }) {
+  const o = useSharedValue(0.3);
+  useEffect(() => {
+    o.value = withDelay(delay, withRepeat(withTiming(1, { duration: 450, easing: Easing.inOut(Easing.ease) }), -1, true));
+  }, [o, delay]);
+  const st = useAnimatedStyle(() => ({ opacity: o.value }));
+  return <Animated.View style={[styles.typingDot, { backgroundColor: T.textDim }, st]} />;
+}
+
+function TypingBubble({ T }: { T: Palette }) {
+  return (
+    <View style={[styles.bubble, styles.theirs, { backgroundColor: T.surfaceStrong, borderColor: T.hairline, flexDirection: "row", gap: 5, paddingVertical: 14 }]}>
+      <Dot T={T} delay={0} />
+      <Dot T={T} delay={150} />
+      <Dot T={T} delay={300} />
     </View>
   );
 }
@@ -142,16 +209,24 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(8,7,13,0.5)",
   },
   back: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  hAvatarWrap: { borderRadius: 21 },
   hAvatar: { width: 42, height: 42, borderRadius: 21 },
   lock: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
   lockAvatar: { width: 96, height: 96, borderRadius: 48 },
-  bubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
+  bubble: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18 },
+  imgBubble: { padding: 4 },
   mine: { borderBottomRightRadius: 4, ...glow("#6366F1", 12, 0.4) },
-  theirs: { alignSelf: "flex-start", maxWidth: "80%", borderBottomLeftRadius: 4, borderWidth: StyleSheet.hairlineWidth * 2 },
+  theirs: { alignSelf: "flex-start", maxWidth: "82%", borderBottomLeftRadius: 4, borderWidth: StyleSheet.hairlineWidth * 2 },
+  img: { width: 210, height: 210, borderRadius: 14 },
+  metaRow: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 5, marginTop: 3 },
+  meta: { fontSize: 10.5, marginTop: 2 },
+  ticks: { fontSize: 11, fontWeight: "700", letterSpacing: -2 },
+  typingDot: { width: 7, height: 7, borderRadius: 4 },
   inputBar: {
-    flexDirection: "row", alignItems: "flex-end", gap: 10, paddingHorizontal: 14, paddingTop: 10,
+    flexDirection: "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 12, paddingTop: 10,
     borderTopWidth: StyleSheet.hairlineWidth * 2, backgroundColor: "rgba(8,7,13,0.6)",
   },
+  attach: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2 },
   input: {
     flex: 1, maxHeight: 110, paddingHorizontal: 14, paddingVertical: 10,
     borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2,

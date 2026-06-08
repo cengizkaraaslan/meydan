@@ -118,8 +118,9 @@ export default function SettingsScreen() {
   const { city, setCity } = useActiveCity();
   const prefs = usePrefs();
 
-  // Akordeon: aynı anda tek bölüm açık (varsayılan hepsi kapalı → sade görünüm).
-  const [open, setOpen] = useState<string | null>(null);
+  // Akordeon: aynı anda tek bölüm açık. Açılışta "Şehir + İlçe" açık gelsin
+  // (uzun içeriği alttaki boşluğu doldurur → ekran dolu/düzgün görünür).
+  const [open, setOpen] = useState<string | null>("city");
   const toggle = (key: string) => { tapH(); setOpen((o) => (o === key ? null : key)); };
   const [notif, setNotif] = useState<NotifPrefs>({ mode: "all", cities: [], categories: [] });
   const [savedAt, setSavedAt] = useState(0);

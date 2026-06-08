@@ -108,3 +108,95 @@ export function imageFor(e: ApiEvent): string {
   const code = map[e.category] ?? map.DIGER;
   return `https://images.unsplash.com/photo-${code}?auto=format&fit=crop&w=1600&q=85`;
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// Dating (eşleşme + sohbet) API'leri — base aynı, API key gerekmez, kimlik=deviceId
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Backend mesajı (eski→yeni). */
+export interface ChatMessage {
+  id: string;
+  fromMe: boolean;
+  text: string;
+  at: number; // epoch ms
+}
+
+/** Eşleşme özeti (sohbet listesi/balon bunu kullanır). */
+export interface MatchSummary {
+  matchKey: string;
+  partnerId: string;
+  partnerName: string;
+  partnerAvatar: string;
+  lastMessage: string | null;
+  lastAt: string | null;
+  unread: number;
+  createdAt: string;
+}
+
+const JSON_HEADERS = { "Content-Type": "application/json", Accept: "application/json" };
+
+async function postJson<T>(path: string, body: unknown): Promise<T | null> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+/** Mock eşleşme konuşması oluşturur (idempotent). matchKey döner. */
+export async function apiEnsureMatch(input: {
+  deviceId: string;
+  partnerId: string;
+  partnerName: string;
+  partnerAvatar: string;
+}): Promise<string | null> {
+  const data = await postJson<{ ok?: boolean; matchKey?: string }>("/api/v1/dating/matches", input);
+  return data?.matchKey ?? null;
+}
+
+/** Cihazın eşleşme özetlerini çeker (yeni→eski). */
+export async function apiFetchMatches(deviceId: string): Promise<MatchSummary[]> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/dating/matches`);
+    url.searchParams.set("deviceId", deviceId);
+    const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const list: MatchSummary[] = data.data ?? [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Bir konuşmanın mesajlarını çeker (eski→yeni). Karşıdakini okundu işaretler. */
+export async function apiFetchMessages(matchKey: string, deviceId: string): Promise<ChatMessage[]> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/dating/messages`);
+    url.searchParams.set("matchKey", matchKey);
+    url.searchParams.set("deviceId", deviceId);
+    const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const list: ChatMessage[] = data.data ?? [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Mesaj gönderir. sender=deviceId → fromMe:true; sender=bot_<id> → fromMe:false (bot cevabı). */
+export async function apiSendMessage(input: {
+  matchKey: string;
+  senderDeviceId: string;
+  text: string;
+}): Promise<ChatMessage | null> {
+  const data = await postJson<{ ok?: boolean; message?: ChatMessage }>("/api/v1/dating/messages", input);
+  return data?.message ?? null;
+}
