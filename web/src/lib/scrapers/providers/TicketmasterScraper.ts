@@ -13,10 +13,10 @@ import type { EventCategory, EventSource, ScrapedEvent } from "../../types";
  */
 // NOT: setEventsForSource her event'i ardışık DB upsert ile yazar → tek run'da
 // yazılan event sayısı serverless maxDuration(60sn) için bounded tutulmalı (~180).
-const TR_PAGES = 1;
-const TR_SIZE = 30;
-const WORLD_COUNTRIES = ["US", "GB", "DE", "FR", "NL"];
-const WORLD_SIZE = 8;
+const TR_PAGES = 2;
+const TR_SIZE = 40;
+const WORLD_COUNTRIES = ["US", "GB", "DE", "FR", "NL", "ES", "IT", "AE"];
+const WORLD_SIZE = 15;
 
 interface TmImage {
   url?: string;
