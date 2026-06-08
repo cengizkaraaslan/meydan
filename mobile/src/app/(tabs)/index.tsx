@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { Dimensions, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Dimensions, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,7 +15,7 @@ import { CATEGORIES } from "@/lib/categories";
 import { fetchEvents, type ApiEvent } from "@/lib/api";
 import { loadEventsCache, saveEventsCache } from "@/lib/eventCache";
 import { dayRange, isPastDay } from "@/lib/format";
-import { useActiveCity } from "@/lib/location";
+import { useActiveCity, ALL_CITIES } from "@/lib/location";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -26,10 +26,6 @@ import { tapH } from "@/lib/haptics";
 const { width } = Dimensions.get("window");
 const HERO_W = width - 32;
 
-// Anasayfa şehir dropdown'ı — en çok içeriğe (etkinlik/kurs/sinema) sahip 8 il.
-const HOME_CITIES = [
-  "İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Eskişehir", "Konya", "Gaziantep",
-];
 
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
@@ -46,6 +42,11 @@ export default function DiscoverScreen() {
   );
   const photoUri = avatarOverride ?? user?.photo;
   const [cityModal, setCityModal] = useState(false);
+  const [citySearch, setCitySearch] = useState("");
+  const filteredCities = useMemo(() => {
+    const q = citySearch.trim().toLocaleLowerCase("tr");
+    return q ? ALL_CITIES.filter((c) => c.toLocaleLowerCase("tr").includes(q)) : ALL_CITIES;
+  }, [citySearch]);
   const [featured, setFeatured] = useState<ApiEvent[]>([]);
   const [cat, setCat] = useState<string | null>(null);
   const [day, setDay] = useState<"all" | "today" | "tomorrow" | "weekend">("all");
@@ -217,26 +218,46 @@ export default function DiscoverScreen() {
           >
             <View style={styles.modalHeader}>
               <Text style={[Type.h2, { color: T.text }]}>{t("change_location")}</Text>
-              <Pressable onPress={() => { tapH(); setCityModal(false); }} hitSlop={10}>
+              <Pressable onPress={() => { tapH(); setCityModal(false); setCitySearch(""); }} hitSlop={10}>
                 <Text style={{ fontSize: 22, color: T.textDim }}>✕</Text>
               </Pressable>
             </View>
 
-            <View style={styles.cityChips}>
-              <Pill
-                label={`✦ ${t("use_my_location")}`}
-                active={city === null}
-                onPress={() => { tapH(); setCity(null); setCityModal(false); }}
-              />
-              {HOME_CITIES.map((c) => (
-                <Pill
+            {/* Konumu kullan */}
+            <Pressable
+              onPress={() => { tapH(); setCity(null); setCityModal(false); setCitySearch(""); }}
+              style={[styles.useLoc, { borderColor: city === null ? T.primary : T.hairline, backgroundColor: T.surfaceStrong }]}
+            >
+              <Text style={[Type.title, { color: city === null ? T.primary : T.text }]}>✦ {t("use_my_location")}</Text>
+            </Pressable>
+
+            {/* Şehir ara (81 il) */}
+            <TextInput
+              value={citySearch}
+              onChangeText={setCitySearch}
+              placeholder="Şehir ara…"
+              placeholderTextColor={T.textFaint}
+              autoCorrect={false}
+              style={[Type.body, styles.citySearch, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+            />
+
+            <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              {filteredCities.map((c) => (
+                <Pressable
                   key={c}
-                  label={c}
-                  active={city === c}
-                  onPress={() => { tapH(); setCity(c); setCityModal(false); }}
-                />
+                  onPress={() => { tapH(); setCity(c); setCityModal(false); setCitySearch(""); }}
+                  style={[styles.cityRow, { borderBottomColor: T.hairline }]}
+                >
+                  <Text style={[Type.body, { color: city === c ? T.primary : T.text, fontWeight: city === c ? "800" : "500" }]}>
+                    📍 {c}
+                  </Text>
+                  {city === c ? <Text style={{ color: T.primary }}>✓</Text> : null}
+                </Pressable>
               ))}
-            </View>
+              {filteredCities.length === 0 ? (
+                <Text style={[Type.body, { color: T.textFaint, textAlign: "center", paddingVertical: 16 }]}>Sonuç yok</Text>
+              ) : null}
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
@@ -274,5 +295,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: Space.sm,
+  },
+  useLoc: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    marginBottom: Space.md,
+  },
+  citySearch: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    marginBottom: Space.sm,
+  },
+  cityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
 });
