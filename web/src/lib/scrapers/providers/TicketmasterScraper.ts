@@ -11,10 +11,12 @@ import type { EventCategory, EventSource, ScrapedEvent } from "../../types";
  * (her biri 1 sayfa, size=50). Toplam ~11 istek; Discovery limiti 5000/gün.
  * Docs: https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/
  */
-const TR_PAGES = 3;
-const TR_SIZE = 100;
+// NOT: setEventsForSource her event'i ardışık DB upsert ile yazar → tek run'da
+// yazılan event sayısı serverless maxDuration(60sn) için bounded tutulmalı (~180).
+const TR_PAGES = 2;
+const TR_SIZE = 40;
 const WORLD_COUNTRIES = ["US", "GB", "DE", "FR", "NL", "ES", "IT", "AE"];
-const WORLD_SIZE = 50;
+const WORLD_SIZE = 12;
 
 interface TmImage {
   url?: string;
