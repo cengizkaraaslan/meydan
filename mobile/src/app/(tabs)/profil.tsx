@@ -14,6 +14,7 @@ import { EventRow } from "@/components/EventCard";
 import { ImageEditor } from "@/components/ImageEditor";
 import { deleteLocalFile } from "@/lib/fileStore";
 import { StoryAvatar } from "@/components/StoryAvatar";
+import { resolveAvatar } from "@/lib/avatar";
 import { Pill, SectionHeader } from "@/ui/atoms";
 import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { useFavorites } from "@/lib/favorites";
@@ -159,8 +160,10 @@ export default function ProfileScreen() {
   // Profil fotoğrafı — kullanıcı kendi seçtiği görseli ayarlayabilir (yerelde + DB'ye senkron).
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
   const [cropUri, setCropUri] = useState<string | null>(null); // kırpma ekranına gidecek ham görsel
+  const [gender, setGender] = useState<string | null>(null);
   useEffect(() => {
     AsyncStorage.getItem("meydanfest:avatar").then(setAvatarOverride);
+    AsyncStorage.getItem("meydanfest:gender").then(setGender);
   }, []);
   const photoUri = avatarOverride ?? user?.photo;
 
@@ -318,7 +321,7 @@ export default function ProfileScreen() {
         <Animated.View entering={FadeInDown.duration(450)} style={styles.header}>
           <Pressable onPress={changePhoto} style={styles.avatarWrap}>
             {/* Story yüklediyse avatarda Instagram-tarzı halka (StoryAvatar) */}
-            <StoryAvatar uri={photoUri} name={user?.name ?? "✦"} size={84} hasStory={stories.length > 0} />
+            <StoryAvatar uri={resolveAvatar(photoUri, user?.name, gender)} name={user?.name ?? "✦"} size={84} hasStory={stories.length > 0} />
             {/* Düzenle rozeti — fotoğrafı değiştir */}
             <View style={[styles.avatarEdit, { backgroundColor: T.primary, borderColor: T.bg }]}>
               <Text style={{ fontSize: 13 }}>📷</Text>

@@ -20,6 +20,7 @@ import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { fetchNotifs } from "@/lib/social";
+import { resolveAvatar } from "@/lib/avatar";
 import { Image } from "expo-image";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { tapH } from "@/lib/haptics";
@@ -35,10 +36,12 @@ export default function DiscoverScreen() {
   const { city, status, setCity } = useActiveCity();
   const { user } = useAuth();
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
-  // Profilde avatar değişince anasayfaya dönüldüğünde güncellensin (her odakta yeniden oku).
+  const [gender, setGender] = useState<string | null>(null);
+  // Profilde avatar/cinsiyet değişince anasayfaya dönüldüğünde güncellensin (her odakta yeniden oku).
   useFocusEffect(
     useCallback(() => {
       AsyncStorage.getItem("meydanfest:avatar").then(setAvatarOverride);
+      AsyncStorage.getItem("meydanfest:gender").then(setGender);
     }, []),
   );
   const photoUri = avatarOverride ?? user?.photo;
@@ -152,11 +155,7 @@ export default function DiscoverScreen() {
             </Pressable>
             {/* Profil — alt bardan kaldırıldı, büyütecin yanında avatar olarak */}
             <Pressable onPress={() => { tapH(); router.push("/profil"); }} style={[styles.searchBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline, overflow: "hidden", padding: 0 }]}>
-              {photoUri ? (
-                <Image source={{ uri: photoUri }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
-              ) : (
-                <Text style={{ fontSize: 18 }}>👤</Text>
-              )}
+              <Image source={{ uri: resolveAvatar(photoUri, user?.name, gender) }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
             </Pressable>
           </View>
         </Animated.View>
