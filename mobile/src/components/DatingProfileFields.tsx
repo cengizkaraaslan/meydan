@@ -26,6 +26,10 @@ export function DatingProfileFields() {
   const { profile, update, toggleIn } = useDProfile();
   const [confirmHide, setConfirmHide] = useState(false);
 
+  // Yaş kilidi: bir kez geçerli yaş kaydedilince (profile.age dolu) artık değiştirilemez.
+  const ageLocked = profile.age.trim().length > 0;
+  const [ageDraft, setAgeDraft] = useState("");
+
   // Doğum tarihi parçaları (gün/ay/yıl) — profil.birthDate ("YYYY-MM-DD") ile senkron.
   const [bd, setBd] = useState({ d: "", m: "", y: "" });
   useEffect(() => {
@@ -168,6 +172,33 @@ export function DatingProfileFields() {
         </View>
         <Text style={[Type.label, { color: T.textFaint, marginTop: Space.sm }]}>
           {profile.showAge ? "Yaşın profilinde görünür" : "Yaşın gizli — sen de başkalarının yaşını göremezsin"}
+        </Text>
+      </View>
+
+      {/* Yaş — bir kez girilir, sonradan değiştirilemez (kilitli) */}
+      <View>
+        <Header title="Yaş" />
+        <TextInput
+          style={[inputStyle, ageLocked && { opacity: 0.55 }]}
+          keyboardType="number-pad"
+          maxLength={2}
+          editable={!ageLocked}
+          placeholder="Yaşın (13-99)"
+          placeholderTextColor={T.textFaint}
+          value={ageLocked ? profile.age : ageDraft}
+          onChangeText={(raw) => {
+            if (ageLocked) return;
+            const val = raw.replace(/[^0-9]/g, "").slice(0, 2);
+            setAgeDraft(val);
+            // Geçerli (2 hane, 13-99) olunca KALICI kaydet → bundan sonra kilitlenir.
+            const n = parseInt(val, 10);
+            if (val.length === 2 && n >= 13 && n <= 99) update({ age: val });
+          }}
+        />
+        <Text style={[Type.label, { color: ageLocked ? T.textFaint : T.gold, marginTop: Space.sm }]}>
+          {ageLocked
+            ? "🔒 Yaş bir kez girilir, sonradan değiştirilemez."
+            : "Yaşını dikkatli gir — kaydettikten sonra değiştiremezsin."}
         </Text>
       </View>
 

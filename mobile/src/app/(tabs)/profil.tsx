@@ -272,7 +272,7 @@ export default function ProfileScreen() {
   return (
     <View style={[styles.root, { backgroundColor: T.bg }]}>
       <AuroraBackground />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: 130, paddingHorizontal: 16 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 160, paddingHorizontal: 16 }}>
         {/* Üst bar — başlık + ayarlar */}
         <View style={styles.topBar}>
           <Text style={[Type.h2, { color: T.text }]}>{t("tab_profile")}</Text>

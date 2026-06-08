@@ -10,6 +10,7 @@ import {
 import { SOURCE_LABELS } from "@/lib/types";
 import { Activity, Zap, AlertTriangle, Clock } from "lucide-react";
 import { ScrapeNowButton } from "@/components/admin/ScrapeNowButton";
+import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,10 @@ interface SourceView {
 export default async function AdminScrapersPage() {
   const scrapers = scraperRegistry.list();
   const usingMock = process.env.USE_MOCK_DATA === "true";
+
+  const session = await auth().catch(() => null);
+  const adminEmail = session?.user?.email ?? "";
+  const sources = scrapers.map((s) => ({ source: String(s.source), label: s.displayName }));
 
   // ÖNCE kalıcı DB'den oku; DB boş/yapılandırılmamışsa in-memory tracker'a düş.
   const dbSummary = await getDbSummary(48);
@@ -93,7 +98,7 @@ export default async function AdminScrapersPage() {
         <StatCard icon={Clock} label="Son çalışma" value={hasAny ? relTime(summary.lastRunAt) : "—"} color="from-amber-500 to-orange-500" valueClassName="text-base" />
       </div>
 
-      <ScrapeNowButton />
+      <ScrapeNowButton email={adminEmail} sources={sources} />
 
       {!hasAny && (
         <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--muted-bg)]/30 p-5 text-center text-sm text-[var(--muted)]">

@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraBackground } from "@/components/AuroraBackground";
-import { Radius, Space, Type, glow } from "@/theme/aurora";
+import { Radius, Space, Type } from "@/theme/aurora";
 import { useAuth } from "@/lib/auth";
 import { isAdmin, ADMIN_EMAIL } from "@/lib/admin";
 import { useTheme, type Palette } from "@/lib/theme";
@@ -84,7 +84,7 @@ export default function AdminHubScreen() {
             return (
               <Animated.View key={it.route} entering={FadeInDown.duration(420).delay(80 + i * 60)}>
                 <Pressable onPress={() => { tapH(); router.push(it.route as never); }}>
-                  <View style={[styles.card, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }, glow(accent, 16, 0.25)]}>
+                  <View style={[styles.card, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
                     <View style={styles.cardRow}>
                       <View style={[styles.iconBox, { backgroundColor: T.surface, borderColor: T.hairline }]}>
                         <Text style={{ fontSize: 26 }}>{it.icon}</Text>
