@@ -14,6 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { IntroAnimation } from "@/components/IntroAnimation";
 import { Walkthrough } from "@/components/Walkthrough";
 import { GlobalSignInPrompt } from "@/components/SignInPrompt";
+import { FavHintModal } from "@/components/FavHintModal";
 import { onReplayTour } from "@/lib/prefs";
 import { initNotifications, scheduleNearbyTeaser, useNearbyNotificationNav } from "@/lib/notify";
 
@@ -120,6 +121,7 @@ export default function RootLayout() {
             <AuthProvider>
               <RootNavigator />
               <GlobalSignInPrompt />
+              <FavHintModal />
             </AuthProvider>
           </PaletteProvider>
         </I18nProvider>

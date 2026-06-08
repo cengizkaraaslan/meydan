@@ -9,7 +9,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
-import { useAuth } from "@/lib/auth";
 
 interface TabRoute { key: string; name: string }
 interface TabBarProps {
@@ -31,9 +30,9 @@ function AuroraTabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const { t: T } = useTheme();
   const { t } = useT();
-  const { user } = useAuth();
   // Oturum yoksa (misafir/girişsiz) favori sekmesini bar'dan gizle; ekran kayıtlı kalır.
-  const routes = state.routes.filter((r) => !(r.name === "favoriler" && !user));
+  // Favori sekmesi bar'dan kaldırıldı (profildeki favori sayacından açılır); ekran kayıtlı kalır.
+  const routes = state.routes.filter((r) => r.name !== "favoriler");
   return (
     <View style={[styles.wrap, { paddingBottom: insets.bottom ? insets.bottom : 14 }]} pointerEvents="box-none">
       <View style={[styles.bar, glow(T.primary, 22, 0.4)]}>

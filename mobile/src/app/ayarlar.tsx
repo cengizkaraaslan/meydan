@@ -118,9 +118,9 @@ export default function SettingsScreen() {
   const { city, setCity } = useActiveCity();
   const prefs = usePrefs();
 
-  // Akordeon: aynı anda tek bölüm açık. Açılışta "Şehir + İlçe" açık gelsin
-  // (uzun içeriği alttaki boşluğu doldurur → ekran dolu/düzgün görünür).
-  const [open, setOpen] = useState<string | null>("city");
+  // Akordeon: aynı anda tek bölüm açık. Açılışta "Bildirim" açık gelsin
+  // (en üstteki bölüm → kullanıcı önce bildirim tercihlerini görür).
+  const [open, setOpen] = useState<string | null>("notif");
   const toggle = (key: string) => { tapH(); setOpen((o) => (o === key ? null : key)); };
   const [notif, setNotif] = useState<NotifPrefs>({ mode: "all", cities: [], categories: [] });
   const [savedAt, setSavedAt] = useState(0);
@@ -245,6 +245,41 @@ export default function SettingsScreen() {
           <View style={{ width: 40 }} />
         </View>
 
+        {/* Bildirim tercihleri */}
+        <Section title={t("notif_prefs")} accent={T.cyan} openKey="notif" current={open} onToggle={toggle} delay={80}>
+          <GlassCard padded>
+                <Text style={[Type.body, { color: T.textDim, marginBottom: Space.md }]}>{t("notif_help")}</Text>
+                <View style={styles.pillWrap}>
+                  <Pill label={t("notif_all")} active={notif.mode === "all"} onPress={() => setNotifMode("all")} />
+                  <Pill label={t("notif_custom")} active={notif.mode === "custom"} gradient={T.primarySoft} onPress={() => setNotifMode("custom")} />
+                  <Pill label={t("notif_off")} active={notif.mode === "off"} onPress={() => setNotifMode("off")} />
+                </View>
+                {notif.mode === "custom" && (
+                  <Animated.View entering={FadeInDown.duration(260)}>
+                    <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
+                    <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>{t("notif_pick_cities")}</Text>
+                    <View style={styles.pillWrap}>
+                      {CITIES.map((c) => (
+                        <Pill key={c} label={c} active={notif.cities.includes(c)} gradient={T.primarySoft} onPress={() => toggleNotifCity(c)} />
+                      ))}
+                    </View>
+                    <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
+                    <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>{t("notif_pick_cats")}</Text>
+                    <View style={styles.pillWrap}>
+                      {CATEGORIES.map((c) => (
+                        <Pill key={c.key} label={`${c.emoji} ${c.label}`} active={notif.categories.includes(c.key)} gradient={c.gradient} onPress={() => toggleNotifCat(c.key)} />
+                      ))}
+                    </View>
+                  </Animated.View>
+                )}
+                {savedAt > 0 && (
+                  <Animated.Text key={savedAt} entering={FadeInDown.duration(240)} style={[Type.label, { color: T.cyan, marginTop: Space.md, textAlign: "center" }]}>
+                    {t("notif_saved")}
+                  </Animated.Text>
+                )}
+          </GlassCard>
+        </Section>
+
         {/* Şehir + İlçe — tüm 81 il + şehre bağlı ilçeler (cihazda + DB'de tutulur) */}
         <Section
           title={`${t("detected_city")}  📍 ${city ?? "—"}${district ? " · " + district : ""}`}
@@ -322,41 +357,6 @@ export default function SettingsScreen() {
             <ToggleRow label={t("reduce_motion")} help={t("reduce_motion_help")} value={prefs.reduceMotion} onValueChange={(v) => { tapH(); prefs.setReduceMotion(v); }} T={T} accent={T.primary} />
             <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.sm }]} />
             <LinkRow icon="🎬" label={t("replay_tour")} onPress={doReplayTour} T={T} />
-          </GlassCard>
-        </Section>
-
-        {/* Bildirim tercihleri */}
-        <Section title={t("notif_prefs")} accent={T.cyan} openKey="notif" current={open} onToggle={toggle} delay={80}>
-          <GlassCard padded>
-                <Text style={[Type.body, { color: T.textDim, marginBottom: Space.md }]}>{t("notif_help")}</Text>
-                <View style={styles.pillWrap}>
-                  <Pill label={t("notif_all")} active={notif.mode === "all"} onPress={() => setNotifMode("all")} />
-                  <Pill label={t("notif_custom")} active={notif.mode === "custom"} gradient={T.primarySoft} onPress={() => setNotifMode("custom")} />
-                  <Pill label={t("notif_off")} active={notif.mode === "off"} onPress={() => setNotifMode("off")} />
-                </View>
-                {notif.mode === "custom" && (
-                  <Animated.View entering={FadeInDown.duration(260)}>
-                    <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
-                    <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>{t("notif_pick_cities")}</Text>
-                    <View style={styles.pillWrap}>
-                      {CITIES.map((c) => (
-                        <Pill key={c} label={c} active={notif.cities.includes(c)} gradient={T.primarySoft} onPress={() => toggleNotifCity(c)} />
-                      ))}
-                    </View>
-                    <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
-                    <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>{t("notif_pick_cats")}</Text>
-                    <View style={styles.pillWrap}>
-                      {CATEGORIES.map((c) => (
-                        <Pill key={c.key} label={`${c.emoji} ${c.label}`} active={notif.categories.includes(c.key)} gradient={c.gradient} onPress={() => toggleNotifCat(c.key)} />
-                      ))}
-                    </View>
-                  </Animated.View>
-                )}
-                {savedAt > 0 && (
-                  <Animated.Text key={savedAt} entering={FadeInDown.duration(240)} style={[Type.label, { color: T.cyan, marginTop: Space.md, textAlign: "center" }]}>
-                    {t("notif_saved")}
-                  </Animated.Text>
-                )}
           </GlassCard>
         </Section>
 

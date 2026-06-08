@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
 import { API_BASE, type ApiEvent } from "./api";
 import { getDeviceId } from "./profileSync";
+import { notifyFavAdded } from "./favHint";
 
 const KEY = "meydanfest:favorites:v1";
 
@@ -47,6 +48,8 @@ export async function toggleFavorite(e: ApiEvent): Promise<boolean> {
     on = true;
   }
   await persist();
+  // Yalnızca EKLEMEde bilgilendirme modalını tetikle (favoriden çıkarmada değil).
+  if (on) notifyFavAdded();
   return on;
 }
 

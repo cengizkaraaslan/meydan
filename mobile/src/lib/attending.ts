@@ -67,6 +67,48 @@ function splitByTime(items: AttendingItem[], nowMs: number) {
   return { upcoming, past };
 }
 
+/**
+ * Etkinlik id'sinden deterministik (sabit) bir sayı türetir — her açılışta aynı sonucu
+ * verir (Math.random YOK). Mock katılımcı listelerini bölüştürmek için kullanılır.
+ */
+export function hashEventId(eventId: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < eventId.length; i++) {
+    h ^= eventId.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+/**
+ * Bir etkinliğin RSVP kategorisi (going/maybe/interested) için, verilen kişi listesinden
+ * DETERMİNİSTİK bir alt küme döndürür. Aynı etkinlik+kategori için her zaman aynı kişiler;
+ * farklı kategoriler farklı (çakışmayan) dilimler alır. Gerçek kullanıcı yok — mock.
+ *
+ * @param eventId etkinlik kimliği (deterministik tohum)
+ * @param category "going" | "maybe" | "interested"
+ * @param people  havuz (people.ts PEOPLE)
+ */
+export function mockAttendeesFor<T>(eventId: string, category: Rsvp, people: readonly T[]): T[] {
+  if (people.length === 0) return [];
+  const base = hashEventId(eventId);
+  // Kategoriye sabit bir ofset ver → üç kategori farklı yerlerden başlasın.
+  const catOffset = category === "going" ? 0 : category === "maybe" ? 1 : 2;
+  const seed = base + catOffset * 101;
+  const start = seed % people.length;
+  // Kategori başına farklı (ama deterministik) bir uzunluk: going > maybe > interested eğilimi.
+  const baseCounts = category === "going" ? 5 : category === "maybe" ? 4 : 3;
+  const count = baseCounts + (seed % 3); // 3..7 arası
+  const out: T[] = [];
+  // Çakışmaları azaltmak için kategoriye göre farklı adım (stride) ile dolaş.
+  const stride = category === "going" ? 1 : category === "maybe" ? 2 : 3;
+  for (let i = 0; i < count && i < people.length; i++) {
+    out.push(people[(start + i * stride) % people.length]);
+  }
+  // Tekrarları temizle (stride people.length ile ortak bölene düşerse oluşabilir).
+  return out.filter((p, i) => out.indexOf(p) === i);
+}
+
 export function useAttending() {
   const [items, setItems] = useState<AttendingItem[]>([]);
 

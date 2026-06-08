@@ -1,14 +1,13 @@
-import React, { useEffect, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { AuroraBackground } from "@/components/AuroraBackground";
-import { GlassCard } from "@/components/GlassCard";
 import { EventRow } from "@/components/EventCard";
 import { ImageEditor } from "@/components/ImageEditor";
 import { deleteLocalFile } from "@/lib/fileStore";
@@ -26,19 +25,40 @@ import { showAuthPrompt } from "@/lib/authPrompt";
 import { syncProfile } from "@/lib/profileSync";
 import { tapH, impactH, successH } from "@/lib/haptics";
 
-/** Tek istatistik kartı — büyük rakam + altında etiket. Tema yüzeyiyle, rakam kesilmeyecek yükseklikte. */
-function StatCard({ value, label, color, T }: { value: string; label: string; color: string; T: Palette }) {
+/** Tek istatistik kartı — büyük rakam + altında etiket. Dokununca ilgili liste açılır. */
+function StatCard({ value, label, color, T, onPress }: { value: string; label: string; color: string; T: Palette; onPress?: () => void }) {
   return (
-    <View style={[styles.statCard, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.statCard, { backgroundColor: T.surfaceStrong, borderColor: T.hairline, opacity: pressed ? 0.65 : 1 }]}
+    >
       <Text style={[styles.statValue, { color }]} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
       <Text style={[Type.label, { color: T.textFaint, marginTop: 8, textAlign: "center" }]} numberOfLines={2}>
         {label}
       </Text>
-    </View>
+    </Pressable>
   );
 }
+
+/** Girilebilecek sosyal hesaplar. */
+const SOCIALS: { key: string; label: string; icon: string; placeholder: string }[] = [
+  { key: "instagram", label: "Instagram", icon: "📸", placeholder: "Instagram kullanıcı adın (örn. @kullanici)" },
+  { key: "tiktok", label: "TikTok", icon: "🎵", placeholder: "TikTok kullanıcı adın (örn. @kullanici)" },
+  { key: "facebook", label: "Facebook", icon: "📘", placeholder: "Facebook profil adın veya linkin" },
+];
+
+interface SocialEntry {
+  handle: string;
+  pub: boolean;
+}
+type SocialMap = Record<string, SocialEntry>;
+const EMPTY_SOCIAL: SocialMap = {
+  instagram: { handle: "", pub: false },
+  tiktok: { handle: "", pub: false },
+  facebook: { handle: "", pub: false },
+};
 
 /** Boş bölüm yer tutucusu — düz metin yerine sade kart (tasarımı toparlar). */
 function EmptyMini({ emoji, text, T }: { emoji: string; text: string; T: Palette }) {
@@ -59,6 +79,46 @@ export default function ProfileScreen() {
   const { upcoming, past } = useAttending();
   const { stories, remove, reload } = useStories();
   const [viewer, setViewer] = useState<Story | null>(null);
+  const [listView, setListView] = useState<null | "upcoming" | "past" | "fav">(null);
+
+  // Sosyal hesaplar (yerelde saklanır; görünürlük toggle'lı).
+  const [social, setSocial] = useState<SocialMap>(EMPTY_SOCIAL);
+  useEffect(() => {
+    AsyncStorage.getItem("meydanfest:social").then((raw) => {
+      if (raw) {
+        try {
+          setSocial({ ...EMPTY_SOCIAL, ...(JSON.parse(raw) as SocialMap) });
+        } catch {
+          /* yoksay */
+        }
+      }
+    });
+  }, []);
+  const saveSocial = (next: SocialMap) => {
+    setSocial(next);
+    AsyncStorage.setItem("meydanfest:social", JSON.stringify(next));
+  };
+
+  // Basit toast bildirimi (alt kısımda kayan).
+  const [toast, setToast] = useState<string | null>(null);
+  const toastO = useSharedValue(0);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = (msg: string) => {
+    setToast(msg);
+    toastO.value = withTiming(1, { duration: 200 });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => {
+      toastO.value = withTiming(0, { duration: 250 });
+    }, 2200);
+  };
+  const toastStyle = useAnimatedStyle(() => ({ opacity: toastO.value }));
+
+  const toggleSocial = (key: string, label: string) => {
+    impactH();
+    const next = { ...social, [key]: { ...social[key], pub: !social[key].pub } };
+    saveSocial(next);
+    showToast(next[key].pub ? `${label} artık herkese açık 👀` : `${label} gizlendi 🔒`);
+  };
 
   // Profil fotoğrafı — kullanıcı kendi seçtiği görseli ayarlayabilir (yerelde + DB'ye senkron).
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
@@ -171,57 +231,98 @@ export default function ProfileScreen() {
 
         {/* İstatistik — yan yana stat kartları (her kart kendi yüzeyinde, rakam tam görünür) */}
         <Animated.View entering={FadeInDown.duration(450).delay(80)} style={styles.statsRow}>
-          <StatCard T={T} value={String(upcoming.length)} label={t("my_upcoming")} color={T.cyan} />
-          <StatCard T={T} value={String(past.length)} label={t("my_past")} color={T.gold} />
-          <StatCard T={T} value={String(favs.length)} label={t("tab_favorites")} color={T.pink} />
+          <StatCard T={T} value={String(upcoming.length)} label={t("my_upcoming")} color={T.cyan} onPress={() => { tapH(); setListView("upcoming"); }} />
+          <StatCard T={T} value={String(past.length)} label={t("my_past")} color={T.gold} onPress={() => { tapH(); setListView("past"); }} />
+          <StatCard T={T} value={String(favs.length)} label={t("tab_favorites")} color={T.pink} onPress={() => { tapH(); setListView("fav"); }} />
         </Animated.View>
 
         {/* Yönetim — sadece admin */}
         {isAdmin(user) && (
           <Animated.View entering={FadeInDown.duration(450).delay(100)}>
-            <Pressable onPress={() => { tapH(); router.push("/admin"); }} style={{ marginBottom: Space.xl }}>
-              <GlassCard glowColor={T.gold} padded>
-                <View style={styles.adminRow}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: Space.md, flex: 1 }}>
-                    <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.adminIcon, glow(T.primary, 14, 0.5)]}>
-                      <Text style={{ fontSize: 18 }}>🛡️</Text>
-                    </LinearGradient>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[Type.title, { color: T.text }]}>{t("admin_panel")}</Text>
-                      <Text style={[Type.label, { color: T.textFaint, marginTop: 2 }]}>{t("admin_users")}</Text>
-                    </View>
+            <Pressable
+              onPress={() => { tapH(); router.push("/admin"); }}
+              style={({ pressed }) => [styles.adminCard, { backgroundColor: T.surfaceStrong, borderColor: T.hairline, opacity: pressed ? 0.7 : 1 }]}
+            >
+              <View style={styles.adminRow}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: Space.md, flex: 1 }}>
+                  <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.adminIcon, glow(T.primary, 14, 0.5)]}>
+                    <Text style={{ fontSize: 18 }}>🛡️</Text>
+                  </LinearGradient>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[Type.title, { color: T.text }]}>{t("admin_panel")}</Text>
+                    <Text style={[Type.label, { color: T.textFaint, marginTop: 2 }]}>{t("admin_users")}</Text>
                   </View>
-                  <Text style={[Type.h2, { color: T.gold }]}>→</Text>
                 </View>
-              </GlassCard>
+                <Text style={[Type.h2, { color: T.gold }]}>→</Text>
+              </View>
             </Pressable>
           </Animated.View>
         )}
 
-        {/* Katılacağım etkinlikler */}
-        <Animated.View entering={FadeInDown.duration(450).delay(120)}>
-          <SectionHeader title={t("my_upcoming")} accent={T.cyan} />
-          <View style={{ gap: Space.sm, marginBottom: Space.xl }}>
-            {upcoming.length ? (
-              upcoming.map((it) => <EventRow key={it.event.id} event={it.event} />)
-            ) : (
-              <EmptyMini emoji="🗓️" text={t("no_events_yet")} T={T} />
-            )}
-          </View>
+        {/* Sosyal hesaplar — her birinin yanında görünürlük anahtarı */}
+        <Animated.View entering={FadeInDown.duration(450).delay(110)} style={{ marginBottom: Space.xl }}>
+          <SectionHeader title={t("social_title")} accent={T.pink} />
+          <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.md }]}>{t("social_desc")}</Text>
+          {SOCIALS.map((s) => (
+            <View key={s.key} style={[styles.socialRow, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+              <View style={styles.socialTop}>
+                <Text style={{ fontSize: 18 }}>{s.icon}</Text>
+                <TextInput
+                  value={social[s.key].handle}
+                  onChangeText={(txt) => saveSocial({ ...social, [s.key]: { ...social[s.key], handle: txt } })}
+                  placeholder={s.placeholder}
+                  placeholderTextColor={T.textFaint}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={[Type.body, styles.socialInput, { color: T.text }]}
+                />
+              </View>
+              <View style={[styles.socialBottom, { borderTopColor: T.hairline }]}>
+                <Text style={[Type.label, { color: social[s.key].pub ? T.success : T.textFaint, flex: 1 }]}>
+                  {social[s.key].pub ? t("social_visible") : t("social_hidden")}
+                </Text>
+                <Switch
+                  value={social[s.key].pub}
+                  onValueChange={() => toggleSocial(s.key, s.label)}
+                  trackColor={{ false: T.hairline, true: T.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+            </View>
+          ))}
         </Animated.View>
 
-        {/* Katıldığım etkinlikler */}
-        <Animated.View entering={FadeInDown.duration(450).delay(160)}>
-          <SectionHeader title={t("my_past")} accent={T.gold} />
-          <View style={{ gap: Space.sm, marginBottom: Space.xl }}>
-            {past.length ? (
-              past.map((it) => <EventRow key={it.event.id} event={it.event} />)
-            ) : (
-              <EmptyMini emoji="🎟️" text={t("no_events_yet")} T={T} />
-            )}
-          </View>
-        </Animated.View>
+        {/* İpucu: yukarıdaki sayaç kartlarına dokununca ilgili liste açılır. */}
+        <Text style={[Type.label, { color: T.textFaint, textAlign: "center" }]}>
+          {t("tap_stat_hint")}
+        </Text>
       </ScrollView>
+
+      {/* Sayaç listesi (favori / katılacağım / katıldığım) — karta tıklayınca açılır */}
+      <Modal visible={!!listView} transparent animationType="slide" onRequestClose={() => setListView(null)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setListView(null)}>
+          <Pressable
+            style={[styles.sheet, { backgroundColor: T.bgElevated, borderColor: T.hairline, paddingBottom: insets.bottom + 16 }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={[styles.sheetHandle, { backgroundColor: T.hairline }]} />
+            <Text style={[Type.h2, { color: T.text, marginBottom: 14 }]}>
+              {listView === "fav" ? t("tab_favorites") : listView === "past" ? t("my_past") : t("my_upcoming")}
+            </Text>
+            {(() => {
+              const data = listView === "fav" ? favs : listView === "past" ? past.map((it) => it.event) : upcoming.map((it) => it.event);
+              if (!data.length) {
+                return <EmptyMini emoji={listView === "fav" ? "❤️" : listView === "past" ? "🎟️" : "🗓️"} text={t("no_events_yet")} T={T} />;
+              }
+              return (
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: Space.sm, paddingBottom: 8 }}>
+                  {data.map((e) => <EventRow key={e.id} event={e} />)}
+                </ScrollView>
+              );
+            })()}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Story izleyici */}
       <Modal visible={!!viewer} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setViewer(null)}>
@@ -242,6 +343,13 @@ export default function ProfileScreen() {
 
       {/* Profil fotoğrafı kırpma ekranı (kare) */}
       <ImageEditor uri={cropUri} aspect={1} outWidth={512} title="Profil fotoğrafı" onDone={saveAvatar} onCancel={() => setCropUri(null)} />
+
+      {/* Toast bildirimi */}
+      {toast && (
+        <Animated.View pointerEvents="none" style={[styles.toast, toastStyle, { backgroundColor: T.bgElevated, borderColor: T.hairline, bottom: insets.bottom + 96 }]}>
+          <Text style={[Type.label, { color: T.text, textAlign: "center" }]}>{toast}</Text>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -279,4 +387,22 @@ const styles = StyleSheet.create({
   viewerBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center", padding: 20 },
   viewerCard: { alignItems: "center", width: "100%" },
   viewerImg: { width: "100%", height: 460, borderRadius: Radius.lg },
+  adminCard: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: Space.lg, marginBottom: Space.xl },
+  // Sayaç listesi alt-sayfası (modal)
+  sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
+  sheet: {
+    maxHeight: "82%", paddingHorizontal: 16, paddingTop: 10,
+    borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2,
+  },
+  sheetHandle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, marginBottom: 14, opacity: 0.6 },
+  // Sosyal hesap satırı
+  socialRow: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, marginBottom: Space.md, paddingHorizontal: Space.md, paddingTop: Space.sm },
+  socialTop: { flexDirection: "row", alignItems: "center", gap: Space.sm, paddingVertical: Space.sm },
+  socialInput: { flex: 1, paddingVertical: 4 },
+  socialBottom: { flexDirection: "row", alignItems: "center", gap: Space.sm, borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: Space.sm },
+  toast: {
+    position: "absolute", left: 40, right: 40, paddingVertical: 12, paddingHorizontal: 18,
+    borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center",
+    ...glow("#000", 16, 0.3),
+  },
 });

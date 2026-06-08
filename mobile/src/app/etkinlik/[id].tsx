@@ -15,7 +15,7 @@ import { fmtLong, fmtPrice } from "@/lib/format";
 import { API_BASE, fetchEventById, imageFor, type ApiEvent } from "@/lib/api";
 import { getDeviceId } from "@/lib/profileSync";
 import { toggleFavorite, useFavorites } from "@/lib/favorites";
-import { setAttending } from "@/lib/attending";
+import { setAttending, mockAttendeesFor } from "@/lib/attending";
 import { addStory } from "@/lib/stories";
 import { Badge, GradientButton, Loader, Pill } from "@/ui/atoms";
 import { useTheme, type Palette } from "@/lib/theme";
@@ -24,6 +24,7 @@ import { useAuth } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { PEOPLE, type Person } from "@/lib/people";
 import { StoryAvatar } from "@/components/StoryAvatar";
+import { AttendeeListModal } from "@/components/AttendeeListModal";
 import { showAuthPrompt } from "@/lib/authPrompt";
 import { tapH, impactH, successH } from "@/lib/haptics";
 import { getEventWeather, type DayWeather } from "@/lib/weather";
@@ -86,8 +87,10 @@ export default function EventDetail() {
   const [storyUri, setStoryUri] = useState<string | null>(null);
   const [storyCaption, setStoryCaption] = useState("");
 
-  // katılacaklar listesi modal'ı
+  // katılacaklar listesi modal'ı (eski tek liste — korunuyor)
   const [listOpen, setListOpen] = useState(false);
+  // RSVP kategorisi başına kişi listesi modal'ı (going/maybe/interested); null = kapalı
+  const [catOpen, setCatOpen] = useState<Rsvp | null>(null);
   // story halkası olan kişiye dokununca story izleyici (yoksa profil açılır)
   const [viewStory, setViewStory] = useState<Person | null>(null);
   // avatara dokun/basılı tut → fotoğrafı büyütme modal'ı (uri)
@@ -373,6 +376,19 @@ export default function EventDetail() {
   const attendees = attendeeList.slice(0, 6);
   const extraAttendees = Math.max(0, attendeeList.length - attendees.length);
 
+  // #RSVP — her kategori için DETERMİNİSTİK (etkinlik id'sine göre sabit) mock kişi listesi.
+  // Math.random YOK → her açılışta aynı kişiler. Kategoriler farklı dilimler alır.
+  const goingPeople = mockAttendeesFor(eid, "going", PEOPLE);
+  const maybePeople = mockAttendeesFor(eid, "maybe", PEOPLE);
+  const interestedPeople = mockAttendeesFor(eid, "interested", PEOPLE);
+  const catPeople: Record<Rsvp, Person[]> = {
+    going: goingPeople,
+    maybe: maybePeople,
+    interested: interestedPeople,
+  };
+  // Kullanıcı bir kategori seçtiyse "Sen" o kategorinin sayımına +1 olarak eklenir.
+  const catCount = (cat: Rsvp) => catPeople[cat].length + (rsvp === cat ? 1 : 0);
+
   const openTicket = () => {
     impactH();
     if (event.ticket_url) WebBrowser.openBrowserAsync(event.ticket_url);
@@ -399,6 +415,7 @@ export default function EventDetail() {
   const openPerson = (pid: string) => {
     tapH();
     setListOpen(false);
+    setCatOpen(null);
     router.push(`/kisi/${pid}`);
   };
 
@@ -493,6 +510,34 @@ export default function EventDetail() {
               <Pill label={t("rsvp_going")} active={rsvp === "going"} gradient={c.gradient} onPress={() => chooseRsvp("going")} />
               <Pill label={t("rsvp_maybe")} active={rsvp === "maybe"} gradient={c.gradient} onPress={() => chooseRsvp("maybe")} />
               <Pill label={t("rsvp_interested")} active={rsvp === "interested"} gradient={c.gradient} onPress={() => chooseRsvp("interested")} />
+            </View>
+
+            {/* Her kategori için tıklanabilir sayaç satırı → o kategorideki kişileri açar */}
+            <View style={{ marginTop: 14, gap: 8 }}>
+              <RsvpCountRow
+                T={T}
+                icon="👥"
+                label="Katılacaklar"
+                count={catCount("going")}
+                active={rsvp === "going"}
+                onPress={() => { tapH(); setCatOpen("going"); }}
+              />
+              <RsvpCountRow
+                T={T}
+                icon="🤔"
+                label="Belki"
+                count={catCount("maybe")}
+                active={rsvp === "maybe"}
+                onPress={() => { tapH(); setCatOpen("maybe"); }}
+              />
+              <RsvpCountRow
+                T={T}
+                icon="✨"
+                label="İlgileniyorum"
+                count={catCount("interested")}
+                active={rsvp === "interested"}
+                onPress={() => { tapH(); setCatOpen("interested"); }}
+              />
             </View>
           </Animated.View>
 
@@ -716,6 +761,38 @@ export default function EventDetail() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* RSVP kategorisi başına kişi listesi (going/maybe/interested) */}
+      <AttendeeListModal
+        visible={catOpen === "going"}
+        title="👥 Katılacaklar"
+        people={goingPeople}
+        gradient={c.gradient}
+        bottomInset={insets.bottom}
+        meLabel={rsvp === "going" ? `✓ ${t("rsvp_going")}` : null}
+        onClose={() => setCatOpen(null)}
+        onPressPerson={openPerson}
+      />
+      <AttendeeListModal
+        visible={catOpen === "maybe"}
+        title="🤔 Belki"
+        people={maybePeople}
+        gradient={c.gradient}
+        bottomInset={insets.bottom}
+        meLabel={rsvp === "maybe" ? `🤔 ${t("rsvp_maybe")}` : null}
+        onClose={() => setCatOpen(null)}
+        onPressPerson={openPerson}
+      />
+      <AttendeeListModal
+        visible={catOpen === "interested"}
+        title="✨ İlgileniyorum"
+        people={interestedPeople}
+        gradient={c.gradient}
+        bottomInset={insets.bottom}
+        meLabel={rsvp === "interested" ? `✨ ${t("rsvp_interested")}` : null}
+        onClose={() => setCatOpen(null)}
+        onPressPerson={openPerson}
+      />
 
       {/* Story izleyici — story halkası olan kişiye dokununca. Mock kişilerde gerçek
           story medyası yok → avatar tam ekran gösterilir; gerçek story'ler DB ile gelecek. */}
