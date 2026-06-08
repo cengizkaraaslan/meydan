@@ -17,6 +17,8 @@ export interface MyEvent {
   imageUri: string | null;
   startsAt: string; // ISO
   createdAt: number;
+  creatorName?: string;
+  creatorHidden?: boolean;
 }
 
 const KEY = "meydanfest:myevents";

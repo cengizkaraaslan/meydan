@@ -7,6 +7,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -16,6 +17,7 @@ import { Image } from "expo-image";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
+import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { router, useLocalSearchParams } from "expo-router";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { GlassCard } from "@/components/GlassCard";
@@ -43,7 +45,11 @@ export default function CreateEventScreen() {
   const [title, setTitle] = useState("");
   const [venue, setVenue] = useState("");
   const [city, setCity] = useState<string | null>(null);
-  const [date, setDate] = useState("");
+  // Etkinlik tarihi+saati — native takvim/saat seçici ile.
+  const [when, setWhen] = useState<Date | null>(null);
+  const [picker, setPicker] = useState<null | "date" | "time">(null);
+  // Oluşturan kimliğini gizle (sonradan düzenlenebilir).
+  const [creatorHidden, setCreatorHidden] = useState(false);
   const [desc, setDesc] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const [website, setWebsite] = useState("");
@@ -82,6 +88,11 @@ export default function CreateEventScreen() {
       setFacebook(ev.facebook);
       setTiktok(ev.tiktok);
       setImage(ev.imageUri);
+      setCreatorHidden(ev.creatorHidden ?? false);
+      if (ev.startsAt) {
+        const d = new Date(ev.startsAt);
+        if (!isNaN(d.getTime())) setWhen(d);
+      }
       pendingDistrict.current = ev.district;
       setCity(ev.city); // ilçe effect'ini tetikler → pendingDistrict uygulanır
     });
@@ -180,6 +191,25 @@ export default function CreateEventScreen() {
     setImage(uri);
   }
 
+  const whenLabel = (d: Date) =>
+    `${d.toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" })} · ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+  // Takvim → saat akışı: tarih seçilince saat seçimine geç; saat seçilince kapat.
+  const onPickerChange = (e: DateTimePickerEvent, sel?: Date) => {
+    if (e.type === "dismissed") { setPicker(null); return; }
+    const base = sel ?? when ?? new Date();
+    const d = new Date(when ?? new Date());
+    if (picker === "date") {
+      d.setFullYear(base.getFullYear(), base.getMonth(), base.getDate());
+      setWhen(d);
+      setPicker("time");
+    } else {
+      d.setHours(base.getHours(), base.getMinutes(), 0, 0);
+      setWhen(d);
+      setPicker(null);
+    }
+  };
+
   async function publish() {
     if (!canPublish || published) return;
     impactH();
@@ -194,7 +224,7 @@ export default function CreateEventScreen() {
           venue: venue.trim(),
           city: city ?? "",
           district: district ?? "",
-          startsAt: new Date().toISOString(),
+          startsAt: (when ?? new Date()).toISOString(),
           description: desc.trim(),
           website: website.trim(),
           instagram: instagram.trim(),
@@ -202,7 +232,8 @@ export default function CreateEventScreen() {
           tiktok: tiktok.trim(),
           imageUrl: image ?? "",
           creatorEmail: user?.email ?? "",
-          creatorName: user?.name ?? "",
+          creatorName: creatorHidden ? "" : (user?.name ?? ""),
+          creatorHidden,
         }),
       });
     } catch {
@@ -223,7 +254,9 @@ export default function CreateEventScreen() {
         facebook: facebook.trim(),
         tiktok: tiktok.trim(),
         imageUri: image,
-        startsAt: new Date().toISOString(),
+        startsAt: (when ?? new Date()).toISOString(),
+        creatorName: user?.name ?? user?.email ?? "",
+        creatorHidden,
       });
     } catch {
       /* yut */
@@ -354,7 +387,44 @@ export default function CreateEventScreen() {
           <Animated.View entering={FadeInDown.duration(450).delay(120)} style={{ gap: 12 }}>
             {field(t("ev_title"), title, setTitle, { icon: "🎫" })}
             {field(t("ev_venue"), venue, setVenue, { icon: "📍" })}
-            {field(t("ev_date"), date, setDate, { icon: "🗓️" })}
+            {/* Tarih & saat — native takvim/saat seçici */}
+            <Pressable
+              onPress={() => { tapH(); setPicker("date"); }}
+              style={[styles.inputWrap, { backgroundColor: T.surfaceStrong, borderColor: T.hairline, alignItems: "center" }]}
+            >
+              <Text style={{ fontSize: 16 }}>🗓️</Text>
+              <Text style={[Type.body, { flex: 1, color: when ? T.text : T.textFaint, marginLeft: 10 }]}>
+                {when ? whenLabel(when) : "Tarih & saat seç"}
+              </Text>
+              <Text style={{ color: T.textDim }}>▾</Text>
+            </Pressable>
+          </Animated.View>
+
+          {picker ? (
+            <DateTimePicker
+              value={when ?? new Date()}
+              mode={picker}
+              is24Hour
+              onChange={onPickerChange}
+            />
+          ) : null}
+
+          {/* Oluşturan + kimlik gizleme */}
+          <Animated.View entering={FadeInDown.duration(450).delay(140)} style={{ gap: 8 }}>
+            <Text style={[Type.label, { color: T.textDim }]}>Oluşturan</Text>
+            <View style={[styles.creatorRow, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+              <Text style={[Type.body, { color: T.text, flex: 1 }]} numberOfLines={1}>
+                {creatorHidden ? "🔒 Gizli (Anonim)" : (user?.name ?? user?.email ?? "Sen")}
+              </Text>
+              <Switch
+                value={creatorHidden}
+                onValueChange={(v) => { impactH(); setCreatorHidden(v); }}
+                trackColor={{ false: T.hairline, true: T.primary }}
+              />
+            </View>
+            <Text style={[Type.micro, { color: T.textFaint }]}>
+              Kimliğimi gizli tut — açarsan adın etkinlikte görünmez (sonradan düzenleyebilirsin).
+            </Text>
           </Animated.View>
 
           {/* Şehir */}
@@ -610,6 +680,15 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth * 2,
     paddingHorizontal: 14,
     paddingVertical: 14,
+  },
+  creatorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   imageBox: {
     height: 190,
