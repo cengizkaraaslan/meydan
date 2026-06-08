@@ -199,11 +199,16 @@ export function useChat(personId: string) {
     [matchKey, deviceId, serverMsgs, refetch],
   );
 
-  /** Mesajı siler. Foto (id "img_" & imageUri) → yerelden çıkar; metin → backend + refetch. */
+  /**
+   * Mesajı siler.
+   * - Yerel (offline) foto (id "img_" & localImgs içinde) → AsyncStorage'dan çıkar.
+   * - Backend mesajı (metin VEYA "[img]<url>" foto; id normal server id) → apiDeleteMessage + refetch.
+   *   Sadece kendi (fromMe) & 10 dk içindeki mesaj silinebilir.
+   */
   const deleteMessage = useCallback(
     async (id: string): Promise<{ ok: boolean; reason?: string }> => {
       if (!matchKey) return { ok: false, reason: "invalid" };
-      // Yerel fotoğraf mesajı
+      // Yerel (offline fallback) fotoğraf mesajı
       const local = localImgs.find((m) => m.id === id);
       if (local && (id.startsWith("img_") || local.imageUri)) {
         const next = localImgs.filter((m) => m.id !== id);
@@ -211,7 +216,7 @@ export function useChat(personId: string) {
         await AsyncStorage.setItem(imgKey(matchKey), JSON.stringify(next));
         return { ok: true };
       }
-      // Backend metin mesajı
+      // Backend mesajı (metin veya foto)
       if (!deviceId) return { ok: false, reason: "invalid" };
       const target = serverMsgs.find((m) => m.id === id);
       if (!target || !target.fromMe) return { ok: false, reason: "not_owner" };
