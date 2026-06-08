@@ -18,6 +18,9 @@ import { dayRange, isPastDay } from "@/lib/format";
 import { useActiveCity } from "@/lib/location";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
+import { Image } from "expo-image";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { tapH } from "@/lib/haptics";
 
 const { width } = Dimensions.get("window");
@@ -28,6 +31,12 @@ export default function DiscoverScreen() {
   const { t: T } = useTheme();
   const { t } = useT();
   const { city, status, setCity } = useActiveCity();
+  const { user } = useAuth();
+  const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
+  useEffect(() => {
+    AsyncStorage.getItem("meydanfest:avatar").then(setAvatarOverride);
+  }, []);
+  const photoUri = avatarOverride ?? user?.photo;
   const [cityModal, setCityModal] = useState(false);
   const [featured, setFeatured] = useState<ApiEvent[]>([]);
   const [cat, setCat] = useState<string | null>(null);
@@ -104,10 +113,17 @@ export default function DiscoverScreen() {
               {city ? <>📍 {city} <Text style={{ color: T.primary, fontSize: 16 }}>▾</Text></> : <>Meydan<Text style={{ color: T.primary }}>Fest</Text></>}
             </Text>
           </Pressable>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            {/* Ayarlar/profil butonu anasayfadan kaldırıldı — ayarlara Profil sekmesindeki ⚙️'den erişilir. */}
+          <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
             <Pressable onPress={() => { tapH(); router.push("/ara"); }} style={[styles.searchBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
               <Text style={{ fontSize: 18 }}>🔍</Text>
+            </Pressable>
+            {/* Profil — alt bardan kaldırıldı, büyütecin yanında avatar olarak */}
+            <Pressable onPress={() => { tapH(); router.push("/profil"); }} style={[styles.searchBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline, overflow: "hidden", padding: 0 }]}>
+              {photoUri ? (
+                <Image source={{ uri: photoUri }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+              ) : (
+                <Text style={{ fontSize: 18 }}>👤</Text>
+              )}
             </Pressable>
           </View>
         </Animated.View>

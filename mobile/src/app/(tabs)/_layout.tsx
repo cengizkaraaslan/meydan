@@ -33,9 +33,8 @@ function AuroraTabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const { t: T } = useTheme();
   const { t } = useT();
-  // Oturum yoksa (misafir/girişsiz) favori sekmesini bar'dan gizle; ekran kayıtlı kalır.
-  // Favori sekmesi bar'dan kaldırıldı (profildeki favori sayacından açılır); ekran kayıtlı kalır.
-  const routes = state.routes.filter((r) => r.name !== "favoriler");
+  // Favori + Profil bar'dan kaldırıldı; favori → profildeki sayaç, profil → anasayfa başlığındaki avatar.
+  const routes = state.routes.filter((r) => r.name !== "favoriler" && r.name !== "profil");
   return (
     <View style={[styles.wrap, { paddingBottom: insets.bottom ? insets.bottom : 14 }]} pointerEvents="box-none">
       <View style={[styles.bar, glow(T.primary, 22, 0.4)]}>
