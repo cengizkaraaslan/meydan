@@ -16,6 +16,7 @@ import { API_BASE, fetchEventById, imageFor, type ApiEvent } from "@/lib/api";
 import { getDeviceId } from "@/lib/profileSync";
 import { toggleFavorite, useFavorites } from "@/lib/favorites";
 import { setAttending, mockAttendeesFor } from "@/lib/attending";
+import { fetchEventSocial } from "@/lib/pastEvents";
 import { addStory, useStories } from "@/lib/stories";
 import { uploadImage, createPost } from "@/lib/social";
 import { Badge, Loader, Pill } from "@/ui/atoms";
@@ -126,6 +127,8 @@ export default function EventDetail() {
 
   // #14 — katılım / yorum / fotoğraf durumu
   const [rsvp, setRsvp] = useState<Rsvp | null>(null);
+  // Gerçek (sunucu) başvuru sayısı — "+N" rozetinde gösterilir.
+  const [serverCount, setServerCount] = useState(0);
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -285,6 +288,16 @@ export default function EventDetail() {
     return () => { alive = false; };
   }, [eid, rsvpKey, commentsKey, photosKey]);
 
+  // Gerçek başvuru sayısını sunucudan çek (etkinlik yüklendiğinde).
+  useEffect(() => {
+    if (!event?.slug) return;
+    let alive = true;
+    fetchEventSocial(event.slug)
+      .then((s) => { if (alive) setServerCount(s.attendeeCount); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [event?.slug]);
+
   const chooseRsvp = (choice: Rsvp) => {
     // Oturum açmayan katılım (katılacağım/belki/ilgileniyorum) yapamaz → giriş modalı.
     if (!user) {
@@ -298,16 +311,20 @@ export default function EventDetail() {
     else AsyncStorage.removeItem(rsvpKey);
     // Profil "Katılacağım / Katıldığım" listeleri için tam etkinlik objesini sakla.
     if (event) setAttending(event, next);
-    // best-effort API (join sinyali)
+    // Sunucuya gönder: join/leave. Giriş yapıldıysa kimlik=email (uninstall→reinstall
+    // sonrası aynı hesapla giriş yapınca katılım korunur); değilse cihaz kimliği.
     if (event) {
       (async () => {
         try {
-          const deviceId = await getDeviceId();
+          const identity = user?.email?.toLowerCase() || (await getDeviceId());
           await fetch(`${API_BASE}/api/v1/event-social`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-api-key": "meydanfest-app" },
-            body: JSON.stringify({ action: "join", deviceId, eventSlug: event.slug }),
+            body: JSON.stringify({ action: next ? "join" : "leave", deviceId: identity, eventSlug: event.slug }),
           });
+          // Sayacı tazele ("+N" gerçek başvuru sayısını göstersin).
+          const s = await fetchEventSocial(event.slug);
+          setServerCount(s.attendeeCount);
         } catch {
           /* yok say */
         }
@@ -614,7 +631,9 @@ export default function EventDetail() {
     interested: interestedPeople,
   };
   // Kategori sayımı: o kategoriye KATILDIYSAM kendimi de say (avatarım listeye eklenir).
-  const catCount = (cat: Rsvp) => catPeople[cat].length + (rsvp === cat && user ? 1 : 0);
+  // "Katılacak" sayısı gerçek sunucu başvurularını da içerir (+N gerçek başvuru sayısı).
+  const catCount = (cat: Rsvp) =>
+    catPeople[cat].length + (rsvp === cat && user ? 1 : 0) + (cat === "going" ? serverCount : 0);
   // Önizleme listesi: o kategoriye katıldıysam avatarımı başa ekle.
   const peopleForCat = (cat: Rsvp): Person[] =>
     rsvp === cat && user ? [buildMePerson(), ...catPeople[cat]] : catPeople[cat];
