@@ -15,7 +15,7 @@ interface HubItem {
   icon: string;
   title: string;
   subtitle: string;
-  route: "/admin/kullanicilar" | "/admin/scraper";
+  route: string;
   color: (T: Palette) => string;
 }
 
@@ -84,7 +84,7 @@ export default function AdminHubScreen() {
             const accent = it.color(T);
             return (
               <Animated.View key={it.route} entering={FadeInDown.duration(420).delay(80 + i * 60)}>
-                <Pressable onPress={() => { tapH(); router.push(it.route); }}>
+                <Pressable onPress={() => { tapH(); router.push(it.route as never); }}>
                   <GlassCard glowColor={accent}>
                     <View style={styles.cardRow}>
                       <View style={[styles.iconBox, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>

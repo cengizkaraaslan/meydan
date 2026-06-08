@@ -36,6 +36,18 @@ export function fmtDistance(km: number): string {
   return Number.isInteger(rounded) ? `${rounded} km` : `${rounded.toFixed(1)} km`;
 }
 
+/** Gün filtresi için yerel tarih aralığı (ISO). "all" → boş. */
+export function dayRange(day: "all" | "today" | "tomorrow" | "weekend"): { from?: string; to?: string } {
+  if (day === "weekend") return weekendRange();
+  if (day === "all") return {};
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  if (day === "tomorrow") start.setDate(start.getDate() + 1);
+  const end = new Date(start);
+  end.setHours(23, 59, 59, 0);
+  return { from: start.toISOString(), to: end.toISOString() };
+}
+
 /** Bu hafta sonu (Cmt+Paz) aralığı ISO olarak. */
 export function weekendRange(): { from: string; to: string } {
   const now = new Date();

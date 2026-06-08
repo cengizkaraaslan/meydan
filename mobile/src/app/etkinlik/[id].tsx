@@ -54,11 +54,56 @@ interface Photo {
 
 type Rsvp = "going" | "maybe" | "interested";
 
+/**
+ * Etkinlik koordinatı yok → id'den DETERMİNİSTİK yaklaşık mesafe üret (Math.random YOK).
+ * Aynı etkinlik her açılışta aynı mesafeyi gösterir. ~0.3–12 km arası.
+ */
+function approxDistance(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) {
+    h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  // 300 m – 12000 m arası deterministik mesafe
+  const meters = 300 + (h % 11700);
+  if (meters < 1000) return `${meters} m yakınında`;
+  return `${(meters / 1000).toFixed(1)} km yakınında`;
+}
+
 interface Story {
   uri: string;
   caption: string;
   eventSlug: string;
   ts: number;
+}
+
+// Türkçe tam gün isimleri (Date.getDay(): 0 Pazar … 6 Cumartesi).
+const WEEKDAYS_TR = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
+
+/** Verilen ISO tarihin Türkçe tam gün adı (örn. "Cumartesi"). */
+function weekdayTR(iso: string): string {
+  return WEEKDAYS_TR[new Date(iso).getDay()];
+}
+
+/**
+ * Yakın tarihler için göreli vurgu etiketi (yerel saat). UZAK/geçmiş tarihlerde null.
+ * Bugün/Yarın; ≤7 gün içindeyse: Cmt/Paz "Bu hafta sonu", değilse "<Gün adı>";
+ * 2-7 gün arası fallback "X gün sonra". >7 gün ya da geçmiş → null (etiket gösterme).
+ */
+function relativeDateLabel(iso: string): string | null {
+  const target = new Date(iso);
+  if (isNaN(target.getTime())) return null;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfTarget = new Date(target);
+  startOfTarget.setHours(0, 0, 0, 0);
+  const dayDiff = Math.round((startOfTarget.getTime() - startOfToday.getTime()) / 86400000);
+  if (dayDiff < 0) return null; // geçmiş
+  if (dayDiff === 0) return "Bugün";
+  if (dayDiff === 1) return "Yarın";
+  if (dayDiff > 7) return null; // uzak
+  const dow = startOfTarget.getDay(); // 0 Paz … 6 Cmt
+  if (dow === 6 || dow === 0) return "Bu hafta sonu";
+  return WEEKDAYS_TR[dow]; // örn. "Perşembe"
 }
 
 export default function EventDetail() {
@@ -93,6 +138,8 @@ export default function EventDetail() {
   const [listOpen, setListOpen] = useState(false);
   // RSVP kategorisi başına kişi listesi modal'ı (going/maybe/interested); null = kapalı
   const [catOpen, setCatOpen] = useState<Rsvp | null>(null);
+  // Katılımcı kartındaki aktif sekme (going/maybe/interested)
+  const [attTab, setAttTab] = useState<Rsvp>("going");
   // Çoklu-segment story izleyici: açık olduğunda gösterilecek gruplar + başlangıç indeksi.
   const [viewerGroups, setViewerGroups] = useState<StoryGroup[] | null>(null);
   const [viewerStart, setViewerStart] = useState(0);
@@ -395,21 +442,20 @@ export default function EventDetail() {
   // katılacaklar — "katılacağım" diyen kullanıcı listenin BAŞINDA görünür (yerel).
   // NOT: gerçek çapraz-cihaz katılımcılar (android↔web) Postgres + eventAttendance ile
   // gelecek; şimdilik kendi RSVP'n anında görünür.
-  const meAttendee: Person | null =
-    rsvp === "going" && user
-      ? {
-          id: "__me",
-          name: user.name,
-          age: 0,
-          city: event.city,
-          distanceKm: 0,
-          online: true,
-          avatar: user.photo || "https://i.pravatar.cc/600?img=12",
-          bio: "",
-          interests: [],
-          gender: "male",
-        }
-      : null;
+  // Kullanıcının kendi Person'u ("Sen") — herhangi bir kategori önizlemesinde başa eklenebilir.
+  const buildMePerson = (): Person => ({
+    id: "__me",
+    name: user?.name || "Sen",
+    age: 0,
+    city: event.city,
+    distanceKm: 0,
+    online: true,
+    avatar: avatarOverride || user?.photo || "https://i.pravatar.cc/600?img=12",
+    bio: "",
+    interests: [],
+    gender: "male",
+  });
+  const meAttendee: Person | null = rsvp === "going" && user ? buildMePerson() : null;
   const attendeeList = meAttendee ? [meAttendee, ...PEOPLE] : PEOPLE;
   const attendees = attendeeList.slice(0, 6);
   const extraAttendees = Math.max(0, attendeeList.length - attendees.length);
@@ -426,6 +472,9 @@ export default function EventDetail() {
   };
   // Kullanıcı bir kategori seçtiyse "Sen" o kategorinin sayımına +1 olarak eklenir.
   const catCount = (cat: Rsvp) => catPeople[cat].length + (rsvp === cat ? 1 : 0);
+  // Bir kategorinin önizleme listesi: rsvp o kategoriyse "Sen" başa eklenir.
+  const peopleForCat = (cat: Rsvp): Person[] =>
+    rsvp === cat && user ? [buildMePerson(), ...catPeople[cat]] : catPeople[cat];
 
   // ── Story şeridi grupları ──
   // Benim bu etkinliğe ait story'lerim → tek grup (avatar: profil override ?? user.photo).
@@ -529,9 +578,18 @@ export default function EventDetail() {
         {/* Bilgi kartları */}
         <View style={{ paddingHorizontal: 16, gap: 12, marginTop: 6 }}>
           <Animated.View entering={FadeInDown.duration(450)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
-            <InfoRow T={T} icon="🗓️" label={t("date")} value={fmtLong(event.starts_at)} />
+            <InfoRow
+              T={T}
+              icon="🗓️"
+              label={t("date")}
+              value={`${fmtLong(event.starts_at)} · ${weekdayTR(event.starts_at)}`}
+              badge={relativeDateLabel(event.starts_at)}
+              badgeColor={c.gradient[0]}
+            />
             <View style={[styles.sep, { backgroundColor: T.hairline }]} />
             <InfoRow T={T} icon="📍" label={t("venue")} value={event.venue || event.city || t("not_specified")} onPress={openMap} actionLabel={t("see_on_map")} />
+            <View style={[styles.sep, { backgroundColor: T.hairline }]} />
+            <InfoRow T={T} icon="📏" label="Uzaklık" value={approxDistance(eid)} />
             <View style={[styles.sep, { backgroundColor: T.hairline }]} />
             <InfoRow
               T={T}
@@ -565,44 +623,6 @@ export default function EventDetail() {
               </View>
             </Animated.View>
           ) : null}
-
-          {/* #14 — RSVP (katılım durumu) segment */}
-          <Animated.View entering={FadeInDown.duration(450).delay(160)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
-            <Text style={[Type.label, { color: T.textFaint, marginBottom: 12 }]}>🙋 {t("join_event")}</Text>
-            <View style={styles.rsvpRow}>
-              <Pill label={t("rsvp_going")} active={rsvp === "going"} gradient={c.gradient} onPress={() => chooseRsvp("going")} />
-              <Pill label={t("rsvp_maybe")} active={rsvp === "maybe"} gradient={c.gradient} onPress={() => chooseRsvp("maybe")} />
-              <Pill label={t("rsvp_interested")} active={rsvp === "interested"} gradient={c.gradient} onPress={() => chooseRsvp("interested")} />
-            </View>
-
-            {/* Her kategori için tıklanabilir sayaç satırı → o kategorideki kişileri açar */}
-            <View style={{ marginTop: 14, gap: 8 }}>
-              <RsvpCountRow
-                T={T}
-                icon="👥"
-                label="Katılacaklar"
-                count={catCount("going")}
-                active={rsvp === "going"}
-                onPress={() => { tapH(); setCatOpen("going"); }}
-              />
-              <RsvpCountRow
-                T={T}
-                icon="🤔"
-                label="Belki"
-                count={catCount("maybe")}
-                active={rsvp === "maybe"}
-                onPress={() => { tapH(); setCatOpen("maybe"); }}
-              />
-              <RsvpCountRow
-                T={T}
-                icon="✨"
-                label="İlgileniyorum"
-                count={catCount("interested")}
-                active={rsvp === "interested"}
-                onPress={() => { tapH(); setCatOpen("interested"); }}
-              />
-            </View>
-          </Animated.View>
 
           {/* Story şeridi + paylaş (Instagram tarzı) */}
           <Animated.View entering={FadeInDown.duration(450).delay(180)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
@@ -639,37 +659,62 @@ export default function EventDetail() {
             ) : null}
           </Animated.View>
 
-          {/* #14 — Etkinliğe katılacaklar (dokun → liste + her satırda "Mesaj at") */}
-          <Animated.View entering={FadeInDown.duration(450).delay(200)}>
-            <Pressable
-              onPress={() => { tapH(); setListOpen(true); }}
-              style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}
-            >
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <Text style={[Type.label, { color: T.textFaint }]}>👥 {t("attendees")}</Text>
-                <Text style={[Type.label, { color: T.primary }]}>{attendeeList.length} →</Text>
-              </View>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                {attendees.map((p, i) => (
-                  <Image
-                    key={p.id}
-                    source={{ uri: p.avatar }}
-                    style={[styles.avatar, { borderColor: T.bg, marginLeft: i === 0 ? 0 : -12 }]}
-                    contentFit="cover"
-                    transition={200}
-                  />
-                ))}
-                {extraAttendees > 0 ? (
-                  <View style={[styles.avatar, styles.avatarMore, { marginLeft: -12, borderColor: T.bg, backgroundColor: T.surfaceStrong }]}>
-                    <Text style={[Type.label, { color: T.textDim }]}>+{extraAttendees}</Text>
-                  </View>
-                ) : null}
-              </View>
-              <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Text style={{ fontSize: 13 }}>💬</Text>
-                <Text style={[Type.label, { color: T.primary }]}>{t("message_attendee")} →</Text>
-              </View>
-            </Pressable>
+          {/* #14 — Etkinliğe katılacaklar — sekmeli filtre (going/maybe/interested) */}
+          <Animated.View entering={FadeInDown.duration(450).delay(200)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+            {/* Sekmeler */}
+            <View style={styles.rsvpRow}>
+              <Pill label="👥 Katılacaklar" active={attTab === "going"} gradient={c.gradient} onPress={() => { tapH(); setAttTab("going"); }} />
+              <Pill label="🤔 Belki" active={attTab === "maybe"} gradient={c.gradient} onPress={() => { tapH(); setAttTab("maybe"); }} />
+              <Pill label="✨ İlgileniyorum" active={attTab === "interested"} gradient={c.gradient} onPress={() => { tapH(); setAttTab("interested"); }} />
+            </View>
+
+            {/* Seçili kategorinin kişileri */}
+            {(() => {
+              const preview = peopleForCat(attTab);
+              const shown = preview.slice(0, 6);
+              const extra = Math.max(0, catCount(attTab) - shown.length);
+              return (
+                <View style={{ marginTop: 14 }}>
+                  {preview.length === 0 ? (
+                    <Text style={[Type.body, { color: T.textFaint }]}>Henüz kimse yok</Text>
+                  ) : (
+                    <Pressable
+                      onPress={() => { tapH(); setCatOpen(attTab); }}
+                      style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+                    >
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        {shown.map((p, i) => (
+                          <Image
+                            key={p.id}
+                            source={{ uri: p.avatar }}
+                            style={[styles.avatar, { borderColor: T.bg, marginLeft: i === 0 ? 0 : -12 }]}
+                            contentFit="cover"
+                            transition={200}
+                          />
+                        ))}
+                        {extra > 0 ? (
+                          <View style={[styles.avatar, styles.avatarMore, { marginLeft: -12, borderColor: T.bg, backgroundColor: T.surfaceStrong }]}>
+                            <Text style={[Type.label, { color: T.textDim }]}>+{extra}</Text>
+                          </View>
+                        ) : null}
+                        <Text style={[Type.label, { color: T.textDim, marginLeft: 10 }]}>{catCount(attTab)}</Text>
+                      </View>
+                      <Text style={[Type.label, { color: T.primary }]}>tümünü gör →</Text>
+                    </Pressable>
+                  )}
+
+                  {/* Katıl kontrolü */}
+                  <Pressable
+                    onPress={() => chooseRsvp(attTab)}
+                    style={[styles.joinBtn, { borderColor: rsvp === attTab ? T.primary : T.hairline, backgroundColor: T.surfaceStrong }]}
+                  >
+                    <Text style={[Type.label, { color: rsvp === attTab ? T.primary : T.text }]}>
+                      {rsvp === attTab ? "✓ Bu listedesin — çık" : "+ Ben de"}
+                    </Text>
+                  </Pressable>
+                </View>
+              );
+            })()}
           </Animated.View>
 
           {/* #14 — Yorumlar */}
@@ -904,13 +949,20 @@ function RsvpCountRow({ T, icon, label, count, active, onPress }: { T: Palette; 
   );
 }
 
-function InfoRow({ T, icon, label, value, valueColor, onPress, actionLabel }: { T: Palette; icon: string; label: string; value: string; valueColor?: string; onPress?: () => void; actionLabel?: string }) {
+function InfoRow({ T, icon, label, value, valueColor, onPress, actionLabel, badge, badgeColor }: { T: Palette; icon: string; label: string; value: string; valueColor?: string; onPress?: () => void; actionLabel?: string; badge?: string | null; badgeColor?: string }) {
   return (
     <Pressable onPress={onPress} disabled={!onPress} style={styles.infoRow}>
       <Text style={{ fontSize: 20 }}>{icon}</Text>
       <View style={{ flex: 1 }}>
         <Text style={[Type.label, { color: T.textFaint }]}>{label}</Text>
-        <Text style={[Type.title, { color: valueColor ?? T.text }]}>{value}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <Text style={[Type.title, { color: valueColor ?? T.text }]}>{value}</Text>
+          {badge ? (
+            <View style={[styles.dateBadge, { backgroundColor: (badgeColor ?? T.primary) + "22", borderColor: badgeColor ?? T.primary }]}>
+              <Text style={[Type.micro, { color: badgeColor ?? T.primary, fontWeight: "800" }]}>{badge}</Text>
+            </View>
+          ) : null}
+        </View>
         {onPress && actionLabel ? <Text style={[Type.label, { color: T.primary, marginTop: 2 }]}>{actionLabel}</Text> : null}
       </View>
     </Pressable>
@@ -924,10 +976,12 @@ const styles = StyleSheet.create({
   heroInfo: { position: "absolute", bottom: 16, left: 16, right: 16 },
   infoCard: { borderRadius: Radius.lg, padding: 16, borderWidth: StyleSheet.hairlineWidth * 2, ...glow("#000", 10, 0.2) },
   infoRow: { flexDirection: "row", gap: 14, alignItems: "center", paddingVertical: 6 },
+  dateBadge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
   sep: { height: StyleSheet.hairlineWidth * 2, marginVertical: 6 },
   rsvpRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   countRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 11, borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2 },
   countBadge: { minWidth: 28, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center", justifyContent: "center" },
+  joinBtn: { marginTop: 14, alignSelf: "flex-start", paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
   storyPreview: { width: "100%", height: 200, borderRadius: Radius.md },
   avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2 },
   avatarMore: { alignItems: "center", justifyContent: "center" },

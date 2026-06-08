@@ -11,7 +11,7 @@ import { Radius, Type, Space } from "@/theme/aurora";
 import { CATEGORIES, CITIES } from "@/lib/categories";
 import { fetchEvents, type ApiEvent } from "@/lib/api";
 import { loadEventsCache, saveEventsCache } from "@/lib/eventCache";
-import { weekendRange } from "@/lib/format";
+import { weekendRange, dayRange } from "@/lib/format";
 import { useActiveCity } from "@/lib/location";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
@@ -31,17 +31,18 @@ export default function DiscoverScreen() {
   const [feed, setFeed] = useState<ApiEvent[]>([]);
   const [cityHit, setCityHit] = useState(false);
   const [cat, setCat] = useState<string | null>(null);
+  const [day, setDay] = useState<"all" | "today" | "tomorrow" | "weekend">("all");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Şehir+kategori kombinasyonuna göre cache anahtarı.
+  // Şehir+kategori+gün kombinasyonuna göre cache anahtarı.
   const cacheKey = useCallback(
-    (category: string | null, useCity: string | null) => `feed:${useCity ?? "auto"}:${category ?? "all"}`,
+    (category: string | null, useCity: string | null, useDay: string) => `feed:${useCity ?? "auto"}:${category ?? "all"}:${useDay}`,
     []
   );
 
-  const load = useCallback(async (category: string | null, useCity: string | null) => {
-    const key = cacheKey(category, useCity);
+  const load = useCallback(async (category: string | null, useCity: string | null, useDay: "all" | "today" | "tomorrow" | "weekend") => {
+    const key = cacheKey(category, useCity, useDay);
 
     // 1) Cache varsa HEMEN göster (hızlı ilk boya), spinner'ı kapat.
     const cached = await loadEventsCache(key);
@@ -55,11 +56,13 @@ export default function DiscoverScreen() {
     // 2) Ardından taze veriyi çek, ekranı güncelle ve cache'i yaz.
     try {
       const { from, to } = weekendRange();
+      // Seçili güne göre ana feed tarih aralığı ("all" → aralık yok).
+      const range = dayRange(useDay);
       // Öncelik: bulunduğun şehir. O şehirde sonuç yoksa → genel (random) feed.
-      let feedRes = await fetchEvents({ city: useCity ?? undefined, category: category ?? undefined, pageSize: 30 });
+      let feedRes = await fetchEvents({ city: useCity ?? undefined, category: category ?? undefined, from: range.from, to: range.to, pageSize: 30 });
       let hit = Boolean(useCity) && feedRes.data.length > 0;
       if (useCity && feedRes.data.length === 0) {
-        feedRes = await fetchEvents({ category: category ?? undefined, pageSize: 30 });
+        feedRes = await fetchEvents({ category: category ?? undefined, from: range.from, to: range.to, pageSize: 30 });
         hit = false;
       }
       const wkRes = await fetchEvents({ from, to, city: useCity ?? undefined, pageSize: 10 });
@@ -83,14 +86,14 @@ export default function DiscoverScreen() {
   useEffect(() => {
     let alive = true;
     // Spinner SADECE cache yokken görünsün: cache varsa load() içinde anında kapanır.
-    void loadEventsCache(cacheKey(cat, city)).then((c) => {
+    void loadEventsCache(cacheKey(cat, city, day)).then((c) => {
       if (alive && !c) setLoading(true);
     });
-    load(cat, city);
+    load(cat, city, day);
     return () => {
       alive = false;
     };
-  }, [cat, city, load, cacheKey]);
+  }, [cat, city, day, load, cacheKey]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -99,7 +102,7 @@ export default function DiscoverScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(cat, city); }} tintColor={T.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(cat, city, day); }} tintColor={T.primary} />
         }
       >
         {/* Header */}
@@ -153,6 +156,26 @@ export default function DiscoverScreen() {
                 contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
                 renderItem={({ item }) => (
                   <Pill label={`${item.emoji} ${item.label}`} active={cat === item.key} onPress={() => setCat(item.key)} />
+                )}
+                style={{ marginBottom: 14 }}
+              />
+            </Animated.View>
+
+            {/* Gün filtresi çipleri */}
+            <Animated.View entering={FadeInDown.delay(135).duration(420)}>
+              <FlatList
+                horizontal
+                data={[
+                  { key: "all", label: "Tümü", emoji: "🗓" },
+                  { key: "today", label: "Bugün", emoji: "☀️" },
+                  { key: "tomorrow", label: "Yarın", emoji: "🌅" },
+                  { key: "weekend", label: "Hafta sonu", emoji: "🎉" },
+                ] as { key: "all" | "today" | "tomorrow" | "weekend"; label: string; emoji: string }[]}
+                keyExtractor={(d) => d.key}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+                renderItem={({ item }) => (
+                  <Pill label={`${item.emoji} ${item.label}`} active={day === item.key} onPress={() => setDay(item.key)} />
                 )}
                 style={{ marginBottom: 26 }}
               />

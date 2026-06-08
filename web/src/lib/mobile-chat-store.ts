@@ -279,3 +279,79 @@ export async function sendMessage(input: {
     },
   );
 }
+
+// ── Düzenle / Sil (sadece sahibi, gönderimden sonraki 10 dk içinde) ──────────────
+
+/** Mesaj düzenleme/silme için izin verilen pencere. */
+export const EDIT_WINDOW_MS = 10 * 60 * 1000;
+
+export type MutationReason = "notfound" | "forbidden" | "expired";
+export interface EditResult {
+  ok: boolean;
+  reason?: MutationReason;
+  message?: MessageView;
+}
+export interface DeleteResult {
+  ok: boolean;
+  reason?: MutationReason;
+}
+
+/**
+ * Mesabı bul → sahibini ve 10 dk penceresini doğrula → text'i güncelle.
+ * Sonuç ayırt edilebilir: {ok:true,message} | {ok:false,reason:"notfound"|"forbidden"|"expired"}.
+ */
+export async function editMessage(input: {
+  id: string;
+  senderDeviceId: string;
+  text: string;
+}): Promise<EditResult> {
+  const { id, senderDeviceId } = input;
+  const text = input.text.trim().slice(0, 2000);
+  return withDb(
+    async () => {
+      const existing = await db.mobileMessage.findUnique({ where: { id } });
+      if (!existing) return { ok: false, reason: "notfound" as const };
+      if (existing.senderDeviceId !== senderDeviceId) return { ok: false, reason: "forbidden" as const };
+      if (Date.now() - existing.createdAt.getTime() > EDIT_WINDOW_MS) return { ok: false, reason: "expired" as const };
+      const r = await db.mobileMessage.update({ where: { id }, data: { text } });
+      return { ok: true, message: { id: r.id, fromMe: true, text: r.text, at: r.createdAt.getTime() } };
+    },
+    () => {
+      const existing = mem.messages.find((x) => x.id === id);
+      if (!existing) return { ok: false, reason: "notfound" as const };
+      if (existing.senderDeviceId !== senderDeviceId) return { ok: false, reason: "forbidden" as const };
+      if (Date.now() - existing.createdAt > EDIT_WINDOW_MS) return { ok: false, reason: "expired" as const };
+      existing.text = text;
+      return { ok: true, message: { id: existing.id, fromMe: true, text: existing.text, at: existing.createdAt } };
+    },
+  );
+}
+
+/**
+ * Mesajı bul → sahibini ve 10 dk penceresini doğrula → sil.
+ * Sonuç: {ok:true} | {ok:false,reason:"notfound"|"forbidden"|"expired"}.
+ */
+export async function deleteMessage(input: {
+  id: string;
+  senderDeviceId: string;
+}): Promise<DeleteResult> {
+  const { id, senderDeviceId } = input;
+  return withDb(
+    async () => {
+      const existing = await db.mobileMessage.findUnique({ where: { id } });
+      if (!existing) return { ok: false, reason: "notfound" as const };
+      if (existing.senderDeviceId !== senderDeviceId) return { ok: false, reason: "forbidden" as const };
+      if (Date.now() - existing.createdAt.getTime() > EDIT_WINDOW_MS) return { ok: false, reason: "expired" as const };
+      await db.mobileMessage.delete({ where: { id } });
+      return { ok: true };
+    },
+    () => {
+      const existing = mem.messages.find((x) => x.id === id);
+      if (!existing) return { ok: false, reason: "notfound" as const };
+      if (existing.senderDeviceId !== senderDeviceId) return { ok: false, reason: "forbidden" as const };
+      if (Date.now() - existing.createdAt > EDIT_WINDOW_MS) return { ok: false, reason: "expired" as const };
+      mem.messages = mem.messages.filter((x) => x.id !== id);
+      return { ok: true };
+    },
+  );
+}

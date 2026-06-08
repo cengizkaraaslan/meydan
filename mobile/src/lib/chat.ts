@@ -3,11 +3,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getOrCreateDeviceId } from "./device";
 import { getPerson } from "./people";
 import {
+  apiDeleteMessage,
+  apiEditMessage,
   apiEnsureMatch,
   apiFetchMessages,
   apiSendMessage,
   type ChatMessage,
 } from "./api";
+
+/** Düzenleme/silme penceresi: gönderimden sonra 10 dakika. */
+export const EDIT_WINDOW_MS = 10 * 60 * 1000;
+
+/** Bir mesaj kendi mesajım mı ve hâlâ 10 dk penceresinde mi? */
+export function canEditMsg(m: Msg): boolean {
+  return m.fromMe && !m.pending && Date.now() - m.at <= EDIT_WINDOW_MS;
+}
 
 /** Sohbet ekranında gösterilen mesaj (backend metni + yerel fotoğraf birleşik). */
 export interface Msg {
@@ -153,6 +163,45 @@ export function useChat(personId: string) {
     [matchKey, localImgs, botReply],
   );
 
+  /** Metin mesajını düzenler (yalnız kendi & 10 dk içinde). Başarıda refetch. */
+  const editMessage = useCallback(
+    async (id: string, text: string): Promise<{ ok: boolean; reason?: string }> => {
+      const trimmed = text.trim();
+      if (!trimmed || !matchKey || !deviceId) return { ok: false, reason: "invalid" };
+      const target = serverMsgs.find((m) => m.id === id);
+      if (!target || !target.fromMe) return { ok: false, reason: "not_owner" };
+      if (Date.now() - target.at > EDIT_WINDOW_MS) return { ok: false, reason: "expired" };
+      const r = await apiEditMessage({ id, senderDeviceId: deviceId, text: trimmed });
+      if (r.ok) await refetch(matchKey, deviceId);
+      return r;
+    },
+    [matchKey, deviceId, serverMsgs, refetch],
+  );
+
+  /** Mesajı siler. Foto (id "img_" & imageUri) → yerelden çıkar; metin → backend + refetch. */
+  const deleteMessage = useCallback(
+    async (id: string): Promise<{ ok: boolean; reason?: string }> => {
+      if (!matchKey) return { ok: false, reason: "invalid" };
+      // Yerel fotoğraf mesajı
+      const local = localImgs.find((m) => m.id === id);
+      if (local && (id.startsWith("img_") || local.imageUri)) {
+        const next = localImgs.filter((m) => m.id !== id);
+        setLocalImgs(next);
+        await AsyncStorage.setItem(imgKey(matchKey), JSON.stringify(next));
+        return { ok: true };
+      }
+      // Backend metin mesajı
+      if (!deviceId) return { ok: false, reason: "invalid" };
+      const target = serverMsgs.find((m) => m.id === id);
+      if (!target || !target.fromMe) return { ok: false, reason: "not_owner" };
+      if (Date.now() - target.at > EDIT_WINDOW_MS) return { ok: false, reason: "expired" };
+      const r = await apiDeleteMessage({ id, senderDeviceId: deviceId });
+      if (r.ok) await refetch(matchKey, deviceId);
+      return r;
+    },
+    [matchKey, deviceId, serverMsgs, localImgs, refetch],
+  );
+
   const messages = useMemo<Msg[]>(() => {
     const fromServer: Msg[] = serverMsgs.map((m) => ({ id: m.id, fromMe: m.fromMe, text: m.text, at: m.at }));
     const all = [...fromServer, ...localImgs, ...pending];
@@ -160,5 +209,5 @@ export function useChat(personId: string) {
     return all;
   }, [serverMsgs, localImgs, pending]);
 
-  return { messages, typing, send, sendImage, ready: !!matchKey };
+  return { messages, typing, send, sendImage, editMessage, deleteMessage, ready: !!matchKey };
 }

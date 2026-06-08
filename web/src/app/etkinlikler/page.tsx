@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { EventCard } from "@/components/EventCard";
 import { EventCardSkeleton } from "@/components/ui/Skeleton";
 import { FilterPanel } from "@/components/FilterPanel";
+import { DayFilterChips } from "@/components/DayFilterChips";
 import { PageFade } from "@/components/motion/PageFade";
 import { StaggerGrid } from "@/components/motion/StaggerGrid";
 import { getEvents } from "@/lib/events";
@@ -75,9 +76,14 @@ export default async function EventsPage({
       </div>
       <div className="grid lg:grid-cols-[260px_1fr] gap-8">
         <FilterPanel />
-        <Suspense fallback={<EventsSkeleton />}>
-          <EventsGrid params={params} />
-        </Suspense>
+        <div>
+          <div className="mb-5">
+            <DayFilterChips />
+          </div>
+          <Suspense fallback={<EventsSkeleton />}>
+            <EventsGrid params={params} />
+          </Suspense>
+        </div>
       </div>
     </PageFade>
   );

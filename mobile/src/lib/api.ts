@@ -200,3 +200,42 @@ export async function apiSendMessage(input: {
   const data = await postJson<{ ok?: boolean; message?: ChatMessage }>("/api/v1/dating/messages", input);
   return data?.message ?? null;
 }
+
+/** Genel amaçlı JSON istek yardımcısı (PATCH/DELETE). ok + reason döndürür. */
+async function sendJson(
+  method: "PATCH" | "DELETE",
+  path: string,
+  body: unknown,
+): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: JSON_HEADERS,
+      body: JSON.stringify(body),
+    });
+    if (res.ok) return { ok: true };
+    if (res.status === 403) return { ok: false, reason: "not_owner" };
+    if (res.status === 409) return { ok: false, reason: "expired" };
+    if (res.status === 404) return { ok: false, reason: "not_found" };
+    return { ok: false, reason: `http_${res.status}` };
+  } catch {
+    return { ok: false, reason: "network" };
+  }
+}
+
+/** Metin mesajını düzenler (10 dk kuralı backend'de de doğrulanır). 403 sahip değil / 409 süre doldu / 404 yok. */
+export async function apiEditMessage(input: {
+  id: string;
+  senderDeviceId: string;
+  text: string;
+}): Promise<{ ok: boolean; reason?: string }> {
+  return sendJson("PATCH", "/api/v1/dating/messages", input);
+}
+
+/** Metin mesajını siler (10 dk kuralı backend'de de doğrulanır). 403 / 409 / 404. */
+export async function apiDeleteMessage(input: {
+  id: string;
+  senderDeviceId: string;
+}): Promise<{ ok: boolean; reason?: string }> {
+  return sendJson("DELETE", "/api/v1/dating/messages", input);
+}

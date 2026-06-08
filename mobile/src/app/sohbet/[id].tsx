@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
@@ -10,7 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { getPerson } from "@/lib/people";
-import { useChat, type Msg } from "@/lib/chat";
+import { useChat, canEditMsg, type Msg } from "@/lib/chat";
 import { useAuth } from "@/lib/auth";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
@@ -19,6 +20,7 @@ import { tapH } from "@/lib/haptics";
 import { sndSend } from "@/lib/sound";
 
 const READ_BLUE = "#34B7F1";
+const CHAT_TIP_KEY = "meydanfest:chatTipSeen";
 
 function hhmm(ms: number): string {
   const d = new Date(ms);
@@ -32,8 +34,10 @@ export default function ChatScreen() {
   const { t: T } = useTheme();
   const { t } = useT();
   const person = getPerson(String(id));
-  const { messages, typing, send, sendImage } = useChat(String(id));
+  const { messages, typing, send, sendImage, editMessage, deleteMessage } = useChat(String(id));
   const [text, setText] = useState("");
+  const [editing, setEditing] = useState<Msg | null>(null);
+  const [tipVisible, setTipVisible] = useState(false);
   const listRef = useRef<FlatList<Msg>>(null);
 
   // Karşı taraftan gelen en son mesajın zamanı → benim ondan ÖNCEKİ mesajlarım "okundu" (mavi tik).
@@ -71,11 +75,91 @@ export default function ChatScreen() {
     );
   }
 
+  // İlk mesajdan sonra (ömür boyu 1 kez) ipucu modalını göster.
+  const maybeShowTip = useCallback(async () => {
+    try {
+      const seen = await AsyncStorage.getItem(CHAT_TIP_KEY);
+      if (seen === "1") return;
+      await AsyncStorage.setItem(CHAT_TIP_KEY, "1");
+      setTipVisible(true);
+    } catch {
+      /* yoksay */
+    }
+  }, []);
+
   const onSend = () => {
-    if (!text.trim()) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     sndSend();
-    void send(text);
+    if (editing) {
+      const target = editing;
+      setEditing(null);
+      setText("");
+      void (async () => {
+        const r = await editMessage(target.id, trimmed);
+        if (!r.ok) {
+          Alert.alert(
+            "Düzenlenemedi",
+            r.reason === "expired"
+              ? "Bu mesajın düzenleme süresi (10 dk) doldu."
+              : "Mesaj düzenlenemedi, tekrar dene.",
+          );
+        }
+      })();
+      return;
+    }
+    void send(trimmed);
+    setText("");
+    void maybeShowTip();
+  };
+
+  const onLongPressMsg = (m: Msg) => {
+    if (!canEditMsg(m)) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const isImage = !!m.imageUri;
+    const buttons: { text: string; style?: "cancel" | "destructive" | "default"; onPress?: () => void }[] = [];
+    if (!isImage) {
+      buttons.push({
+        text: "Düzenle",
+        onPress: () => {
+          setEditing(m);
+          setText(m.text);
+        },
+      });
+    }
+    buttons.push({
+      text: "Sil",
+      style: "destructive",
+      onPress: () => {
+        Alert.alert("Mesajı sil", "Bu mesaj silinsin mi?", [
+          { text: "İptal", style: "cancel" },
+          {
+            text: "Sil",
+            style: "destructive",
+            onPress: () => {
+              void (async () => {
+                const r = await deleteMessage(m.id);
+                if (!r.ok) {
+                  Alert.alert(
+                    "Silinemedi",
+                    r.reason === "expired"
+                      ? "Bu mesajın silme süresi (10 dk) doldu."
+                      : "Mesaj silinemedi, tekrar dene.",
+                  );
+                }
+              })();
+            },
+          },
+        ]);
+      },
+    });
+    buttons.push({ text: "İptal", style: "cancel" });
+    Alert.alert(isImage ? "Fotoğraf" : "Mesaj", undefined, buttons);
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
     setText("");
   };
 
@@ -116,9 +200,21 @@ export default function ChatScreen() {
           keyExtractor={(m) => m.id}
           contentContainerStyle={{ padding: 16, gap: 8, paddingBottom: 16 }}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => <Bubble T={T} m={item} read={item.fromMe && !item.pending && item.at < lastIncomingAt} />}
+          renderItem={({ item }) => <Bubble T={T} m={item} read={item.fromMe && !item.pending && item.at < lastIncomingAt} onLongPress={() => onLongPressMsg(item)} />}
           ListFooterComponent={typing ? <TypingBubble T={T} /> : null}
         />
+
+        {/* Düzenleme modu göstergesi */}
+        {editing ? (
+          <View style={[styles.editBar, { backgroundColor: T.surfaceStrong, borderTopColor: T.hairline }]}>
+            <Text style={[Type.label, { color: T.primary, flex: 1 }]} numberOfLines={1}>
+              Mesajı düzenliyorsun
+            </Text>
+            <Pressable onPress={() => { tapH(); cancelEdit(); }} hitSlop={10}>
+              <Text style={{ color: T.textFaint, fontSize: 16 }}>✕</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* Girdi */}
         <View style={[styles.inputBar, { paddingBottom: insets.bottom ? insets.bottom : 12, borderTopColor: T.hairline }]}>
@@ -141,6 +237,22 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* İlk mesaj ipucu (ömür boyu 1 kez) */}
+      <Modal visible={tipVisible} transparent animationType="fade" onRequestClose={() => setTipVisible(false)}>
+        <View style={styles.tipBackdrop}>
+          <View style={[styles.tipCard, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+            <Text style={[Type.body, { color: T.text, textAlign: "center" }]}>
+              💬 İpucu: Gönderdiğin mesajı 10 dakika içinde düzenleyebilir veya silebilirsin — mesaja basılı tut.
+            </Text>
+            <Pressable onPress={() => { tapH(); setTipVisible(false); }} style={{ marginTop: 18 }}>
+              <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.tipBtn}>
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Anladım</Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -152,11 +264,11 @@ function Ticks({ read, pending }: { read: boolean; pending?: boolean }) {
   );
 }
 
-function Bubble({ T, m, read }: { T: Palette; m: Msg; read: boolean }) {
+function Bubble({ T, m, read, onLongPress }: { T: Palette; m: Msg; read: boolean; onLongPress?: () => void }) {
   const isImage = !!m.imageUri;
   if (m.fromMe) {
     return (
-      <View style={{ alignSelf: "flex-end", maxWidth: "82%" }}>
+      <Pressable onLongPress={onLongPress} delayLongPress={300} style={{ alignSelf: "flex-end", maxWidth: "82%" }}>
         <LinearGradient colors={T.primarySoft} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.bubble, styles.mine, isImage && styles.imgBubble]}>
           {isImage ? (
             <Image source={{ uri: m.imageUri }} style={styles.img} contentFit="cover" transition={150} />
@@ -168,7 +280,7 @@ function Bubble({ T, m, read }: { T: Palette; m: Msg; read: boolean }) {
             <Ticks read={read} pending={m.pending} />
           </View>
         </LinearGradient>
-      </View>
+      </Pressable>
     );
   }
   return (
@@ -232,4 +344,11 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2,
   },
   send: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  editBar: {
+    flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth * 2,
+  },
+  tipBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
+  tipCard: { width: "100%", borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 22 },
+  tipBtn: { borderRadius: Radius.md, alignItems: "center", justifyContent: "center", paddingVertical: 12 },
 });
