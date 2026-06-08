@@ -626,3 +626,68 @@ model ScraperRun {
 
   @@index([source, startedAt])
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MEYDAN — sosyal duvar (Instagram tarzı): takip grafiği + gönderiler + tepki/yorum + bildirim.
+// Kimlik deviceId bazlı (User FK yok); hedefler mock kişiler (fake_<id>) veya gerçek cihazlar.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Follow {
+  id               String   @id @default(cuid())
+  followerDeviceId String
+  followingId      String   // hedef: fake_<id> veya gerçek deviceId
+  createdAt        DateTime @default(now())
+
+  @@unique([followerDeviceId, followingId])
+  @@index([followerDeviceId])
+  @@index([followingId])
+}
+
+model MobilePost {
+  id           String   @id @default(cuid())
+  authorId     String   // yazar deviceId veya fake_<id>
+  authorName   String?
+  authorAvatar String?  @db.Text
+  text         String?  @db.Text
+  imageUrl     String?  @db.Text
+  eventSlug    String?
+  eventTitle   String?
+  createdAt    DateTime @default(now())
+
+  @@index([authorId, createdAt])
+  @@index([createdAt])
+}
+
+model PostReaction {
+  id        String   @id @default(cuid())
+  postId    String
+  deviceId  String
+  emoji     String   // 👍 ❤️ 😂 😮 😢 🔥
+  createdAt DateTime @default(now())
+
+  @@unique([postId, deviceId])
+  @@index([postId])
+}
+
+model PostComment {
+  id         String   @id @default(cuid())
+  postId     String
+  deviceId   String
+  authorName String?
+  text       String   @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([postId, createdAt])
+}
+
+model MobileNotif {
+  id        String   @id @default(cuid())
+  deviceId  String   // alıcı
+  type      String   // "follow"
+  actorId   String   // eylemi yapan (takip eden) deviceId/fake_<id>
+  actorName String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([deviceId, createdAt])
+}
