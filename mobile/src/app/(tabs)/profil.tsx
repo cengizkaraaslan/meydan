@@ -26,7 +26,7 @@ import { useIsAdmin } from "@/lib/admin";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { showAuthPrompt } from "@/lib/authPrompt";
-import { syncProfile } from "@/lib/profileSync";
+import { syncProfile, onAvatarRestored } from "@/lib/profileSync";
 import { uploadImage } from "@/lib/social";
 import { useDProfile, ageFromBirthDate } from "@/lib/dprofile";
 import { useActiveCity, ALL_CITIES, districtsFor } from "@/lib/location";
@@ -193,6 +193,8 @@ export default function ProfileScreen() {
     AsyncStorage.getItem("meydanfest:avatar").then(setAvatarOverride);
     AsyncStorage.getItem("meydanfest:gender").then(setGender);
   }, []);
+  // Girişte sunucudan avatar geri yüklenince (reinstall sonrası) anında uygula.
+  useEffect(() => onAvatarRestored(setAvatarOverride), []);
   const photoUri = avatarOverride ?? user?.photo;
 
   // Galeriden seç → kırpma ekranını aç (native crop değil, kendi ImageCropper'ımız).

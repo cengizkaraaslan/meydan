@@ -22,6 +22,7 @@ import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { fetchNotifs } from "@/lib/social";
+import { onAvatarRestored } from "@/lib/profileSync";
 import { resolveAvatar } from "@/lib/avatar";
 import { Image } from "expo-image";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -55,6 +56,8 @@ export default function DiscoverScreen() {
       AsyncStorage.getItem("meydanfest:gender").then(setGender);
     }, []),
   );
+  // Girişte sunucudan avatar geri yüklenince (reinstall sonrası) anında uygula.
+  useEffect(() => onAvatarRestored(setAvatarOverride), []);
   const photoUri = avatarOverride ?? user?.photo;
   // Okunmamış bildirim sayacı — ekran her odaklandığında tazelenir.
   const [unread, setUnread] = useState(0);

@@ -5,6 +5,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import * as Linking from "expo-linking";
 import { API_BASE } from "./api";
+import { setAccountKey, restoreAvatar } from "./profileSync";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -118,6 +119,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })();
   }, []);
+
+  // Kullanıcı hazır olunca (giriş VEYA açılışta oturum geri yüklenince): profili hesaba
+  // (email) bağla ve sunucudaki avatar'ı yerele geri yükle → reinstall'da avatar kaybolmaz.
+  useEffect(() => {
+    if (user?.email) {
+      setAccountKey(user.email);
+      void restoreAvatar();
+    } else {
+      setAccountKey(null);
+    }
+  }, [user?.email]);
 
   const handleUser = useCallback(async (u: AuthUser) => {
     setUser(u);
