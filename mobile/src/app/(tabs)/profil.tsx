@@ -28,7 +28,8 @@ import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { showAuthPrompt } from "@/lib/authPrompt";
 import { syncProfile, onAvatarRestored } from "@/lib/profileSync";
-import { uploadImage } from "@/lib/social";
+import { uploadImageResult } from "@/lib/social";
+import { InfoModal } from "@/components/InfoModal";
 import { useDProfile, ageFromBirthDate } from "@/lib/dprofile";
 import { useActiveCity, ALL_CITIES, districtsFor } from "@/lib/location";
 import { tapH, impactH, successH } from "@/lib/haptics";
@@ -190,6 +191,7 @@ export default function ProfileScreen() {
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
   const [cropUri, setCropUri] = useState<string | null>(null); // kırpma ekranına gidecek ham görsel
   const [uploadingAvatar, setUploadingAvatar] = useState(false); // avatar sunucuya yükleniyor mu
+  const [infoModal, setInfoModal] = useState<{ title: string; message?: string; tone?: "error" | "success" | "info" } | null>(null);
   const [gender, setGender] = useState<string | null>(null);
   useEffect(() => {
     AsyncStorage.getItem("meydanfest:avatar").then(setAvatarOverride);
@@ -231,27 +233,29 @@ export default function ProfileScreen() {
         } catch {
           /* küçültme başarısızsa orijinali dene */
         }
-        // 1) Görseli sunucuya (R2) yükle → public URL.
-        const url = await uploadImage(uploadUri, "post");
-        if (!url) {
-          Alert.alert(
-            "Avatar yüklenemedi",
-            "Sunucuya bağlanılamadı ya da yükleme reddedildi. İnternetini kontrol edip tekrar dene.\n\n(Şu an yalnız bu cihazda görünür, hesabına kaydedilmedi.)",
-          );
+        // 1) Görseli sunucuya (R2) yükle → public URL (hata varsa sunucunun gerçek mesajı).
+        const result = await uploadImageResult(uploadUri, "post");
+        if ("error" in result) {
+          setInfoModal({
+            tone: "error",
+            title: "Avatar yüklenemedi",
+            message: `${result.error}\n\nŞu an yalnız bu cihazda görünür, hesabına kaydedilmedi.`,
+          });
           return;
         }
+        const url = result.url;
         setAvatarOverride(url);
         AsyncStorage.setItem("meydanfest:avatar", url);
         if (prev && prev !== url) deleteLocalFile(prev);
         // 2) Public URL'i profile (hesaba) kaydet → reinstall'da geri gelir.
         const ok = await syncProfile({ avatar: url });
         if (!ok) {
-          Alert.alert("Kaydedilemedi", "Avatar yüklendi ama profile kaydedilemedi. Daha sonra tekrar dene.");
+          setInfoModal({ tone: "error", title: "Kaydedilemedi", message: "Avatar yüklendi ama profile kaydedilemedi. Daha sonra tekrar dene." });
         } else {
           showToast("Avatar güncellendi ✓");
         }
-      } catch {
-        Alert.alert("Avatar hatası", "Beklenmeyen bir hata oluştu. Lütfen tekrar dene.");
+      } catch (e) {
+        setInfoModal({ tone: "error", title: "Avatar hatası", message: e instanceof Error ? e.message : "Beklenmeyen bir hata oluştu." });
       } finally {
         setUploadingAvatar(false);
       }
@@ -844,6 +848,14 @@ export default function ProfileScreen() {
           <Text style={[Type.label, { color: T.text, textAlign: "center" }]}>{toast}</Text>
         </Animated.View>
       )}
+
+      <InfoModal
+        visible={!!infoModal}
+        title={infoModal?.title ?? ""}
+        message={infoModal?.message}
+        tone={infoModal?.tone}
+        onClose={() => setInfoModal(null)}
+      />
     </View>
   );
 }

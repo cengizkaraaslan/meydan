@@ -166,8 +166,14 @@ function guessType(uri: string): { type: string; ext: string } {
   return { type: "image/jpeg", ext: "jpg" };
 }
 
-/** Yerel görseli R2'ye yükler, public URL döner (başarısızsa null). kind: "story"|"post". */
-export async function uploadImage(uri: string, kind: "story" | "post" = "post"): Promise<string | null> {
+/**
+ * Yerel görseli R2'ye yükler. Başarıda { url }, hatada { error } (sunucunun gerçek
+ * mesajı: "Geçersiz tür", "Dosya 6MB...", "Yüklenemedi: ...", bağlantı hatası vb.).
+ */
+export async function uploadImageResult(
+  uri: string,
+  kind: "story" | "post" = "post",
+): Promise<{ url: string } | { error: string }> {
   try {
     const { type, ext } = guessType(uri);
     const form = new FormData();
@@ -175,14 +181,26 @@ export async function uploadImage(uri: string, kind: "story" | "post" = "post"):
     form.append("file", { uri, name: `img.${ext}`, type } as unknown as Blob);
     form.append("kind", kind);
     const res = await fetch(`${API_BASE}/api/v1/social/upload`, { method: "POST", body: form });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { ok?: boolean; url?: string };
-    if (!data.ok || !data.url) return null;
+    let data: { ok?: boolean; url?: string; error?: string } | null = null;
+    try {
+      data = (await res.json()) as { ok?: boolean; url?: string; error?: string };
+    } catch {
+      /* gövde JSON değil */
+    }
+    if (!res.ok || !data?.ok || !data?.url) {
+      return { error: data?.error ? String(data.error) : `Sunucu hatası (HTTP ${res.status})` };
+    }
     // publicUrl göreli (/api/r2-image/...) dönebilir → mobilde render için mutlak yap.
-    return data.url.startsWith("http") ? data.url : `${API_BASE}${data.url}`;
-  } catch {
-    return null;
+    return { url: data.url.startsWith("http") ? data.url : `${API_BASE}${data.url}` };
+  } catch (e) {
+    return { error: e instanceof Error ? `Bağlantı hatası: ${e.message}` : "Bağlantı hatası" };
   }
+}
+
+/** Yerel görseli R2'ye yükler, public URL döner (başarısızsa null). kind: "story"|"post". */
+export async function uploadImage(uri: string, kind: "story" | "post" = "post"): Promise<string | null> {
+  const r = await uploadImageResult(uri, kind);
+  return "url" in r ? r.url : null;
 }
 
 export async function createStory(input: {
