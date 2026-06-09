@@ -71,7 +71,13 @@ export const MUNICIPALITY_CONFIGS: MunicipalityConfig[] = [
     eventListPath: "/etkinlikler", city: "Kayseri",
     selectors: { card: ".event-item-box", title: ".event-item-title", date: ".event-item-date", venue: ".event-line:last-child .event-line-text", image: ".event-item-image img", link: ".event-item-title a" },
   },
-  { source: "MUNI_DIYARBAKIR",    displayName: "Diyarbakır BB",     baseUrl: "https://www.diyarbakir.bel.tr",       eventListPath: "/etkinlikler",     city: "Diyarbakır" },
+  // Diyarbakır: Next.js+Strapi SPA, /etkinlikler statik boş → Strapi proxy API (sort=startDate:desc → upcoming-first).
+  // image nested obje, url slug prefix gerektirir → ikisi de atlandı (title/date/venue yeter).
+  {
+    source: "MUNI_DIYARBAKIR", displayName: "Diyarbakır BB", baseUrl: "https://www.diyarbakir.bel.tr",
+    eventListPath: "/tr/icerik/etkinlikler", city: "Diyarbakır",
+    api: { url: "/api/strapi/events?pagination[pageSize]=60&sort=startDate:desc", listPath: "data", fields: { id: "id", title: "title", date: "startDate", venue: "location" } },
+  },
   // Hatay: api/events JSON, yanıt {success, data:[...]} ile sarmalı → listPath: "data".
   // date ISO "2026-05-13T16:30:00", url+image relative.
   {
@@ -79,14 +85,41 @@ export const MUNICIPALITY_CONFIGS: MunicipalityConfig[] = [
     eventListPath: "/etkinlikler", city: "Hatay",
     api: { url: "/api/events", listPath: "data", fields: { id: "id", title: "name", date: "date", url: "url", image: "image" } },
   },
-  { source: "MUNI_MANISA",        displayName: "Manisa BB",         baseUrl: "https://www.manisa.bel.tr",           eventListPath: "/etkinlikler",     city: "Manisa" },
-  { source: "MUNI_SAMSUN",        displayName: "Samsun BB",         baseUrl: "https://www.samsun.bel.tr",           eventListPath: "/etkinlikler",     city: "Samsun" },
-  { source: "MUNI_AYDIN",         displayName: "Aydın BB",          baseUrl: "https://www.aydin.bel.tr",            eventListPath: "/etkinlikler",     city: "Aydın" },
+  // Manisa: etkinlikler kültür alt-domeninde (kultur.manisa.bel.tr), statik SSR.
+  {
+    source: "MUNI_MANISA", displayName: "Manisa BB", baseUrl: "https://kultur.manisa.bel.tr",
+    eventListPath: "/etkinlikler", city: "Manisa",
+    selectors: { card: ".event-card", title: ".ech__title", date: ".ech__meta .meta:nth-child(2) .value", venue: ".ech__address", image: "a.ech__media img", link: "a.event-cta" },
+  },
+  // Samsun: doğru yol /etkinliklerimiz (eski /etkinlikler 404), statik 200+ kart.
+  {
+    source: "MUNI_SAMSUN", displayName: "Samsun BB", baseUrl: "https://www.samsun.bel.tr",
+    eventListPath: "/etkinliklerimiz", city: "Samsun",
+    selectors: { card: "li.activities-card", title: "h3.title", date: ".activities-date", image: "img", link: "a.flexbox" },
+  },
+  // Aydın: ASP.NET MVC server-render; tarih+yer tek .ozet metninde "Tarih : ... Yer : ..."
+  // (parseDate ilk dd.mm.yyyy'yi alır). /etkinlikler sezon dışı boş olabilir, dolunca aynı markup.
+  {
+    source: "MUNI_AYDIN", displayName: "Aydın BB", baseUrl: "https://www.aydin.bel.tr",
+    eventListPath: "/etkinlikler", city: "Aydın",
+    selectors: { card: ".haber", title: ".baslik", date: ".ozet", venue: ".ozet", image: ".haberImg", link: "a" },
+  },
   { source: "MUNI_BALIKESIR",     displayName: "Balıkesir BB",      baseUrl: "https://www.balikesir.bel.tr",        eventListPath: "/etkinlikler",     city: "Balıkesir" },
-  { source: "MUNI_DENIZLI",       displayName: "Denizli BB",        baseUrl: "https://www.denizli.bel.tr",          eventListPath: "/etkinlikler",     city: "Denizli" },
+  // Denizli: ASP.NET Default.aspx?k=<kategori>; "Gösteri ve Etkinlikler" bölümü statik.
+  {
+    source: "MUNI_DENIZLI", displayName: "Denizli BB", baseUrl: "https://www.denizli.bel.tr",
+    eventListPath: "/Default.aspx?k=gosteri-ve-etkinlikler", city: "Denizli",
+    selectors: { card: "div.thumbiceriklist", title: "a.baslik", date: "span.tarih", image: "img", link: "a.baslik" },
+  },
   { source: "MUNI_ERZURUM",       displayName: "Erzurum BB",        baseUrl: "https://www.erzurum.bel.tr",          eventListPath: "/etkinlikler",     city: "Erzurum" },
   { source: "MUNI_SANLIURFA",     displayName: "Şanlıurfa BB",      baseUrl: "https://www.sanliurfa.bel.tr",        eventListPath: "/etkinlikler",     city: "Şanlıurfa" },
-  { source: "MUNI_SAKARYA",       displayName: "Sakarya BB",        baseUrl: "https://www.sakarya.bel.tr",          eventListPath: "/etkinlikler",     city: "Sakarya" },
+  // Sakarya: etkinlik takvimi ebis.sakarya.bel.tr (Angular SPA) → api.sakarya.bel.tr Ebis API.
+  // Default sıra upcoming-first; image/url sadece id döndürür → atlandı (title/date/venue yeter).
+  {
+    source: "MUNI_SAKARYA", displayName: "Sakarya BB", baseUrl: "https://ebis.sakarya.bel.tr",
+    eventListPath: "/etkinlik-takvimi", city: "Sakarya",
+    api: { url: "https://api.sakarya.bel.tr/Ebis/Activity?PageSize=60&ActivityStatus=null", listPath: "data", fields: { id: "id", title: "name", date: "startDate", venue: "locationFormatedNames" } },
+  },
   { source: "MUNI_TEKIRDAG",      displayName: "Tekirdağ BB",       baseUrl: "https://www.tekirdag.bel.tr",         eventListPath: "/etkinlikler",     city: "Tekirdağ" },
   // MUNI_TRABZON: ÇÖZMEZ — www.trabzon.bel.tr/etkinlikler sadece resim-carousel; gerçek veri kurumsal.trabzon.bel.tr/Etkinlikler alt-domeninde, ayrı concrete scraper gerek.
   { source: "MUNI_TRABZON",       displayName: "Trabzon BB",        baseUrl: "https://www.trabzon.bel.tr",          eventListPath: "/etkinlikler",     city: "Trabzon" },
