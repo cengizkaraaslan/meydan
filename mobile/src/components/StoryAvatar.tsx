@@ -74,7 +74,7 @@ export function StoryAvatar({ uri, name, size, hasStory, online, onPress }: Prop
       {innerCircle}
     </LinearGradient>
   ) : (
-    // Story yoksa: aynı boyut, nötr ince çerçeve (hizalama bozulmasın).
+    // Story yoksa: ÇERÇEVE YOK (görünmez kenarlık — yalnız hizalama için aynı boyut).
     <View
       style={{
         width: outer,
@@ -84,7 +84,7 @@ export function StoryAvatar({ uri, name, size, hasStory, online, onPress }: Prop
         alignItems: "center",
         justifyContent: "center",
         borderWidth: 1,
-        borderColor: T.hairline,
+        borderColor: "transparent",
       }}
     >
       {innerCircle}

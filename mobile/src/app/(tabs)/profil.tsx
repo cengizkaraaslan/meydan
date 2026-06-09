@@ -431,16 +431,11 @@ export default function ProfileScreen() {
           <Text style={[Type.label, { color: T.textFaint, marginTop: 4 }]}>{user?.email || t("exploring")}</Text>
         </Animated.View>
 
-        {/* Story halkası — paylaş + görüntüle */}
+        {/* Daha önce paylaşılan story'ler — yalnız VARSA (paylaşım profilden DEĞİL,
+            Meydan sayfasındaki story-paylaş modalından yapılır). */}
+        {storyGroups.length > 0 && (
         <Animated.View entering={FadeInDown.duration(450).delay(40)} style={{ marginBottom: Space.xl }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Space.md, paddingVertical: 2 }}>
-            {/* Story paylaş */}
-            <Pressable onPress={shareStory} style={styles.storyItem}>
-              <View style={[styles.storyAdd, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}>
-                <Text style={{ fontSize: 26, color: T.primary }}>＋</Text>
-              </View>
-              <Text style={[Type.micro, { color: T.textDim, maxWidth: 64, textAlign: "center" }]} numberOfLines={1}>{t("share_story")}</Text>
-            </Pressable>
             {/* Story'ler — etkinliğe göre gruplu. Etiket = ETKİNLİK ADI (yoksa başlık). */}
             {storyGroups.map((grp, gi) => {
               const head = grp[0];
@@ -469,6 +464,7 @@ export default function ProfileScreen() {
             })}
           </ScrollView>
         </Animated.View>
+        )}
 
         {/* Oturumsuzken Google girişi */}
         {!user && (
