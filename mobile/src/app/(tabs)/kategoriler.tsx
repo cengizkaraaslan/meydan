@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -26,6 +26,9 @@ function lower(s: string): string {
   return s.toLocaleLowerCase("tr-TR");
 }
 
+/** Sayfa başına kayıt (10'ar 10'ar pagination). */
+const PAGE_SIZE = 10;
+
 export default function KategorilerScreen() {
   const insets = useSafeAreaInsets();
   const { t: T } = useTheme();
@@ -44,6 +47,10 @@ export default function KategorilerScreen() {
   const [districts, setDistricts] = useState<string[]>([]);
   const [events, setEvents] = useState<ApiEvent[]>([]);
   const [loading, setLoading] = useState(false);
+  // Pagination: page = yüklü son sayfa, totalPages = sunucudaki toplam sayfa.
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const hasSelection = selected.length > 0;
 
@@ -82,34 +89,40 @@ export default function KategorilerScreen() {
   // Etkinlikleri çek. Şehir + fiyat (free) filtresi sunucu tarafında uygulanır.
   // Kategori dizisi `selected` değiştiğinde (string'e çevrilerek) yeniden tetiklenir.
   const selectedKey = selected.join(",");
+  // Tek kategori seçiliyse sunucu `category` paramıyla verimli/doğru sayfalama;
+  // çoklu/tüm seçimde kategori filtresi client'ta (visibleEvents) uygulanır.
+  const serverCategory = selected.length === 1 ? selected[0] : undefined;
+
+  // Filtre değişince sayfa 1'den taze çek. Sonuç HAM şehir feed'i olarak tutulur;
+  // kategori/fiyat/ilçe filtreleri visibleEvents'te uygulanır (sayfalama bozulmasın).
   useEffect(() => {
     if (selected.length === 0) {
       setEvents([]);
+      setTotalPages(1);
       return;
     }
     let alive = true;
     setLoading(true);
     setEvents([]);
+    setPage(1);
     (async () => {
       try {
-        // Şehir + genel (kategori filtresiz) çek; kategori filtresini client'ta uygula.
-        // Böylece çoklu seçimde tek istekle birden çok kategori desteklenir.
         const res = await fetchEvents({
           city: cityFilter ?? undefined,
+          category: serverCategory,
           freeOnly: priceFilter === "free",
-          pageSize: 60,
+          page: 1,
+          pageSize: PAGE_SIZE,
         });
-        let data = res.data;
-        // Seçili kategorilere göre filtrele.
-        const sel = new Set(selected);
-        data = data.filter((e) => sel.has(e.category));
-        // Gelişmiş fiyat filtresi: paid → biletli, student → üniversite kaynakları (öğrenciye açık).
-        if (priceFilter === "paid") data = data.filter((e) => !e.is_free);
-        else if (priceFilter === "student") data = data.filter((e) => (e.source || "").startsWith("UNI") || e.is_free);
-        // NOT: Şehir seçiliyse ve sonuç boşsa BAŞKA şehir getirme (#21) — EmptyState gösterilir.
-        if (alive) setEvents(data);
+        if (alive) {
+          setEvents(res.data);
+          setTotalPages(res.meta.total_pages);
+        }
       } catch {
-        if (alive) setEvents([]);
+        if (alive) {
+          setEvents([]);
+          setTotalPages(1);
+        }
       } finally {
         if (alive) setLoading(false);
       }
@@ -117,15 +130,49 @@ export default function KategorilerScreen() {
     return () => {
       alive = false;
     };
-  }, [selectedKey, cityFilter, priceFilter]);
+  }, [selectedKey, serverCategory, cityFilter, priceFilter]);
+
+  // Sonraki sayfayı çek ve listeye ekle (10'ar 10'ar).
+  const loadMore = useCallback(async () => {
+    if (loading || loadingMore || page >= totalPages) return;
+    setLoadingMore(true);
+    try {
+      const next = page + 1;
+      const res = await fetchEvents({
+        city: cityFilter ?? undefined,
+        category: serverCategory,
+        freeOnly: priceFilter === "free",
+        page: next,
+        pageSize: PAGE_SIZE,
+      });
+      setEvents((prev) => {
+        const seen = new Set(prev.map((e) => e.id));
+        return [...prev, ...res.data.filter((e) => !seen.has(e.id))];
+      });
+      setPage(next);
+      setTotalPages(res.meta.total_pages);
+    } catch {
+      /* yoksay */
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loading, loadingMore, page, totalPages, cityFilter, serverCategory, priceFilter]);
 
   // İlçe filtresi (#C2): seçili ilçe (null = tümü). Veride district alanı yok →
   // venue/title içinde ilçe adı geçenleri göster.
   const visibleEvents = useMemo(() => {
-    if (!district) return events;
-    const q = lower(district);
-    return events.filter((e) => lower(e.venue || "").includes(q) || lower(e.title || "").includes(q));
-  }, [events, district]);
+    const sel = new Set(selected);
+    let data = events.filter((e) => sel.has(e.category));
+    // Gelişmiş fiyat: paid → biletli, student → üniversite kaynakları (öğrenciye açık).
+    if (priceFilter === "paid") data = data.filter((e) => !e.is_free);
+    else if (priceFilter === "student") data = data.filter((e) => (e.source || "").startsWith("UNI") || e.is_free);
+    // İlçe (#C2): veride district yok → venue/title içinde ilçe adı geçenler.
+    if (district) {
+      const q = lower(district);
+      data = data.filter((e) => lower(e.venue || "").includes(q) || lower(e.title || "").includes(q));
+    }
+    return data;
+  }, [events, selected, priceFilter, district]);
 
   const toggleCategory = (key: string) => {
     tapH();
@@ -144,6 +191,12 @@ export default function KategorilerScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: 130 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        onScroll={({ nativeEvent }) => {
+          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          // Sona ~500px kala bir sonraki sayfayı otomatik yükle (sonsuz kaydırma).
+          if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 500) loadMore();
+        }}
+        scrollEventThrottle={250}
       >
         <Animated.View entering={FadeInDown.duration(450)}>
           <Text style={[Type.h1, styles.title, { color: T.text }]}>{t("categories")}</Text>
@@ -314,6 +367,24 @@ export default function KategorilerScreen() {
                     <EventRow event={e} />
                   </Animated.View>
                 ))}
+                {/* 10'ar 10'ar sayfalama: daha varsa buton/oto-yükle; bittiyse kapanış */}
+                {page < totalPages ? (
+                  <Pressable
+                    onPress={loadMore}
+                    disabled={loadingMore}
+                    style={[styles.loadMore, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}
+                  >
+                    {loadingMore ? (
+                      <ActivityIndicator color={T.primary} />
+                    ) : (
+                      <Text style={[Type.title, { color: T.primary }]}>Daha fazla göster</Text>
+                    )}
+                  </Pressable>
+                ) : visibleEvents.length > 0 ? (
+                  <Text style={[Type.label, { color: T.textFaint, textAlign: "center", marginTop: Space.lg }]}>
+                    Hepsi bu kadar ✦
+                  </Text>
+                ) : null}
               </>
             )}
           </View>
@@ -385,6 +456,14 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 30 },
   tileLabel: { color: "#fff" },
   results: { marginTop: Space.xl, paddingHorizontal: 16 },
+  loadMore: {
+    marginTop: Space.lg,
+    paddingVertical: 14,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   hint: {
     textAlign: "center",
     marginTop: Space.xxl,
