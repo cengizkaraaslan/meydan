@@ -77,6 +77,39 @@ export function guessCategory(text: string): EventCategory {
   return "DIGER";
 }
 
+/**
+ * Başlık gerçek etkinlik değil, idari/kurumsal duyuru mu? (üniversite/belediye "duyurular"
+ * sayfaları elektrik kesintisi, ihale, sınav sonucu, alım ilanı gibi gürültüyle dolu —
+ * bunlar etkinlik feed'ine GİRMEMELİ). Önce net etkinlik sinyali varsa asla duyuru sayma.
+ */
+export function isAdminNotice(title: string): boolean {
+  const t = title.toLocaleLowerCase("tr");
+  // Net etkinlik sinyali → kesinlikle duyuru değil (öncelikli koruma).
+  if (
+    /(konser|festival|şenlik|senlik|sergi|söyleşi|soylesi|panel|konferans|sempozyum|çalıştay|calistay|atölye|atolye|workshop|tiyatro|gösteri|gosteri|dinleti|resital|film göster|film goster|stand[\s-]?up|imza günü|imza gunu|yarışma|yarisma|turnuva|bienal|fuar|söyleşi|gala|kermes|defile)/.test(
+      t,
+    )
+  ) {
+    return false;
+  }
+  // İdari/kurumsal duyuru kalıpları → etkinlik değil, ele.
+  return /(elektrik kesinti|su kesinti|doğal\s?gaz|dogal\s?gaz|\bkesinti|ihale|satın al|satin al|satış ilan|satis ilan|kiralama|alım ilan|alim ilan|alımı yapıla|alimi yapila|personel al|öğretim (üyesi|elemanı) al|ogretim (uyesi|elemani) al|sözleşmeli|sozlesmeli|\bkadro\b|yedek aday|\batama\b|görevlendir|gorevlendir|sınav sonu|sinav sonu|başvuru sonu|basvuru sonu|mülakat|mulakat|yerleştir|yerlestir|yönetmelik|yonetmelik|yönerge|yonerge|genelge|meclis günde|meclis gunde|encümen|encumen|imar plan|askı ilan|aski ilan|askıya çık|askiya cik|zeyilname|burs başvuru|burs basvuru|kayıt yenile|kayit yenile|ders kayd|bütünleme|butunleme|final sınav|vize sınav|akademik takvim|harç|yatay geçiş|yatay gecis|mazeret sınav|tebliğ|yeterlik sınav|yeterlik sinav|mezuniyet tören|mezuniyet toren|ilanen|duyurusu$|sonuçları$|sonuclari$|ilanı$|ilani$)/.test(
+    t,
+  );
+}
+
+/**
+ * Başlık NET bir etkinlik mi? (konser/sergi/söyleşi/panel/atölye/tiyatro/şenlik...).
+ * Üniversite "duyurular" sayfaları gibi sinyal/gürültü oranı kötü kaynaklarda DENYLIST
+ * yetmez (idari ilan çeşidi sonsuz) → sadece bu allowlist'i geçenler etkinlik sayılır.
+ */
+export function isEventTitle(title: string): boolean {
+  const t = title.toLocaleLowerCase("tr");
+  return /(konser|festival|şenlik|senlik|sergi|söyleşi|soylesi|panel|konferans|seminer|sempozyum|çalıştay|calistay|atölye|atolye|workshop|tiyatro|gösteri̇m|gosterim|gösteri|gosteri|dinleti|resital|stand[\s-]?up|komedi|yarışma|yarisma|turnuva|şampiyona|sampiyona|maraton|koşusu|kosusu|\bgala\b|bienal|\bfuar|kermes|defile|imza gün|buluşma|bulusma|kutlama|\banma\b|anması|gecesi|şöleni|soleni|karnaval|etkinli[kğ]|\bforum\b|kariyer gün|\boyunu\b)/.test(
+    t,
+  );
+}
+
 const HTML_ENTITY_MAP: Record<string, string> = {
   "&#252;": "ü", "&#220;": "Ü", "&#246;": "ö", "&#214;": "Ö",
   "&#231;": "ç", "&#199;": "Ç", "&#287;": "ğ", "&#286;": "Ğ",

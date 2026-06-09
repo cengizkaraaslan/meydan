@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { MunicipalityScraper } from "./MunicipalityScraper";
+import { isAdminNotice, isEventTitle } from "./parse-helpers";
 import type { EventCategory, EventSource, ScrapedEvent } from "../types";
 
 export interface MunicipalityConfig {
@@ -110,6 +111,8 @@ export class GenericMunicipalityScraper extends MunicipalityScraper {
   public readonly city: string;
   private readonly listingUrl: string;
   private readonly selectors: Required<NonNullable<MunicipalityConfig["selectors"]>>;
+  /** true → başlık net etkinlik (allowlist) değilse ele; false → sadece idari duyuruyu (denylist) ele. */
+  protected readonly requireEventSignal: boolean = false;
 
   constructor(private readonly config: MunicipalityConfig) {
     super();
@@ -154,6 +157,9 @@ export class GenericMunicipalityScraper extends MunicipalityScraper {
         }
         title = title.slice(0, 160);
         if (!title || title.length < 4) return;
+        // Duyuru-board kaynakları (üniv): sadece net etkinlik başlıklarını tut.
+        // Etkinlik-listesi kaynakları (belediye): yalnız idari duyuruları (kesinti/ihale/sınav/alım) ele.
+        if (this.requireEventSignal ? !isEventTitle(title) : isAdminNotice(title)) return;
 
         // Link: çocuk <a> yoksa kartın kendisi <a> olabilir.
         const linkEl = card.find(this.selectors.link).first();
@@ -234,6 +240,7 @@ export class GenericMunicipalityScraper extends MunicipalityScraper {
         const row = list[i];
         const title = String(row[f.title] ?? "").trim().replace(/\s+/g, " ").slice(0, 160);
         if (!title || title.length < 4) continue;
+        if (this.requireEventSignal ? !isEventTitle(title) : isAdminNotice(title)) continue;
         const href = f.url ? String(row[f.url] ?? "") : "";
         const idRaw = f.id ? String(row[f.id] ?? "") : "";
         const externalId = `${this.config.source.toLowerCase()}-${
@@ -269,5 +276,6 @@ export class GenericMunicipalityScraper extends MunicipalityScraper {
 }
 
 export class GenericUniversityScraper extends GenericMunicipalityScraper {
-  // Üniversiteler de aynı pattern — fark sadece registry'de sınıflama
+  // Üniversite "duyurular" sayfaları idari ilanla dolu → yalnız net etkinlik başlıklarını tut.
+  protected override readonly requireEventSignal = true;
 }

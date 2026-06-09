@@ -371,7 +371,8 @@ export class FestivallTrScraper extends BaseScraper {
       city: card.cityHint,
       startsAt: range.startsAt,
       endsAt: range.endsAt,
-      isFree: false,
+      // Liste verisinde fiyat yok; festivall festivalleri varsayılan ücretsiz (bkz. detailToEvent).
+      isFree: true,
       ticketUrl: card.url,
       imageUrl: card.imageUrl,
     };
@@ -474,6 +475,10 @@ export class FestivallTrScraper extends BaseScraper {
     }
 
     const price = parseLdPrice(ld?.offers);
+    const hasPrice = price.min != null || price.max != null;
+    // festivall.com.tr festivalleri çoğunlukla ücretsiz halk/şehir festivali ve sayfalarda
+    // fiyat/bilet bilgisi YOK → fiyat yoksa ÜCRETSİZ say (yanlış "Biletli" damgası olmasın).
+    const isFree = price.free === true ? true : hasPrice ? false : true;
 
     return {
       source: this.source,
@@ -486,7 +491,7 @@ export class FestivallTrScraper extends BaseScraper {
       district: structured.district,
       startsAt,
       endsAt,
-      isFree: price.free ?? false,
+      isFree,
       priceMin: price.min,
       priceMax: price.max,
       ticketUrl: card.url,
