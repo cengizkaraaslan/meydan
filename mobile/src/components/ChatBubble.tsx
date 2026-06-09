@@ -1,15 +1,13 @@
 import React, { useCallback, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import { Image } from "expo-image";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, type Href } from "expo-router";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Radius, Type, glow } from "@/theme/aurora";
+import { glow } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
-import { useT } from "@/lib/i18n";
-import { impactH, tapH } from "@/lib/haptics";
+import { impactH } from "@/lib/haptics";
 import { listConversations, totalUnread, type Conversation } from "@/lib/conversations";
 
 const SIZE = 58;
@@ -17,14 +15,13 @@ const MARGIN = 16;
 
 /**
  * Anasayfada sürüklenebilir, en yakın kenara yapışan yüzen sohbet balonu.
- * Dokununca daha önce konuşulan kişilerin (sohbet geçmişi) listesi açılır.
+ * Dokununca Instagram-Direct tarzı tam ekran mesaj kutusu (/mesajlar) açılır.
+ * Rozet için okunmamış toplamı odaklandıkça tazelenir.
  */
 export function ChatBubble() {
   const { t: T } = useTheme();
-  const { t } = useT();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const [open, setOpen] = useState(false);
   const [convos, setConvos] = useState<Conversation[]>([]);
   const unread = totalUnread(convos);
 
@@ -45,11 +42,10 @@ export function ChatBubble() {
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
 
-  const openPanel = useCallback(async () => {
+  const openMessages = useCallback(() => {
     impactH();
-    const list = await listConversations();
-    setConvos(list);
-    setOpen(true);
+    // "/mesajlar" yeni route — typed-routes union'ı expo start/build'de yeniden üretilince tanınır.
+    router.push("/mesajlar" as Href);
   }, []);
 
   const clamp = (v: number, lo: number, hi: number) => {
@@ -61,7 +57,7 @@ export function ChatBubble() {
   const tap = Gesture.Tap()
     .maxDistance(12)
     .onEnd(() => {
-      runOnJS(openPanel)();
+      runOnJS(openMessages)();
     });
 
   const pan = Gesture.Pan()
@@ -86,87 +82,19 @@ export function ChatBubble() {
     transform: [{ translateX: x.value }, { translateY: y.value }],
   }));
 
-  const goChat = (id: string) => {
-    tapH();
-    setOpen(false);
-    router.push(`/sohbet/${id}`);
-  };
-
   return (
-    <>
-      <GestureDetector gesture={gesture}>
-        <Animated.View style={[styles.wrap, style, glow(T.primary, 20, 0.5)]}>
-          <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
-            <Text style={styles.emoji}>💬</Text>
-          </LinearGradient>
-          {unread > 0 && (
-            <View style={[styles.bubbleBadge, { borderColor: T.bg }]}>
-              <Text style={styles.badgeText}>{unread > 99 ? "99+" : unread}</Text>
-            </View>
-          )}
-        </Animated.View>
-      </GestureDetector>
-
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable
-            style={[
-              styles.sheet,
-              { backgroundColor: T.bgElevated, borderColor: T.hairline, paddingBottom: insets.bottom + 16 },
-            ]}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={[styles.handle, { backgroundColor: T.hairline }]} />
-            <Text style={[Type.h2, { color: T.text, marginBottom: 14 }]}>💬 {t("chats_title")}</Text>
-
-            {convos.length === 0 ? (
-              <Text style={[Type.body, { color: T.textDim, paddingVertical: 26, textAlign: "center", lineHeight: 21 }]}>
-                {t("no_chats")}
-              </Text>
-            ) : (
-              <ScrollView style={{ maxHeight: height * 0.55 }} showsVerticalScrollIndicator={false}>
-                {convos.map((c) => (
-                  <Pressable
-                    key={c.id}
-                    onPress={() => goChat(c.id)}
-                    style={({ pressed }) => [
-                      styles.row,
-                      { borderColor: T.hairline, opacity: pressed ? 0.6 : 1 },
-                    ]}
-                  >
-                    <View>
-                      <Image source={{ uri: c.avatar }} style={styles.av} contentFit="cover" />
-                      {c.online && <View style={[styles.dot, { backgroundColor: T.success, borderColor: T.bgElevated }]} />}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>
-                        {c.name}
-                      </Text>
-                      <Text
-                        style={[
-                          Type.label,
-                          { color: c.unread > 0 ? T.text : T.textDim, marginTop: 2, fontWeight: c.unread > 0 ? "700" : "400" },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {c.lastText ?? ""}
-                      </Text>
-                    </View>
-                    {c.unread > 0 ? (
-                      <View style={styles.rowBadge}>
-                        <Text style={styles.badgeText}>{c.unread > 99 ? "99+" : c.unread}</Text>
-                      </View>
-                    ) : (
-                      <Text style={{ color: T.textFaint, fontSize: 18 }}>›</Text>
-                    )}
-                  </Pressable>
-                ))}
-              </ScrollView>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </>
+    <GestureDetector gesture={gesture}>
+      <Animated.View style={[styles.wrap, style, glow(T.primary, 20, 0.5)]}>
+        <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
+          <Text style={styles.emoji}>💬</Text>
+        </LinearGradient>
+        {unread > 0 && (
+          <View style={[styles.bubbleBadge, { borderColor: T.bg }]}>
+            <Text style={styles.badgeText}>{unread > 99 ? "99+" : unread}</Text>
+          </View>
+        )}
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -201,40 +129,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     borderWidth: 2,
   },
-  rowBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "#FF3B30",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 6,
-  },
   badgeText: { color: "#fff", fontSize: 11, fontWeight: "800" },
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
-  sheet: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-  },
-  handle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, marginBottom: 14, opacity: 0.6 },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 11,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  av: { width: 50, height: 50, borderRadius: 25 },
-  dot: {
-    position: "absolute",
-    right: 0,
-    bottom: 0,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-  },
 });
