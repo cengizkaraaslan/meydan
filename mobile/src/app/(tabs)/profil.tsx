@@ -14,6 +14,7 @@ import { EventRow } from "@/components/EventCard";
 import { ImageEditor } from "@/components/ImageEditor";
 import { deleteLocalFile } from "@/lib/fileStore";
 import { StoryAvatar } from "@/components/StoryAvatar";
+import { EventStoryViewer, type StoryGroup } from "@/components/EventStoryViewer";
 import { resolveAvatar } from "@/lib/avatar";
 import { Pill, SectionHeader } from "@/ui/atoms";
 import { Radius, Space, Type, glow } from "@/theme/aurora";
@@ -21,7 +22,7 @@ import { useFavorites } from "@/lib/favorites";
 import { useAttending } from "@/lib/attending";
 import { useStories, addStory, type Story } from "@/lib/stories";
 import { useAuth } from "@/lib/auth";
-import { isAdmin } from "@/lib/admin";
+import { useIsAdmin } from "@/lib/admin";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { showAuthPrompt } from "@/lib/authPrompt";
@@ -81,10 +82,12 @@ export default function ProfileScreen() {
   const { t: T } = useTheme();
   const { t } = useT();
   const { user, signInWithGoogle, configured } = useAuth();
+  const { admin: isUserAdmin } = useIsAdmin();
   const { list: favs } = useFavorites();
   const { upcoming, past } = useAttending();
   const { stories, remove, reload, editCaption } = useStories();
-  const [viewer, setViewer] = useState<Story | null>(null);
+  // Açık story grubu (EventStoryViewer için indeks); null = kapalı.
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   // Story başlığı (caption) düzenleme — thumbnail'a uzun basınca açılır.
   const [editingStory, setEditingStory] = useState<Story | null>(null);
   const [captionDraft, setCaptionDraft] = useState("");
@@ -308,11 +311,38 @@ export default function ProfileScreen() {
     successH();
   };
 
-  const deleteStory = (s: Story) => {
-    remove(s.ts);
-    setViewer(null);
-    successH();
-  };
+  const myAvatar = resolveAvatar(photoUri, user?.name, gender);
+
+  // Story'leri ETKİNLİĞE göre grupla: aynı eventSlug → tek story (çok segment, yan yana).
+  // eventSlug boş (profilden doğrudan paylaşılan) → her biri kendi grubu.
+  const storyGroups = useMemo<Story[][]>(() => {
+    const map = new Map<string, Story[]>();
+    const order: string[] = [];
+    for (const s of stories) {
+      const key = s.eventSlug ? `e:${s.eventSlug}` : `s:${s.ts}`;
+      if (!map.has(key)) { map.set(key, []); order.push(key); }
+      map.get(key)!.push(s);
+    }
+    return order.map((k) => map.get(k)!);
+  }, [stories]);
+
+  // EventStoryViewer için gruplar (çok segment + ⋯ Sil + etkinlik etiketi).
+  const viewerGroups = useMemo<StoryGroup[]>(
+    () =>
+      storyGroups.map((grp) => ({
+        id: grp[0].eventSlug || `me-${grp[0].ts}`,
+        name: grp[0].eventTitle?.trim() || user?.name || "Story'n",
+        avatar: myAvatar,
+        isMe: true,
+        segments: grp.map((s) => ({
+          uri: s.uri,
+          caption: s.caption || undefined,
+          eventTitle: s.eventTitle,
+          city: s.city,
+        })),
+      })),
+    [storyGroups, user?.name, myAvatar],
+  );
 
   // Story başlığı düzenleme modalını aç — mevcut caption draft'a yüklenir.
   const openCaptionEditor = (s: Story) => {
@@ -369,15 +399,32 @@ export default function ProfileScreen() {
               </View>
               <Text style={[Type.micro, { color: T.textDim, maxWidth: 64, textAlign: "center" }]} numberOfLines={1}>{t("share_story")}</Text>
             </Pressable>
-            {/* Story'ler */}
-            {stories.map((s) => (
-              <Pressable key={s.ts} onPress={() => { tapH(); setViewer(s); }} onLongPress={() => openCaptionEditor(s)} delayLongPress={350} style={styles.storyItem}>
-                <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.storyRing}>
-                  <Image source={{ uri: s.uri }} style={[styles.storyThumb, { borderColor: T.bg }]} contentFit="cover" transition={200} />
-                </LinearGradient>
-                <Text style={[Type.micro, { color: T.textDim, maxWidth: 64, textAlign: "center" }]} numberOfLines={1}>{t("view_story")}</Text>
-              </Pressable>
-            ))}
+            {/* Story'ler — etkinliğe göre gruplu. Etiket = ETKİNLİK ADI (yoksa başlık). */}
+            {storyGroups.map((grp, gi) => {
+              const head = grp[0];
+              const label = head.eventTitle?.trim() || head.caption?.trim() || "Story";
+              // Yeniden adlandırma yalnızca etkinliğe bağlı OLMAYAN tek story için (etiket caption olur).
+              const canRename = grp.length === 1 && !head.eventTitle;
+              return (
+                <Pressable
+                  key={head.ts}
+                  onPress={() => { tapH(); setViewerIndex(gi); }}
+                  onLongPress={canRename ? () => openCaptionEditor(head) : undefined}
+                  delayLongPress={350}
+                  style={styles.storyItem}
+                >
+                  <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.storyRing}>
+                    <Image source={{ uri: head.uri }} style={[styles.storyThumb, { borderColor: T.bg }]} contentFit="cover" transition={200} />
+                  </LinearGradient>
+                  {grp.length > 1 ? (
+                    <View style={[styles.storyCount, { backgroundColor: T.primary, borderColor: T.bg }]}>
+                      <Text style={styles.storyCountTxt}>{grp.length}</Text>
+                    </View>
+                  ) : null}
+                  <Text style={[Type.micro, { color: T.textDim, maxWidth: 64, textAlign: "center" }]} numberOfLines={1}>{label}</Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
         </Animated.View>
 
@@ -400,7 +447,7 @@ export default function ProfileScreen() {
         </Animated.View>
 
         {/* Yönetim — sadece admin */}
-        {isAdmin(user) && (
+        {isUserAdmin && (
           <Animated.View entering={FadeInDown.duration(450).delay(100)}>
             <Pressable
               onPress={() => { tapH(); router.push("/admin"); }}
@@ -552,22 +599,22 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
-      {/* Story izleyici */}
-      <Modal visible={!!viewer} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setViewer(null)}>
-        <Animated.View entering={FadeIn.duration(180)} style={styles.viewerBackdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setViewer(null)} />
-          {viewer ? (
-            <View style={styles.viewerCard}>
-              <Image source={{ uri: viewer.uri }} style={styles.viewerImg} contentFit="cover" transition={200} />
-              {viewer.caption ? <Text style={[Type.title, { color: "#fff", marginTop: Space.md, textAlign: "center" }]}>{viewer.caption}</Text> : null}
-              <View style={{ flexDirection: "row", gap: Space.md, marginTop: Space.lg }}>
-                <Pill label={t("delete")} onPress={() => deleteStory(viewer)} />
-                <Pill label={t("back")} gradient={T.primarySoft} onPress={() => setViewer(null)} />
-              </View>
-            </View>
-          ) : null}
-        </Animated.View>
-      </Modal>
+      {/* Story izleyici — EventStoryViewer (çok segment yan yana, etkinlik etiketi, ⋯ → Sil) */}
+      {viewerIndex !== null && viewerGroups[viewerIndex] ? (
+        <EventStoryViewer
+          groups={viewerGroups}
+          startIndex={viewerIndex}
+          onClose={() => setViewerIndex(null)}
+          onDeleteSegment={(gi, si) => {
+            // (grup, segment) → ilgili story'nin ts'iyle kalıcı sil, şeridi yenile, kapat.
+            const target = storyGroups[gi]?.[si];
+            if (target) void remove(target.ts);
+            reload();
+            setViewerIndex(null);
+            successH();
+          }}
+        />
+      ) : null}
 
       {/* Story başlığı (caption) düzenleme — thumbnail'a uzun basınca */}
       <Modal visible={!!editingStory} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setEditingStory(null)}>
@@ -778,6 +825,9 @@ const styles = StyleSheet.create({
   storyAdd: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 3 },
   storyRing: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", padding: 2 },
   storyThumb: { width: "100%", height: "100%", borderRadius: 30, borderWidth: 2 },
+  // Aynı etkinlikte birden çok resim → segment sayısı rozeti (ring'in sağ-üstü).
+  storyCount: { position: "absolute", top: 0, right: 4, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, alignItems: "center", justifyContent: "center", borderWidth: 2 },
+  storyCountTxt: { color: "#fff", fontSize: 11, fontWeight: "800" },
   statsRow: { flexDirection: "row", gap: Space.md, marginBottom: Space.xl },
   statCard: {
     flex: 1,
@@ -796,9 +846,6 @@ const styles = StyleSheet.create({
   adminIcon: { width: 44, height: 44, borderRadius: Radius.md, alignItems: "center", justifyContent: "center" },
   googleBtn: { flexDirection: "row", gap: 10, alignItems: "center", justifyContent: "center", paddingVertical: 15, borderRadius: Radius.pill, backgroundColor: "#fff", ...glow("#fff", 18, 0.18) },
   googleG: { fontSize: 17, fontWeight: "800", color: "#4285F4" },
-  viewerBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center", padding: 20 },
-  viewerCard: { alignItems: "center", width: "100%" },
-  viewerImg: { width: "100%", height: 460, borderRadius: Radius.lg },
   adminCard: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: Space.lg, marginBottom: Space.xl },
   // Sayaç listesi alt-sayfası (modal)
   sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },

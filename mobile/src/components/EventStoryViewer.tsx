@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
   cancelAnimation,
   runOnJS,
@@ -52,11 +53,22 @@ interface Props {
 export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegment }: Props) {
   const insets = useSafeAreaInsets();
   const { t: T } = useTheme();
+  const { width: SW } = useWindowDimensions();
   const [gi, setGi] = useState(startIndex);
   const [si, setSi] = useState(0);
   // ⋯ menüsü açık mı (açıkken otomatik ilerleme durur).
   const [menuOpen, setMenuOpen] = useState(false);
+  // Pinch ile yakınlaştırma sürerken otomatik ilerlemeyi durdur.
+  const [zooming, setZooming] = useState(false);
   const progress = useSharedValue(0);
+
+  // İsteğe bağlı pinch-to-zoom: parmakla yakınlaştır, bırakınca normale döner.
+  const scale = useSharedValue(1);
+  const tx = useSharedValue(0);
+  const ty = useSharedValue(0);
+  const imgStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
+  }));
 
   const group = groups[gi];
   const segment = group?.segments[si];
@@ -90,13 +102,20 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
   // Aktif segment için zamanlayıcıyı başlat (reanimated withTiming + runOnJS).
   // Menü açıkken durdur; menü kapanınca segment baştan ilerler.
   useEffect(() => {
-    if (!segment || menuOpen) return;
+    if (!segment || menuOpen || zooming) return;
     progress.value = 0;
     progress.value = withTiming(1, { duration: SEGMENT_MS }, (finished) => {
       if (finished) runOnJS(advance)();
     });
     return () => { cancelAnimation(progress); };
-  }, [gi, si, segment, advance, progress, menuOpen]);
+  }, [gi, si, segment, advance, progress, menuOpen, zooming]);
+
+  // Segment değişince zoom'u sıfırla (yeni görsel yakınlaştırılmış başlamasın).
+  useEffect(() => {
+    scale.value = 1;
+    tx.value = 0;
+    ty.value = 0;
+  }, [gi, si, scale, tx, ty]);
 
   const prev = useCallback(() => {
     if (si > 0) {
@@ -130,6 +149,37 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
     onDeleteSegment?.(gi, si);
   }, [onDeleteSegment, gi, si, progress]);
 
+  // Dokunma: sol yarı = geri, sağ yarı = ileri. Yakınlaştırılmışken gezinme yok.
+  const tapNav = Gesture.Tap()
+    .maxDuration(250)
+    .onEnd((e, success) => {
+      if (!success || scale.value > 1.01) return;
+      if (e.x < SW / 2) runOnJS(prev)();
+      else runOnJS(next)();
+    });
+
+  // Pinch: 1–4 arası yakınlaştır; bırakınca normale (1) döner.
+  const pinch = Gesture.Pinch()
+    .onStart(() => runOnJS(setZooming)(true))
+    .onUpdate((e) => {
+      scale.value = Math.min(Math.max(e.scale, 1), 4);
+    })
+    .onEnd(() => {
+      scale.value = withTiming(1);
+      tx.value = withTiming(0);
+      ty.value = withTiming(0);
+      runOnJS(setZooming)(false);
+    });
+
+  // Yakınlaştırılmışken iki parmakla sürükleyerek gez.
+  const pan = Gesture.Pan().onUpdate((e) => {
+    if (scale.value <= 1.01) return;
+    tx.value = e.translationX;
+    ty.value = e.translationY;
+  });
+
+  const gesture = Gesture.Race(tapNav, Gesture.Simultaneous(pinch, pan));
+
   if (!group || !segment) return null;
 
   const isRealPerson = !group.isMe && !!getPerson(group.id);
@@ -139,19 +189,23 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
 
   return (
     <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={close}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.root}>
-        <Image source={{ uri: segment.uri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+        {/* Görsel + dokunma/pinch jestleri. contentFit="contain": fotoğraf KIRPILMADAN
+            sığar (eski "cover" hafif zoom/kırpma hissi veriyordu). */}
+        <GestureDetector gesture={gesture}>
+          <Animated.View style={StyleSheet.absoluteFill}>
+            <Animated.View style={[StyleSheet.absoluteFill, imgStyle]}>
+              <Image source={{ uri: segment.uri }} style={StyleSheet.absoluteFill} contentFit="contain" transition={150} />
+            </Animated.View>
+          </Animated.View>
+        </GestureDetector>
         <LinearGradient
           colors={["rgba(0,0,0,0.55)", "transparent", "transparent", "rgba(0,0,0,0.55)"]}
           locations={[0, 0.25, 0.7, 1]}
           style={StyleSheet.absoluteFill}
+          pointerEvents="none"
         />
-
-        {/* Dokunma alanları: sol yarı = geri, sağ yarı = ileri */}
-        <View style={styles.tapRow} pointerEvents="box-none">
-          <Pressable style={styles.tapHalf} onPress={prev} />
-          <Pressable style={styles.tapHalf} onPress={next} />
-        </View>
 
         {/* İlerleme çubukları (segment başına) */}
         <View style={[styles.bars, { top: insets.top + 8 }]} pointerEvents="none">
@@ -232,6 +286,7 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
           </View>
         ) : null}
       </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -249,8 +304,6 @@ function SegmentBar({ state, progress }: { state: "done" | "active" | "pending";
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000" },
-  tapRow: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, flexDirection: "row" },
-  tapHalf: { flex: 1 },
   bars: { position: "absolute", left: 10, right: 10, flexDirection: "row", gap: 4 },
   barTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.3)", overflow: "hidden" },
   barFill: { height: 3, borderRadius: 2, backgroundColor: "#fff" },

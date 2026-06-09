@@ -1,14 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db, isDbConfigured } from "@/lib/db";
+import { isAdminEmail, isFounderEmail } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
-
-// Mobil admin = uygulamadaki ADMIN_EMAIL ile aynı (lib/admin.ts).
-const ADMIN_EMAILS = new Set(["cengiz7karaaslan@gmail.com"]);
-
-function isAdminEmail(email: string | null | undefined): boolean {
-  return !!email && ADMIN_EMAILS.has(email.trim().toLowerCase());
-}
 
 /**
  * GET /api/v1/admin/users?email=<adminEmail>
@@ -18,7 +12,7 @@ function isAdminEmail(email: string | null | undefined): boolean {
  */
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get("email");
-  if (!isAdminEmail(email)) {
+  if (!(await isAdminEmail(email))) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
   }
   if (!isDbConfigured) {
@@ -77,6 +71,50 @@ export async function GET(request: NextRequest) {
       fakeCount: deviceUsers.filter((d) => d.isFake).length,
       users: [...realUsers, ...deviceUsers],
     });
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "DB hatası" }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH /api/v1/admin/users
+ * Body: { email: <adminEmail>, userId: string, role: "ADMIN" | "USER" }
+ * Bir GERÇEK (User) kullanıcının rolünü değiştirir → admin yap / adminliği kaldır.
+ */
+export async function PATCH(request: NextRequest) {
+  let body: { email?: string; userId?: string; role?: string };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return NextResponse.json({ error: "Geçersiz istek" }, { status: 400 });
+  }
+
+  if (!(await isAdminEmail(body.email))) {
+    return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
+  }
+  if (!isDbConfigured) {
+    return NextResponse.json({ error: "Veritabanı yapılandırılmamış" }, { status: 503 });
+  }
+  const { userId, role } = body;
+  if (!userId || (role !== "ADMIN" && role !== "USER")) {
+    return NextResponse.json({ error: "userId ve role (ADMIN|USER) zorunlu" }, { status: 400 });
+  }
+
+  try {
+    const target = await db.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (!target) {
+      return NextResponse.json({ error: "Kullanıcı bulunamadı" }, { status: 404 });
+    }
+    // Kurucu adminin rolü panelden düşürülemez (zaten whitelist ile admin kalır → kafa karıştırmasın).
+    if (role === "USER" && isFounderEmail(target.email)) {
+      return NextResponse.json({ error: "Kurucu adminin rolü değiştirilemez" }, { status: 400 });
+    }
+    const updated = await db.user.update({
+      where: { id: userId },
+      data: { role },
+      select: { id: true, name: true, email: true, role: true },
+    });
+    return NextResponse.json({ ok: true, user: updated });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "DB hatası" }, { status: 500 });
   }

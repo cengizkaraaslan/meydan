@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -7,13 +7,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { useAuth } from "@/lib/auth";
-import { isAdmin } from "@/lib/admin";
+import { isFounderEmail, useIsAdmin } from "@/lib/admin";
 import { useTheme, type Palette } from "@/lib/theme";
-import { tapH } from "@/lib/haptics";
+import { tapH, successH } from "@/lib/haptics";
 import {
   fetchAdminUsers,
   formatDate,
   formatRelative,
+  setUserRole,
   type AdminUser,
   type AdminApiError,
 } from "@/lib/adminApi";
@@ -50,8 +51,21 @@ function Badge({ T, kind }: { T: Palette; kind: Kind }) {
   );
 }
 
-function UserCard({ T, u, i }: { T: Palette; u: AdminUser; i: number }) {
+function UserCard({
+  T,
+  u,
+  i,
+  adminEmail,
+  onRoleChanged,
+}: {
+  T: Palette;
+  u: AdminUser;
+  i: number;
+  adminEmail: string;
+  onRoleChanged: (userId: string, role: string) => void;
+}) {
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   const real = u.type === "real";
   const fake = u.type === "device" && u.isFake;
   const kind: Kind = real ? "real" : fake ? "fake" : "device";
@@ -66,9 +80,42 @@ function UserCard({ T, u, i }: { T: Palette; u: AdminUser; i: number }) {
   const sub = real ? (u.email ?? "—") : [u.city, u.district].filter(Boolean).join(" · ") || "Konum yok";
   const avatar = real ? u.image : u.avatar;
 
+  // Admin yap / adminliği kaldır (yalnızca gerçek kullanıcı; kurucu değiştirilemez).
+  const isUserAdmin = real && u.role === "ADMIN";
+  const founder = real && isFounderEmail(u.email);
+  const toggleAdmin = () => {
+    if (u.type !== "real") return;
+    const target = u;
+    const makeAdmin = target.role !== "ADMIN";
+    const who = target.name || target.email || "kullanıcı";
+    Alert.alert(
+      makeAdmin ? "Admin yap" : "Adminliği kaldır",
+      `${who} ${makeAdmin ? "admin yapılsın mı?" : "adminlikten çıkarılsın mı?"}`,
+      [
+        { text: "Vazgeç", style: "cancel" },
+        {
+          text: makeAdmin ? "Admin yap" : "Kaldır",
+          style: makeAdmin ? "default" : "destructive",
+          onPress: async () => {
+            setBusy(true);
+            try {
+              const r = await setUserRole(adminEmail, target.id, makeAdmin);
+              onRoleChanged(target.id, r.role);
+              successH();
+            } catch (e) {
+              Alert.alert("Hata", (e as AdminApiError)?.message ?? "Rol değiştirilemedi.");
+            } finally {
+              setBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <Animated.View entering={FadeInDown.duration(380).delay(Math.min(i, 12) * 30)}>
-      <View style={[styles.card, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }, open ? glow(accent, 16, 0.25) : null]}>
+      <View style={[styles.card, { backgroundColor: T.surfaceStrong, borderWidth: 0 }, open ? glow(accent, 16, 0.25) : null]}>
         <Pressable
           onPress={() => { tapH(); setOpen((o) => !o); }}
           style={{ flexDirection: "row", alignItems: "center", gap: Space.md }}
@@ -100,6 +147,23 @@ function UserCard({ T, u, i }: { T: Palette; u: AdminUser; i: number }) {
                 <StatLine T={T} icon="🪪" label="Rol" value={u.role || "kullanıcı"} />
                 <StatLine T={T} icon="🗓️" label="Kayıt" value={formatDate(u.createdAt)} />
                 <StatLine T={T} icon="⏱️" label="Son aktivite" value={formatRelative(u.updatedAt)} />
+                {founder ? (
+                  <Text style={[Type.micro, { color: T.textFaint, marginTop: 10 }]}>🛡️ Kurucu admin (değiştirilemez)</Text>
+                ) : (
+                  <Pressable
+                    onPress={() => { tapH(); toggleAdmin(); }}
+                    disabled={busy}
+                    style={[styles.roleBtn, { borderColor: isUserAdmin ? T.pink : T.primary, opacity: busy ? 0.6 : 1 }]}
+                  >
+                    {busy ? (
+                      <ActivityIndicator color={isUserAdmin ? T.pink : T.primary} />
+                    ) : (
+                      <Text style={[Type.label, { color: isUserAdmin ? T.pink : T.primary }]}>
+                        {isUserAdmin ? "🛡️ Adminliği kaldır" : "🛡️ Admin yap"}
+                      </Text>
+                    )}
+                  </Pressable>
+                )}
               </>
             ) : (
               <>
@@ -122,6 +186,7 @@ function UserCard({ T, u, i }: { T: Palette; u: AdminUser; i: number }) {
 export default function AdminUsersScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { admin, ready } = useIsAdmin();
   const { t: T } = useTheme();
 
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -163,7 +228,16 @@ export default function AdminUsersScreen() {
 
   const onRefresh = useCallback(() => { setRefreshing(true); void load(); }, [load]);
 
-  if (!isAdmin(user)) {
+  // Admin doğrulanırken (terfi edilen admin için sunucu kontrolü) bekle; sonra karar ver.
+  if (!ready) {
+    return (
+      <View style={[styles.root, { backgroundColor: T.bg }]}>
+        <AuroraBackground />
+        <View style={styles.center}><ActivityIndicator color={T.primary} /></View>
+      </View>
+    );
+  }
+  if (!admin) {
     router.replace("/");
     return null;
   }
@@ -225,7 +299,16 @@ export default function AdminUsersScreen() {
         ) : (
           <View style={{ gap: Space.md }}>
             {users.map((u, i) => (
-              <UserCard key={`${u.type}-${u.id}`} T={T} u={u} i={i} />
+              <UserCard
+                key={`${u.type}-${u.id}`}
+                T={T}
+                u={u}
+                i={i}
+                adminEmail={email}
+                onRoleChanged={(id, role) =>
+                  setUsers((prev) => prev.map((x) => (x.type === "real" && x.id === id ? { ...x, role } : x)))
+                }
+              />
             ))}
           </View>
         )}
@@ -273,5 +356,13 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth * 2,
   },
   expand: { marginTop: Space.md, paddingTop: Space.md, borderTopWidth: StyleSheet.hairlineWidth * 2 },
+  roleBtn: {
+    marginTop: Space.md,
+    paddingVertical: 11,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   center: { alignItems: "center", justifyContent: "center", paddingVertical: 50 },
 });

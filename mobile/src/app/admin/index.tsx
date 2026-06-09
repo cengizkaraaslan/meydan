@@ -1,12 +1,11 @@
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { Radius, Space, Type } from "@/theme/aurora";
-import { useAuth } from "@/lib/auth";
-import { isAdmin, ADMIN_EMAIL } from "@/lib/admin";
+import { useIsAdmin, ADMIN_EMAIL } from "@/lib/admin";
 import { useTheme, type Palette } from "@/lib/theme";
 import { tapH } from "@/lib/haptics";
 
@@ -37,11 +36,21 @@ const ITEMS: HubItem[] = [
 
 export default function AdminHubScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { admin, ready } = useIsAdmin();
   const { t: T } = useTheme();
 
-  // Admin değilse içeri girince ana sayfaya at.
-  if (!isAdmin(user)) {
+  // Admin doğrulanırken bekle; sonra admin değilse ana sayfaya at.
+  if (!ready) {
+    return (
+      <View style={[styles.root, { backgroundColor: T.bg }]}>
+        <AuroraBackground />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={T.primary} />
+        </View>
+      </View>
+    );
+  }
+  if (!admin) {
     router.replace("/");
     return null;
   }

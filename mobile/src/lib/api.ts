@@ -72,11 +72,11 @@ export async function fetchEvents(q: EventQuery = {}): Promise<EventsResponse> {
 }
 
 export async function fetchEventById(id: string): Promise<ApiEvent | null> {
-  // v1 tekil endpoint slug bazlı; listeden id ile bulmak en güvenlisi (küçük sayfa).
-  // Önce geniş bir sayfadan ara; bulunamazsa null.
+  // Listeden ara; bulunamazsa null. Parametre id VEYA slug olabilir — sistem/duyuru
+  // gönderileri (akış) yalnızca slug taşıdığı için ikisini de eşleştiriyoruz.
   try {
     const res = await fetchEvents({ pageSize: 100 });
-    return res.data.find((e) => e.id === id) ?? null;
+    return res.data.find((e) => e.id === id || e.slug === id) ?? null;
   } catch {
     return null;
   }

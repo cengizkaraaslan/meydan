@@ -21,8 +21,8 @@ import { EventRow } from "@/components/EventCard";
 import { PostCard } from "@/components/PostCard";
 import { CommentsModal } from "@/components/CommentsModal";
 import { PostActionsModal } from "@/components/PostActionsModal";
-import { StoryViewer } from "@/components/StoryViewer";
 import { EventStoryViewer, type StoryGroup } from "@/components/EventStoryViewer";
+import { personToGroup } from "@/components/EventStoryStrip";
 import { StoryAvatar } from "@/components/StoryAvatar";
 import { Loader, SectionHeader, EmptyState } from "@/ui/atoms";
 import { Radius, Type, glow } from "@/theme/aurora";
@@ -725,7 +725,14 @@ export default function MeydanScreen() {
         onEdit={onEditPost}
         onDelete={onDeletePost}
       />
-      <StoryViewer person={storyPerson} onClose={() => setStoryPerson(null)} />
+      {/* Başkalarının story'si — etkinlik story'leriyle aynı Instagram-tarzı modal. */}
+      {storyPerson ? (
+        <EventStoryViewer
+          groups={[personToGroup(storyPerson)]}
+          startIndex={0}
+          onClose={() => setStoryPerson(null)}
+        />
+      ) : null}
       {/* Kendi story'lerim — gerçek görselle (çoklu segment). */}
       {myStoryOpen && stories.length > 0 ? (
         <EventStoryViewer

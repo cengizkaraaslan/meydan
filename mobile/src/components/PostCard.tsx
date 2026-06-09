@@ -118,7 +118,9 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
   const openEvent = () => {
     if (isSystem && post.eventSlug) {
       tapH();
-      router.push(`/etkinlik/${post.eventSlug}` as never);
+      // Object-form: param expo-router tarafından düzgün encode edilir (slug Türkçe
+      // karakter/boşluk içerse de URL bozulmaz). Ham `/etkinlik/${slug}` URL'yi bozuyordu.
+      router.push({ pathname: "/etkinlik/[id]", params: { id: post.eventSlug } });
     }
   };
 

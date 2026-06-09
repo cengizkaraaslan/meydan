@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { LayoutDashboard, CalendarDays, Users, Cable, CreditCard, ScrollText, HardDrive, Flag, Palette } from "lucide-react";
 import { getOpenCount } from "@/lib/reports-store";
+import { auth } from "@/auth";
+import { isAdminEmail } from "@/lib/adminAuth";
 
 const nav = [
   { href: "/admin",                label: "Panel",        icon: LayoutDashboard },
@@ -14,7 +17,13 @@ const nav = [
   { href: "/admin/loglar",         label: "Loglar",       icon: ScrollText },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  // Guard: yalnızca admin (kurucu e-posta VEYA DB role=ADMIN) paneli görebilir.
+  const session = await auth().catch(() => null);
+  const email = session?.user?.email ?? null;
+  if (!email) redirect("/giris");
+  if (!(await isAdminEmail(email))) redirect("/");
+
   const openReports = getOpenCount();
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">

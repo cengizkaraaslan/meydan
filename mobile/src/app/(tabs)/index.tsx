@@ -228,20 +228,26 @@ export default function DiscoverScreen() {
           <Loader label={t("loading")} />
         ) : (
           <>
-            {/* Hero carousel */}
+            {/* Hero carousel — yatay ScrollView (FlatList değil): dikey ScrollView içine
+                gömülü yatay VirtualizedList, login sonrası fresh mount'ta cache dolu gelince
+                genişliği 0 ölçüp BOŞ kalıyordu (ancak pull-refresh ile geliyordu). ≤6 öğe
+                olduğundan sanallaştırma gereksiz; ScrollView mount'ta güvenilir çizer. */}
             {featured.length > 0 && (
               <Animated.View entering={FadeInDown.delay(55).duration(420)}>
-                <FlatList
+                <ScrollView
                   horizontal
-                  data={featured.filter((e) => !isPastDay(e.starts_at))}
-                  keyExtractor={(e) => e.id}
                   showsHorizontalScrollIndicator={false}
                   snapToInterval={HERO_W + 12}
                   decelerationRate="fast"
                   contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
-                  renderItem={({ item }) => <HeroCard event={item} width={HERO_W} />}
                   style={{ marginBottom: 24 }}
-                />
+                >
+                  {featured
+                    .filter((e) => !isPastDay(e.starts_at))
+                    .map((item) => (
+                      <HeroCard key={item.id} event={item} width={HERO_W} />
+                    ))}
+                </ScrollView>
               </Animated.View>
             )}
 

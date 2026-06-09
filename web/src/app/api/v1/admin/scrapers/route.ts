@@ -4,14 +4,10 @@ import type { EventSource } from "@/lib/types";
 import { scraperRegistry } from "@/lib/scrapers/ScraperRegistry";
 import { recordRun, persistRun, getLatestRunPerSourceFromDb } from "@/lib/scrapers/RunTracker";
 import { setEventsForSource } from "@/lib/scrapers/EventCache";
+import { isAdminEmail } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-const ADMIN_EMAILS = new Set(["cengiz7karaaslan@gmail.com"]);
-function isAdminEmail(email: string | null | undefined): boolean {
-  return !!email && ADMIN_EMAILS.has(email.trim().toLowerCase());
-}
 
 /**
  * GET /api/v1/admin/scrapers?email=<adminEmail>
@@ -19,7 +15,7 @@ function isAdminEmail(email: string | null | undefined): boolean {
  */
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get("email");
-  if (!isAdminEmail(email)) {
+  if (!(await isAdminEmail(email))) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
   }
 
@@ -71,7 +67,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  if (!isAdminEmail(body.email)) {
+  if (!(await isAdminEmail(body.email))) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
   }
 

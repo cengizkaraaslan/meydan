@@ -137,6 +137,27 @@ export async function fetchAdminUsers(email: string): Promise<AdminUsersResp> {
   };
 }
 
+/**
+ * Bir gerçek (girişli) kullanıcıyı admin yap / adminliği kaldır (DB User.role).
+ * adminEmail = isteği yapan adminin e-postası (yetki). Hatada throw eder.
+ */
+export async function setUserRole(
+  adminEmail: string,
+  userId: string,
+  makeAdmin: boolean,
+): Promise<{ id: string; role: string }> {
+  const res = await fetch(`${API_BASE}/api/v1/admin/users`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ email: adminEmail, userId, role: makeAdmin ? "ADMIN" : "USER" }),
+  });
+  const data = (await res.json().catch(() => ({}))) as { user?: { id: string; role: string }; error?: string };
+  if (!res.ok) {
+    throw new AdminApiError(res.status, data.error ?? (res.status === 403 ? "Yetkiniz yok." : `Sunucu hatası (${res.status}).`));
+  }
+  return data.user ?? { id: userId, role: makeAdmin ? "ADMIN" : "USER" };
+}
+
 /** Bot/scraper listesini + son çalışmalarını getirir. Hatada throw eder. */
 export async function fetchScrapers(email: string): Promise<ScraperItem[]> {
   const url = `${API_BASE}/api/v1/admin/scrapers?email=${encodeURIComponent(email)}`;

@@ -7,7 +7,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeIn, FadeInDown, FadeOut, ZoomIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { catMeta } from "@/lib/categories";
@@ -18,7 +18,7 @@ import { toggleFavorite, useFavorites } from "@/lib/favorites";
 import { setAttending, mockAttendeesFor } from "@/lib/attending";
 import { fetchEventSocial } from "@/lib/pastEvents";
 import { addStory, useStories } from "@/lib/stories";
-import { uploadImage, createPost } from "@/lib/social";
+import { uploadImage } from "@/lib/social";
 import { Badge, Loader, Pill } from "@/ui/atoms";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useCanSeeAges } from "@/lib/dprofile";
@@ -50,6 +50,25 @@ interface Comment {
 
 // Yorum düzenleme penceresi: 2 dakika.
 const EDIT_WINDOW_MS = 2 * 60 * 1000;
+
+// Yorum düzenle/sil ipucu (ömür boyu 1 kez gösterilir).
+const COMMENT_TIP_KEY = "meydanfest:eventCommentTipSeen";
+
+/** Zaman damgası → "az önce" / "3 dk önce" / "2 saat önce" / "5 gün önce" / "3 Haz". */
+function relTime(ts: number): string {
+  const diff = Date.now() - ts;
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return "az önce";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} dk önce`;
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return `${hour} saat önce`;
+  const day = Math.floor(hour / 24);
+  if (day < 7) return `${day} gün önce`;
+  const d = new Date(ts);
+  const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+  return `${d.getDate()} ${months[d.getMonth()]}`;
+}
 
 /** Etkinliğe eklenen fotoğraf. `by` = yükleyen kullanıcı id'si (sahiplik/silme için). */
 interface Photo {
@@ -133,6 +152,8 @@ export default function EventDetail() {
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
+  // Yorum düzenle/sil ipucu modalı (ilk yorumdan sonra 1 kez).
+  const [commentTip, setCommentTip] = useState(false);
   // Oturum açan kullanıcının sahiplik kimliği (foto/yorum düzenle-sil yetkisi).
   const ownerId = user?.id ?? user?.email?.toLowerCase() ?? "";
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -147,8 +168,8 @@ export default function EventDetail() {
   const [storyUri, setStoryUri] = useState<string | null>(null);
   // story kaynak seçimi (Kamera/Galeri) — alttan açılan şık modal.
   const [storySrcModal, setStorySrcModal] = useState(false);
-  // duvara (Meydan feed) foto paylaşma durumu
-  const [wallPosting, setWallPosting] = useState(false);
+  // "Story paylaşıldı" gösterişli başarı modalı (Alert yerine).
+  const [storyShared, setStoryShared] = useState(false);
 
   // katılacaklar listesi modal'ı (eski tek liste — korunuyor)
   const [listOpen, setListOpen] = useState(false);
@@ -179,6 +200,13 @@ export default function EventDetail() {
       leaveHelpSeen.current = v === "1";
     });
   }, []);
+
+  // "Story paylaşıldı" başarı modalı ~2.2 sn sonra kendini kapatır (tıklayınca da kapanır).
+  useEffect(() => {
+    if (!storyShared) return;
+    const tm = setTimeout(() => setStoryShared(false), 2200);
+    return () => clearTimeout(tm);
+  }, [storyShared]);
 
   // Geri gitme denemesi: daha önce görüldüyse normal geri; değilse modalı 1 kez göster.
   const tryLeave = () => {
@@ -366,6 +394,31 @@ export default function EventDetail() {
     ]);
   };
 
+  // Yoruma basılı tut → düzenle/sil aksiyon menüsü (yetkisi olan kendi yorumunda).
+  const onLongPressComment = (cm: Comment) => {
+    const canEdit = canEditComment(cm);
+    const canDel = canDeleteComment(cm);
+    if (!canEdit && !canDel) return;
+    impactH();
+    const actions: { text: string; style?: "cancel" | "destructive"; onPress?: () => void }[] = [];
+    if (canEdit) actions.push({ text: `✏️ ${t("edit")}`, onPress: () => startEditComment(cm) });
+    if (canDel) actions.push({ text: `🗑️ ${t("delete")}`, style: "destructive", onPress: () => deleteComment(cm) });
+    actions.push({ text: t("cancel"), style: "cancel" });
+    Alert.alert(cm.name, undefined, actions);
+  };
+
+  // İlk yorumdan sonra (ömür boyu 1 kez) "basılı tut" ipucunu göster.
+  const maybeShowCommentTip = async () => {
+    try {
+      const seen = await AsyncStorage.getItem(COMMENT_TIP_KEY);
+      if (seen === "1") return;
+      await AsyncStorage.setItem(COMMENT_TIP_KEY, "1");
+      setCommentTip(true);
+    } catch {
+      /* yok say */
+    }
+  };
+
   const sendComment = () => {
     // Oturum açmayan yorum yazamaz → giriş modalı.
     if (!user) { showAuthPrompt(t("login_required")); return; }
@@ -385,6 +438,7 @@ export default function EventDetail() {
       return next;
     });
     setDraft("");
+    void maybeShowCommentTip();
   };
 
   const addPhoto = async () => {
@@ -510,78 +564,8 @@ export default function EventDetail() {
       /* yok say */
     }
     successH();
-    Alert.alert("Story paylaşıldı ✓", "Story'in bu etkinlikte yayında.");
+    setStoryShared(true); // gösterişli başarı modalı
     reloadStories(); // şerit anında güncellensin
-  };
-
-  // 📷 Duvara paylaş: bu etkinlikte çekilen/seçilen fotoğraf Meydan duvarına (feed) düşer.
-  // Story paylaşımından AYRI bir aksiyon — mevcut akışı bozmaz.
-  const postPhotoToWall = async (uri: string) => {
-    if (!event) return;
-    setWallPosting(true);
-    try {
-      const imageUrl = await uploadImage(uri, "post");
-      if (!imageUrl) {
-        Alert.alert("Yüklenemedi", "Fotoğraf yüklenemedi, tekrar dene.");
-        return;
-      }
-      const avatar = await AsyncStorage.getItem("meydanfest:avatar");
-      const ok = await createPost({
-        imageUrl,
-        eventSlug: event.slug,
-        eventTitle: event.title,
-        authorName: user?.name || undefined,
-        authorAvatar: avatar || undefined,
-      });
-      if (ok) {
-        successH();
-        Alert.alert("Duvarda paylaşıldı ✓", "Fotoğrafın Meydan duvarına düştü.");
-      } else {
-        Alert.alert("Paylaşılamadı", "Gönderi paylaşılamadı, tekrar dene.");
-      }
-    } finally {
-      setWallPosting(false);
-    }
-  };
-
-  // Duvara paylaş: kaynak seç (Kamera / Galeri) → R2 → createPost.
-  const shareToWall = () => {
-    // Oturum açmayan duvara paylaşamaz → giriş modalı.
-    if (!user) {
-      showAuthPrompt(t("lock_photo_title"));
-      return;
-    }
-    if (wallPosting) return;
-    impactH();
-    Alert.alert("Duvarda paylaş", "Fotoğraf kaynağını seç", [
-      {
-        text: "📷 Kamera",
-        onPress: async () => {
-          const perm = await ImagePicker.requestCameraPermissionsAsync();
-          if (!perm.granted) {
-            Alert.alert("Kamera izni gerekli", "Fotoğraf çekmek için kamera iznine ihtiyaç var.");
-            return;
-          }
-          const res = await ImagePicker.launchCameraAsync({ quality: 0.7 });
-          if (res.canceled || !res.assets?.length) return;
-          await postPhotoToWall(res.assets[0].uri);
-        },
-      },
-      {
-        text: "🖼️ Galeri",
-        onPress: async () => {
-          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (!perm.granted) {
-            Alert.alert("Galeri izni gerekli", "Fotoğraf seçmek için galeri iznine ihtiyaç var.");
-            return;
-          }
-          const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7 });
-          if (res.canceled || !res.assets?.length) return;
-          await postPhotoToWall(res.assets[0].uri);
-        },
-      },
-      { text: "İptal", style: "cancel" },
-    ]);
   };
 
   if (loading) return <View style={{ flex: 1, backgroundColor: T.bg }}><Loader /></View>;
@@ -686,7 +670,16 @@ export default function EventDetail() {
   };
   const share = () => {
     impactH();
-    Share.share({ message: `${event.title} — ${fmtLong(event.starts_at)} · ${event.city}\n${event.ticket_url ?? ""}` });
+    // Etkinlik DETAY sayfasının linki — açan kişi doğrudan bu etkinliğin sayfasına gelir
+    // (web /etkinlik/[slug]; OG önizleme görseliyle). Eskiden sadece bilet linki paylaşılıyordu.
+    const url = `${API_BASE}/etkinlik/${event.slug}`;
+    Share.share(
+      {
+        message: `${event.title} — ${fmtLong(event.starts_at)} · ${event.city}\n${url}`,
+        url, // iOS: ayrı url alanı zengin link önizlemesi verir
+      },
+      { dialogTitle: event.title },
+    );
   };
   // katılacaklar listesinden bir kişiye mesaj — sohbet için giriş zorunlu (uygulama kuralı)
   const messagePerson = (pid: string) => {
@@ -727,7 +720,8 @@ export default function EventDetail() {
               />
             </Pressable>
           )}
-          <LinearGradient colors={["rgba(8,7,13,0.5)", "transparent", "rgba(8,7,13,0.6)", T.bg]} locations={[0, 0.3, 0.7, 1]} style={StyleSheet.absoluteFill} />
+          {/* pointerEvents="none": vinyet dokunuşu yutmasın, alttaki resme dokununca zoom açılsın. */}
+          <LinearGradient colors={["rgba(8,7,13,0.5)", "transparent", "rgba(8,7,13,0.6)", T.bg]} locations={[0, 0.3, 0.7, 1]} style={StyleSheet.absoluteFill} pointerEvents="none" />
           {/* Üst bar */}
           <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
             <Pressable onPress={() => { tapH(); tryLeave(); }} style={[styles.circleBtn, { borderColor: T.hairline }]}><Text style={styles.circleTxt}>←</Text></Pressable>
@@ -811,17 +805,6 @@ export default function EventDetail() {
               onOpen={openStoryViewer}
               onShare={pickStory}
             />
-
-            {/* 📷 Duvarda paylaş — story'den AYRI: fotoğraf Meydan duvarına (feed) düşer. */}
-            <Pressable
-              onPress={shareToWall}
-              disabled={wallPosting}
-              style={[styles.wallShareBtn, { borderColor: T.hairline, backgroundColor: T.surfaceStrong, opacity: wallPosting ? 0.6 : 1 }]}
-            >
-              <Text style={[Type.label, { color: T.text }]}>
-                {wallPosting ? "Yükleniyor…" : "📷 Duvarda paylaş"}
-              </Text>
-            </Pressable>
           </Animated.View>
 
           {/* #14 — Etkinliğe katılacaklar — sekmeli filtre (going/maybe/interested) */}
@@ -911,13 +894,19 @@ export default function EventDetail() {
                   const editing = editingId === cm.id;
                   const initial = (cm.name?.charAt(0) || "?").toUpperCase();
                   return (
-                    <View key={cm.id} style={[styles.bubble, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+                    <Pressable
+                      key={cm.id}
+                      onLongPress={editing ? undefined : () => onLongPressComment(cm)}
+                      delayLongPress={300}
+                      style={[styles.bubble, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+                    >
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
                         <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cmAvatar}>
                           <Text style={{ color: "#fff", fontSize: 12, fontWeight: "800" }}>{initial}</Text>
                         </LinearGradient>
                         <Text style={[Type.label, { color: T.text, flex: 1 }]} numberOfLines={1}>{cm.name}</Text>
-                        {cm.editedTs ? <Text style={[Type.micro, { color: T.textFaint }]}>{t("edited")}</Text> : null}
+                        <Text style={[Type.micro, { color: T.textFaint }]}>{relTime(cm.editedTs ?? cm.ts)}</Text>
+                        {cm.editedTs ? <Text style={[Type.micro, { color: T.textFaint }]}>· {t("edited")}</Text> : null}
                       </View>
                       {editing ? (
                         <View style={{ gap: 8 }}>
@@ -936,21 +925,7 @@ export default function EventDetail() {
                       ) : (
                         <Text style={[Type.body, { color: T.text, lineHeight: 20 }]}>{cm.text}</Text>
                       )}
-                      {!editing && (canEditComment(cm) || canDeleteComment(cm)) ? (
-                        <View style={{ flexDirection: "row", gap: 16, marginTop: 8 }}>
-                          {canEditComment(cm) ? (
-                            <Pressable onPress={() => startEditComment(cm)} hitSlop={6}>
-                              <Text style={[Type.micro, { color: T.primary }]}>✏️ {t("edit")}</Text>
-                            </Pressable>
-                          ) : null}
-                          {canDeleteComment(cm) ? (
-                            <Pressable onPress={() => deleteComment(cm)} hitSlop={6}>
-                              <Text style={[Type.micro, { color: T.pink }]}>🗑️ {t("delete")}</Text>
-                            </Pressable>
-                          ) : null}
-                        </View>
-                      ) : null}
-                    </View>
+                    </Pressable>
                   );
                 })}
               </View>
@@ -990,12 +965,19 @@ export default function EventDetail() {
             {photos.length ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                 {photos.map((p, i) => (
-                  <View key={`${p.uri}-${i}`}>
-                    <Image source={{ uri: p.uri }} style={styles.photo} contentFit="cover" transition={200} />
-                    {canDeletePhoto(p) ? (
-                      <Pressable onPress={() => deletePhoto(i)} hitSlop={8} style={styles.photoDel}>
-                        <Text style={{ fontSize: 13 }}>🗑️</Text>
-                      </Pressable>
+                  <View key={`${p.uri}-${i}`} style={{ gap: 4 }}>
+                    <View>
+                      <Image source={{ uri: p.uri }} style={styles.photo} contentFit="cover" transition={200} />
+                      {canDeletePhoto(p) ? (
+                        <Pressable onPress={() => deletePhoto(i)} hitSlop={8} style={styles.photoDel}>
+                          <Text style={{ fontSize: 13 }}>🗑️</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                    {p.ts ? (
+                      <Text style={[Type.micro, { color: T.textFaint, maxWidth: styles.photo.width, textAlign: "center" }]} numberOfLines={1}>
+                        {relTime(p.ts)}
+                      </Text>
                     ) : null}
                   </View>
                 ))}
@@ -1009,6 +991,20 @@ export default function EventDetail() {
           {guest ? <View style={{ height: 2 }} /> : null}
         </View>
       </ScrollView>
+
+      {/* Yorum düzenle/sil ipucu (ömür boyu 1 kez) */}
+      <Modal visible={commentTip} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setCommentTip(false)}>
+        <Pressable style={styles.tipScrim} onPress={() => { tapH(); setCommentTip(false); }}>
+          <View style={[styles.tipCard, { backgroundColor: T.bgElevated, borderColor: T.hairline }]}>
+            <Text style={[Type.body, { color: T.text, textAlign: "center", lineHeight: 22 }]}>
+              💡 İpucu: Yazdığın yorumu düzenlemek veya silmek için yoruma <Text style={{ fontWeight: "800" }}>basılı tut</Text>.
+            </Text>
+            <Pressable onPress={() => { tapH(); setCommentTip(false); }} style={{ marginTop: 16 }}>
+              <Text style={[Type.label, { color: T.primary }]}>Tamam</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* Katılacaklar listesi — bottom-sheet; her satırda "Mesaj at" */}
       <Modal visible={listOpen} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setListOpen(false)}>
@@ -1192,6 +1188,36 @@ export default function EventDetail() {
         <ZoomableImage uri={heroUri} visible={zoom} onClose={() => setZoom(false)} />
       ) : null}
 
+      {/* "Story paylaşıldı" — gösterişli başarı modalı (Alert yerine) */}
+      <Modal visible={storyShared} transparent animationType="none" statusBarTranslucent onRequestClose={() => setStoryShared(false)}>
+        <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(220)} style={styles.successScrim}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setStoryShared(false)} />
+          <Animated.View
+            entering={ZoomIn.springify().damping(13).mass(0.7)}
+            style={[styles.successCard, { backgroundColor: T.bgElevated, borderColor: T.hairline }, glow(c.gradient[0], 28, 0.5)]}
+          >
+            {/* Parıltılı gradient halka + ✓ */}
+            <View style={styles.successRingWrap}>
+              <LinearGradient colors={c.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.successRing}>
+                <Animated.Text entering={ZoomIn.delay(140).springify().damping(10)} style={styles.successCheck}>✓</Animated.Text>
+              </LinearGradient>
+              <Animated.Text entering={FadeIn.delay(260)} style={[styles.successSpark, styles.sparkTL]}>✨</Animated.Text>
+              <Animated.Text entering={FadeIn.delay(320)} style={[styles.successSpark, styles.sparkTR]}>🎉</Animated.Text>
+              <Animated.Text entering={FadeIn.delay(380)} style={[styles.successSpark, styles.sparkBL]}>⭐</Animated.Text>
+            </View>
+            <Text style={[Type.h2, { color: T.text, marginTop: 16, textAlign: "center" }]}>Story paylaşıldı! 🎉</Text>
+            <Text style={[Type.body, { color: T.textDim, marginTop: 6, textAlign: "center" }]}>
+              Story'in bu etkinlikte yayında ✨
+            </Text>
+            <Pressable onPress={() => { tapH(); setStoryShared(false); }} style={{ marginTop: 18, borderRadius: Radius.pill, overflow: "hidden" }}>
+              <LinearGradient colors={c.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.successBtn}>
+                <Text style={[Type.label, { color: "#fff" }]}>Harika</Text>
+              </LinearGradient>
+            </Pressable>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+
       {/* Avatar fotoğrafını büyütme modal'ı (dokun/basılı tut) */}
       <Modal visible={!!photoView} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPhotoView(null)}>
         <Pressable style={styles.photoModalBg} onPress={() => setPhotoView(null)}>
@@ -1356,11 +1382,22 @@ const styles = StyleSheet.create({
   onlineDot: { position: "absolute", right: 0, bottom: 0, width: 13, height: 13, borderRadius: 7, borderWidth: 2 },
   attMsgBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 9 },
   bubble: { borderRadius: Radius.md, padding: 12, borderWidth: StyleSheet.hairlineWidth * 2 },
+  tipScrim: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 28 },
+  tipCard: { width: "100%", maxWidth: 360, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 20, alignItems: "center" },
+  successScrim: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.6)", paddingHorizontal: 32 },
+  successCard: { width: "100%", maxWidth: 340, borderRadius: Radius.xl, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 22, alignItems: "center" },
+  successRingWrap: { width: 104, height: 104, alignItems: "center", justifyContent: "center" },
+  successRing: { width: 84, height: 84, borderRadius: 42, alignItems: "center", justifyContent: "center" },
+  successCheck: { color: "#fff", fontSize: 44, fontWeight: "900", marginTop: -2 },
+  successSpark: { position: "absolute", fontSize: 22 },
+  sparkTL: { top: 0, left: 6 },
+  sparkTR: { top: 4, right: 2 },
+  sparkBL: { bottom: 2, left: 12, fontSize: 18 },
+  successBtn: { paddingHorizontal: 32, paddingVertical: 11, alignItems: "center", justifyContent: "center" },
   cmAvatar: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   input: { flex: 1, borderRadius: Radius.pill, paddingHorizontal: 16, paddingVertical: 10, borderWidth: StyleSheet.hairlineWidth * 2, fontSize: 14 },
   sendBtn: { paddingHorizontal: 16, paddingVertical: 11, alignItems: "center", justifyContent: "center" },
   addPhoto: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
-  wallShareBtn: { marginTop: 14, paddingVertical: 11, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center", justifyContent: "center" },
   photo: { width: 100, height: 100, borderRadius: Radius.md },
   photoModalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center", padding: 16 },
   photoModalImg: { width: "94%", height: "78%", borderRadius: Radius.lg },

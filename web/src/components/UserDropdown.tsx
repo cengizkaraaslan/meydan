@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { LogOut, Settings, User as UserIcon, ChevronDown } from "lucide-react";
-import { signOut } from "@/lib/auth-actions";
+import { LogOut, Loader2, Settings, User as UserIcon, ChevronDown } from "lucide-react";
+import { signOut } from "next-auth/react";
 
 interface UserDropdownProps {
   name: string | null;
@@ -14,7 +14,16 @@ interface UserDropdownProps {
 
 export function UserDropdown({ name, image, email }: UserDropdownProps) {
   const [open, setOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  // Çıkış: istemci tarafında anında loading göster, sonra çerezi temizleyip "/" e dön.
+  // (Eski server-action formu tıklayınca menüyü kapatıp donuyordu → "bekliyor" hissi.)
+  function handleSignOut() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    void signOut({ callbackUrl: "/" });
+  }
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -97,17 +106,20 @@ export function UserDropdown({ name, image, email }: UserDropdownProps) {
 
             <div className="my-1 border-t border-[var(--border)]" />
 
-            <form action={signOut}>
-              <button
-                type="submit"
-                role="menuitem"
-                onClick={() => setOpen(false)}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-[var(--danger)]/10 transition-colors text-sm text-[var(--danger)]"
-              >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleSignOut}
+              disabled={loggingOut}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-[var(--danger)]/10 transition-colors text-sm text-[var(--danger)] disabled:opacity-70 disabled:cursor-wait"
+            >
+              {loggingOut ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
                 <LogOut className="size-4" />
-                Çıkış yap
-              </button>
-            </form>
+              )}
+              {loggingOut ? "Çıkış yapılıyor…" : "Çıkış yap"}
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
