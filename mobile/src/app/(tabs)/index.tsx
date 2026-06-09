@@ -134,9 +134,10 @@ export default function DiscoverScreen() {
 
     // 1) Cache varsa HEMEN göster (hızlı ilk boya), spinner'ı kapat.
     const cached = await loadEventsCache(key);
-    if (cached) {
-      const cachedImg = cached.filter((e) => e.image_url);
-      setFeatured((cachedImg.length >= 5 ? cachedImg : cached).slice(0, 6));
+    const hadCache = !!(cached && cached.length > 0);
+    if (hadCache) {
+      const cachedImg = cached!.filter((e) => e.image_url);
+      setFeatured((cachedImg.length >= 5 ? cachedImg : cached!).slice(0, 6));
       setLoading(false);
     }
 
@@ -157,8 +158,10 @@ export default function DiscoverScreen() {
       }
       const withImg = feedRes.data.filter((e) => e.image_url);
       const list = (withImg.length >= 5 ? withImg : feedRes.data).slice(0, 6);
-      // Boş sonuç mevcut hero'yu boşaltmasın (ilk yükleme hariç).
-      if (list.length > 0 || !loadedOnce.current) setFeatured(list);
+      // Boş TAZE sonuç, gösterilmiş hero'yu (cache/önceki) ASLA boşaltmasın — "Ankara
+      // geldi sonra slider kalktı" buydu: cache dolu gösterilip taze fetch boş dönünce
+      // ilk yüklemede setFeatured([]) hero'yu siliyordu. Yalnız hiç veri yokken boş set.
+      if (list.length > 0 || (!loadedOnce.current && !hadCache)) setFeatured(list);
       void saveEventsCache(key, feedRes.data);
     } catch {
       /* cache gösterildiyse koru */

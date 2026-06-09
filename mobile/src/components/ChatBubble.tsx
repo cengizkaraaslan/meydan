@@ -7,6 +7,9 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { glow } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
+import { useT } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
+import { showAuthPrompt } from "@/lib/authPrompt";
 import { impactH } from "@/lib/haptics";
 import { listConversations, totalUnread, type Conversation } from "@/lib/conversations";
 
@@ -20,6 +23,8 @@ const MARGIN = 16;
  */
 export function ChatBubble() {
   const { t: T } = useTheme();
+  const { t } = useT();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const [convos, setConvos] = useState<Conversation[]>([]);
@@ -44,9 +49,14 @@ export function ChatBubble() {
 
   const openMessages = useCallback(() => {
     impactH();
+    // Sohbet yalnız gerçek kullanıcıya açık → girişsizse şık premium giriş modalı.
+    if (!user) {
+      showAuthPrompt(t("lock_chat_title"));
+      return;
+    }
     // "/mesajlar" yeni route — typed-routes union'ı expo start/build'de yeniden üretilince tanınır.
     router.push("/mesajlar" as Href);
-  }, []);
+  }, [user, t]);
 
   const clamp = (v: number, lo: number, hi: number) => {
     "worklet";

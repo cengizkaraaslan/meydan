@@ -17,6 +17,8 @@ import { Radius, Type } from "@/theme/aurora";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
+import { showAuthPrompt } from "@/lib/authPrompt";
 import { tapH } from "@/lib/haptics";
 import { listConversations, type Conversation } from "@/lib/conversations";
 
@@ -28,6 +30,7 @@ import { listConversations, type Conversation } from "@/lib/conversations";
 export default function MesajlarScreen() {
   const { t: T } = useTheme();
   const { t } = useT();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [convos, setConvos] = useState<Conversation[]>([]);
@@ -37,6 +40,7 @@ export default function MesajlarScreen() {
   const hasLoaded = useRef(false);
 
   const load = useCallback(async (background: boolean) => {
+    if (!user) { setLoading(false); return; }
     if (!background) setLoading(true);
     try {
       const list = await listConversations();
@@ -46,14 +50,18 @@ export default function MesajlarScreen() {
     } finally {
       if (!background) setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   // İlk açılışta skeleton'lı yükle; sonraki odaklanmalarda (sohbetten dönünce) arkaplanda tazele.
   useFocusEffect(
     useCallback(() => {
+      if (!user) {
+        showAuthPrompt(t("lock_chat_title"));
+        return;
+      }
       load(hasLoaded.current);
       hasLoaded.current = true;
-    }, [load]),
+    }, [load, user, t]),
   );
 
   const onRefresh = useCallback(async () => {
@@ -128,7 +136,7 @@ export default function MesajlarScreen() {
             <View style={styles.empty}>
               <Text style={{ fontSize: 44, marginBottom: 10 }}>💬</Text>
               <Text style={[Type.body, { color: T.textDim, textAlign: "center", lineHeight: 21 }]}>
-                {q ? "Sonuç yok" : t("no_chats")}
+                {!user ? t("lock_chat_title") : q ? "Sonuç yok" : t("no_chats")}
               </Text>
             </View>
           }
