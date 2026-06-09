@@ -193,8 +193,8 @@ export default function KategorilerScreen() {
         keyboardShouldPersistTaps="handled"
         onScroll={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-          // Sona ~500px kala bir sonraki sayfayı otomatik yükle (sonsuz kaydırma).
-          if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 500) loadMore();
+          // Sona ~700px kala bir sonraki sayfayı otomatik yükle (sonsuz kaydırma).
+          if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 700) loadMore();
         }}
         scrollEventThrottle={250}
       >
@@ -367,19 +367,11 @@ export default function KategorilerScreen() {
                     <EventRow event={e} />
                   </Animated.View>
                 ))}
-                {/* 10'ar 10'ar sayfalama: daha varsa buton/oto-yükle; bittiyse kapanış */}
+                {/* Sonsuz kaydırma: kaydırınca oto-yükle (onScroll); altta dönen spinner. */}
                 {page < totalPages ? (
-                  <Pressable
-                    onPress={loadMore}
-                    disabled={loadingMore}
-                    style={[styles.loadMore, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}
-                  >
-                    {loadingMore ? (
-                      <ActivityIndicator color={T.primary} />
-                    ) : (
-                      <Text style={[Type.title, { color: T.primary }]}>Daha fazla göster</Text>
-                    )}
-                  </Pressable>
+                  <View style={{ paddingVertical: 24, alignItems: "center" }}>
+                    <ActivityIndicator color={T.primary} />
+                  </View>
                 ) : visibleEvents.length > 0 ? (
                   <Text style={[Type.label, { color: T.textFaint, textAlign: "center", marginTop: Space.lg }]}>
                     Hepsi bu kadar ✦
@@ -456,14 +448,6 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 30 },
   tileLabel: { color: "#fff" },
   results: { marginTop: Space.xl, paddingHorizontal: 16 },
-  loadMore: {
-    marginTop: Space.lg,
-    paddingVertical: 14,
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   hint: {
     textAlign: "center",
     marginTop: Space.xxl,
