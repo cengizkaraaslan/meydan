@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -29,8 +29,12 @@ export function StoryAvatar({ uri, name, size, hasStory, online, onPress }: Prop
   const outer = size + 2 * (STROKE + GAP);
   const innerBg = size + 2 * GAP;
 
-  const avatar = uri ? (
-    <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} contentFit="cover" transition={150} />
+  // Görsel yüklenemezse (bozuk/expire URL — ör. eski Gmail foto) baş-harf rozetine düş.
+  const [errored, setErrored] = useState(false);
+  useEffect(() => setErrored(false), [uri]);
+
+  const avatar = uri && !errored ? (
+    <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} contentFit="cover" transition={150} onError={() => setErrored(true)} />
   ) : (
     <LinearGradient
       colors={T.primaryGradient}

@@ -137,7 +137,8 @@ function ImageAdjust({
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
           {img ? (
             <Canvas style={{ width: FW, height: FH, borderRadius: 12 }}>
-              <SkiaImage image={img} x={0} y={0} width={FW} height={FH} fit="fill">
+              {/* contain: kırpılmış görselin TAMAMINI göster (zoom/kırpma yok). */}
+              <SkiaImage image={img} x={0} y={0} width={FW} height={FH} fit="contain">
                 <ColorMatrix matrix={matrix} />
               </SkiaImage>
             </Canvas>

@@ -23,7 +23,7 @@ import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { fetchNotifs } from "@/lib/social";
 import { onAvatarRestored } from "@/lib/profileSync";
-import { resolveAvatar } from "@/lib/avatar";
+import { resolveAvatar, defaultAvatar } from "@/lib/avatar";
 import { Image } from "expo-image";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { tapH } from "@/lib/haptics";
@@ -59,6 +59,9 @@ export default function DiscoverScreen() {
   // Girişte sunucudan avatar geri yüklenince (reinstall sonrası) anında uygula.
   useEffect(() => onAvatarRestored(setAvatarOverride), []);
   const photoUri = avatarOverride ?? user?.photo;
+  // Avatar URL'i (yüklü/Gmail) yüklenemezse default'a düş.
+  const [avatarErr, setAvatarErr] = useState(false);
+  useEffect(() => setAvatarErr(false), [photoUri]);
   // Okunmamış bildirim sayacı — ekran her odaklandığında tazelenir.
   const [unread, setUnread] = useState(0);
   useFocusEffect(
@@ -236,7 +239,7 @@ export default function DiscoverScreen() {
             </Pressable>
             {/* Profil — alt bardan kaldırıldı, başlıkta avatar olarak */}
             <Pressable onPress={() => { tapH(); router.push("/profil"); }} style={[styles.searchBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline, overflow: "hidden", padding: 0 }]}>
-              <Image source={{ uri: resolveAvatar(photoUri, user?.name, gender) }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+              <Image source={{ uri: avatarErr ? defaultAvatar(user?.name, gender) : resolveAvatar(photoUri, user?.name, gender) }} style={{ width: "100%", height: "100%" }} contentFit="cover" onError={() => setAvatarErr(true)} />
             </Pressable>
           </View>
         </Animated.View>
