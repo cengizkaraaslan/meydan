@@ -66,9 +66,9 @@ export function ImageCropper({ uri, aspect = 1, outWidth = 1080, title, embedded
   const [busy, setBusy] = useState(false);
 
   // Çerçeve boyutu — ekrana sığacak şekilde, oran korunarak.
-  let FW = SW - 32;
+  let FW = SW - 16;
   let FH = FW / aspect;
-  const MAXH = SH * 0.6;
+  const MAXH = SH * 0.72;
   if (FH > MAXH) {
     FH = MAXH;
     FW = FH * aspect;

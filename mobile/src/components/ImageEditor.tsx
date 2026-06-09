@@ -93,9 +93,9 @@ function ImageAdjust({
   // Önizleme boyutu (görsel oranına göre, ekrana sığacak şekilde).
   const iw = img ? img.width() : 1;
   const ih = img ? img.height() : 1;
-  let FW = SW - 32;
+  let FW = SW - 16;
   let FH = FW * (ih / iw);
-  const MAXH = SH * 0.48;
+  const MAXH = SH * 0.56;
   if (FH > MAXH) {
     FH = MAXH;
     FW = FH * (iw / ih);
