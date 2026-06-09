@@ -11,8 +11,9 @@ import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useCanSeeAges } from "@/lib/dprofile";
 import { tapH, impactH } from "@/lib/haptics";
-import { fetchFollowing, followUser, unfollowUser, followIdForPerson } from "@/lib/social";
+import { fetchFollowing, followUser, unfollowUser, followIdForPerson, fetchStoriesFor, type MobileStoryView } from "@/lib/social";
 import { personStats as getPersonStats } from "@/lib/personStats";
+import { EventStoryViewer, type StoryGroup } from "@/components/EventStoryViewer";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 const HERO_H = Math.round(SCREEN_H * 0.58);
@@ -48,6 +49,29 @@ export default function PersonScreen() {
   const [isFollowing, setIsFollowing] = React.useState(false);
   const [followBusy, setFollowBusy] = React.useState(false);
   const [statsOpen, setStatsOpen] = React.useState(false);
+
+  // Bu kişinin story'leri (başkasının gözünden görüntüleme).
+  const [personStories, setPersonStories] = React.useState<MobileStoryView[]>([]);
+  const [storyOpen, setStoryOpen] = React.useState(false);
+  React.useEffect(() => {
+    let alive = true;
+    // followId: mock kişide u1→fake_u1, gerçek kullanıcıda deviceId (story sahibi id'si).
+    fetchStoriesFor([followId]).then((s) => { if (alive) setPersonStories(s); }).catch(() => {});
+    return () => { alive = false; };
+  }, [followId]);
+  const storyGroup = React.useMemo<StoryGroup>(
+    () => ({
+      id: String(id),
+      name: person?.name ?? "",
+      avatar: person?.avatar ?? "",
+      segments: personStories.map((s) => ({
+        uri: s.imageUrl,
+        caption: s.caption ?? undefined,
+        eventTitle: s.eventTitle ?? undefined,
+      })),
+    }),
+    [id, person?.name, person?.avatar, personStories],
+  );
 
   const detailedStats = React.useMemo(() => getPersonStats(String(id)), [id]);
 
@@ -149,10 +173,17 @@ export default function PersonScreen() {
                 ? `📍 ${person.distanceKm} km · ${t("person_nearby")}`
                 : `📍 ${person.distanceKm} km ${t("away")}`}
             </Text>
-            {/* Sayaçlar — sadece gösterim, tıklanmaz */}
-            <Text style={[Type.body, { color: T.textDim, marginTop: 6, fontWeight: "600" }]}>
-              {`📸 ${stats.storyCount} story · 🎟️ ${stats.eventCount} etkinlik`}
-            </Text>
+            {/* Sayaçlar — story varsa "📸 N story" tıklanabilir (story'leri izle) */}
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, gap: 6 }}>
+              {personStories.length > 0 ? (
+                <Pressable onPress={() => { tapH(); setStoryOpen(true); }} hitSlop={6}>
+                  <Text style={[Type.body, { color: T.primary, fontWeight: "800" }]}>📸 {personStories.length} story ▸</Text>
+                </Pressable>
+              ) : (
+                <Text style={[Type.body, { color: T.textDim, fontWeight: "600" }]}>📸 0 story</Text>
+              )}
+              <Text style={[Type.body, { color: T.textDim, fontWeight: "600" }]}>· 🎟️ {stats.eventCount} etkinlik</Text>
+            </View>
           </Animated.View>
         </View>
 
@@ -306,6 +337,11 @@ export default function PersonScreen() {
           </Animated.View>
         </Pressable>
       </Modal>
+
+      {/* Bu kişinin story'lerini başkasının gözünden izle */}
+      {storyOpen ? (
+        <EventStoryViewer groups={[storyGroup]} onClose={() => setStoryOpen(false)} />
+      ) : null}
     </View>
   );
 }
