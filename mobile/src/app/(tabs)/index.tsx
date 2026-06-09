@@ -29,6 +29,15 @@ import { tapH } from "@/lib/haptics";
 
 const { width } = Dimensions.get("window");
 const HERO_W = width - 32;
+const FEATURED_COUNT = 8;
+
+/** Hero slider için: geçmişi ele, görselli olanları öne al, FEATURED_COUNT'a kadar doldur. */
+function pickFeatured(events: ApiEvent[]): ApiEvent[] {
+  const up = events.filter((e) => !isPastDay(e.starts_at));
+  const withImg = up.filter((e) => e.image_url);
+  const without = up.filter((e) => !e.image_url);
+  return [...withImg, ...without].slice(0, FEATURED_COUNT);
+}
 
 
 export default function DiscoverScreen() {
@@ -136,8 +145,7 @@ export default function DiscoverScreen() {
     const cached = await loadEventsCache(key);
     const hadCache = !!(cached && cached.length > 0);
     if (hadCache) {
-      const cachedImg = cached!.filter((e) => e.image_url);
-      setFeatured((cachedImg.length >= 5 ? cachedImg : cached!).slice(0, 6));
+      setFeatured(pickFeatured(cached!));
       setLoading(false);
     }
 
@@ -145,19 +153,22 @@ export default function DiscoverScreen() {
     try {
       // Seçili güne göre tarih aralığı ("all" → aralık yok).
       const range = dayRange(useDay);
+      // "all" gününde bile GEÇMİŞ etkinlik gelmesin → from=now. Yoksa API past+future
+      // döndürüp app slice öncesi geçmişleri kapsıyordu → filtre sonrası çok az kalıyordu
+      // (Ankara'da 111 etkinlik varken yalnız 2 görünmesinin sebebi buydu).
+      const fromDate = range.from ?? new Date().toISOString();
       let feedRes;
       if (!trCountry) {
         // Yurt dışı: o ülkenin etkinlikleri (şehir filtresi yok).
-        feedRes = await fetchEvents({ country: ctry.name, category: category ?? undefined, from: range.from, to: range.to, pageSize: 30 });
+        feedRes = await fetchEvents({ country: ctry.name, category: category ?? undefined, from: fromDate, to: range.to, pageSize: 40 });
       } else {
         // Türkiye: öncelik bulunduğun şehir. O şehirde sonuç yoksa → genel (random) feed.
-        feedRes = await fetchEvents({ city: useCity ?? undefined, category: category ?? undefined, from: range.from, to: range.to, pageSize: 30 });
+        feedRes = await fetchEvents({ city: useCity ?? undefined, category: category ?? undefined, from: fromDate, to: range.to, pageSize: 40 });
         if (useCity && feedRes.data.length === 0) {
-          feedRes = await fetchEvents({ category: category ?? undefined, from: range.from, to: range.to, pageSize: 30 });
+          feedRes = await fetchEvents({ category: category ?? undefined, from: fromDate, to: range.to, pageSize: 40 });
         }
       }
-      const withImg = feedRes.data.filter((e) => e.image_url);
-      const list = (withImg.length >= 5 ? withImg : feedRes.data).slice(0, 6);
+      const list = pickFeatured(feedRes.data);
       // Boş TAZE sonuç, gösterilmiş hero'yu (cache/önceki) ASLA boşaltmasın — "Ankara
       // geldi sonra slider kalktı" buydu: cache dolu gösterilip taze fetch boş dönünce
       // ilk yüklemede setFeatured([]) hero'yu siliyordu. Yalnız hiç veri yokken boş set.
