@@ -6,6 +6,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
+import {
+  AudioModule,
+  RecordingPresets,
+  useAudioPlayer,
+  useAudioPlayerStatus,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from "expo-audio";
 import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,6 +37,12 @@ function hhmm(ms: number): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+/** ms → "m:ss" (sesli mesaj süresi/sayaç). */
+function mmss(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
@@ -37,7 +51,7 @@ export default function ChatScreen() {
   const { t } = useT();
   const canSeeAges = useCanSeeAges();
   const person = getPerson(String(id));
-  const { messages, typing, send, sendImage, editMessage, deleteMessage, ready } = useChat(String(id));
+  const { messages, typing, send, sendImage, sendVoice, editMessage, deleteMessage, ready } = useChat(String(id));
   const [text, setText] = useState("");
   const [editing, setEditing] = useState<Msg | null>(null);
   const [tipVisible, setTipVisible] = useState(false);
@@ -48,6 +62,55 @@ export default function ChatScreen() {
   // Yalnızca yeni gönderdiğim balona giriş animasyonu uygulamak için son gönderim zamanını tutuyoruz.
   const [lastSentAt, setLastSentAt] = useState(0);
   const listRef = useRef<FlatList<Msg>>(null);
+
+  // ── Sesli mesaj kaydı (expo-audio) ──
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recState = useAudioRecorderState(recorder);
+  const [recording, setRecording] = useState(false);
+  const recStartRef = useRef(0);
+
+  const startRecording = useCallback(async () => {
+    try {
+      const perm = await AudioModule.requestRecordingPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Mikrofon izni", "Sesli mesaj için mikrofon iznine ihtiyaç var.");
+        return;
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      recStartRef.current = Date.now();
+      setRecording(true);
+    } catch {
+      setRecording(false);
+    }
+  }, [recorder]);
+
+  const stopRecordingAndSend = useCallback(async () => {
+    try {
+      await recorder.stop();
+      const uri = recorder.uri;
+      const sec = (Date.now() - recStartRef.current) / 1000;
+      setRecording(false);
+      if (uri && sec >= 1) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        sndSend();
+        void sendVoice(uri, sec);
+      }
+    } catch {
+      setRecording(false);
+    }
+  }, [recorder, sendVoice]);
+
+  const cancelRecording = useCallback(async () => {
+    try {
+      await recorder.stop();
+    } catch {
+      /* yoksay */
+    }
+    setRecording(false);
+    tapH();
+  }, [recorder]);
 
   // Gönder (↑) butonunun "pulse/uçuş" efekti (sadece sohbet ekranında).
   const sendScale = useSharedValue(1);
@@ -251,29 +314,55 @@ export default function ChatScreen() {
           </View>
         ) : null}
 
-        {/* Girdi */}
-        <View style={[styles.inputBar, { paddingBottom: insets.bottom ? insets.bottom : 12, borderTopColor: T.hairline, opacity: ready ? 1 : 0.55 }]}>
-          <Pressable onPress={onPickImage} disabled={!ready} hitSlop={8} style={[styles.attach, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-            <Text style={{ fontSize: 20 }}>📷</Text>
-          </Pressable>
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            editable={ready}
-            placeholder={t("message_hint", { name: person.name })}
-            placeholderTextColor={T.textFaint}
-            style={[Type.body, styles.input, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
-            multiline
-            onSubmitEditing={onSend}
-          />
-          <Pressable onPress={onSend} disabled={!ready}>
-            <Animated.View style={sendBtnStyle}>
+        {/* Girdi / Sesli mesaj kayıt çubuğu */}
+        {recording ? (
+          <View style={[styles.inputBar, { paddingBottom: insets.bottom ? insets.bottom : 12, borderTopColor: T.hairline }]}>
+            <Pressable onPress={cancelRecording} hitSlop={8} style={[styles.attach, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+              <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+            </Pressable>
+            <View style={[styles.recBar, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+              <View style={styles.recDot} />
+              <Text style={[Type.body, { color: T.text }]}>{mmss(recState.durationMillis ?? 0)}</Text>
+              <Text style={[Type.label, { color: T.textFaint, marginLeft: 10 }]}>Kaydediliyor…</Text>
+            </View>
+            <Pressable onPress={stopRecordingAndSend}>
               <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.send}>
                 <Ionicons name="send" size={20} color="#fff" />
               </LinearGradient>
-            </Animated.View>
-          </Pressable>
-        </View>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={[styles.inputBar, { paddingBottom: insets.bottom ? insets.bottom : 12, borderTopColor: T.hairline, opacity: ready ? 1 : 0.55 }]}>
+            <Pressable onPress={onPickImage} disabled={!ready} hitSlop={8} style={[styles.attach, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+              <Text style={{ fontSize: 20 }}>📷</Text>
+            </Pressable>
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              editable={ready}
+              placeholder={t("message_hint", { name: person.name })}
+              placeholderTextColor={T.textFaint}
+              style={[Type.body, styles.input, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+              multiline
+              onSubmitEditing={onSend}
+            />
+            {text.trim().length === 0 && !editing ? (
+              <Pressable onPress={startRecording} disabled={!ready} hitSlop={6}>
+                <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.send}>
+                  <Ionicons name="mic" size={20} color="#fff" />
+                </LinearGradient>
+              </Pressable>
+            ) : (
+              <Pressable onPress={onSend} disabled={!ready}>
+                <Animated.View style={sendBtnStyle}>
+                  <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.send}>
+                    <Ionicons name="send" size={20} color="#fff" />
+                  </LinearGradient>
+                </Animated.View>
+              </Pressable>
+            )}
+          </View>
+        )}
       </KeyboardAvoidingView>
 
       {/* Mesaj uzun-bas action-sheet (tema uyumlu, alttan açılır) */}
@@ -285,7 +374,7 @@ export default function ChatScreen() {
           >
             <View style={[styles.sheetHandle, { backgroundColor: T.hairline }]} />
             <Text style={[Type.label, { color: T.textDim, textAlign: "center", marginBottom: 6 }]}>
-              {actionMsg?.imageUri ? "Fotoğraf" : "Mesaj"}
+              {actionMsg?.imageUri ? "Fotoğraf" : actionMsg?.audioUri ? "Sesli mesaj" : "Mesaj"}
             </Text>
 
             {confirmDel ? (
@@ -310,7 +399,7 @@ export default function ChatScreen() {
               </>
             ) : (
               <>
-                {actionMsg && !actionMsg.imageUri ? (
+                {actionMsg && !actionMsg.imageUri && !actionMsg.audioUri ? (
                   <Pressable onPress={onEditFromSheet} style={[styles.sheetRow, { backgroundColor: T.surfaceStrong }]}>
                     <Text style={[Type.body, { color: T.text }]}>✏️  Düzenle</Text>
                   </Pressable>
@@ -358,6 +447,7 @@ function Ticks({ read, pending }: { read: boolean; pending?: boolean }) {
 
 function Bubble({ T, m, read, justSent, onLongPress }: { T: Palette; m: Msg; read: boolean; justSent?: boolean; onLongPress?: () => void }) {
   const isImage = !!m.imageUri;
+  const isAudio = !!m.audioUri;
   if (m.fromMe) {
     return (
       // Facebook Messenger tarzı gönderim: yeni balon aşağıdan yukarı + hafif scale/opaklık ile "pop".
@@ -367,7 +457,9 @@ function Bubble({ T, m, read, justSent, onLongPress }: { T: Palette; m: Msg; rea
       >
         <Pressable onLongPress={onLongPress} delayLongPress={300}>
           <LinearGradient colors={T.primarySoft} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.bubble, styles.mine, isImage && styles.imgBubble]}>
-            {isImage ? (
+            {isAudio ? (
+              <VoiceMessage uri={m.audioUri!} sec={m.audioSec} tint="#fff" track="rgba(255,255,255,0.35)" />
+            ) : isImage ? (
               <Image source={{ uri: m.imageUri }} style={styles.img} contentFit="cover" transition={150} />
             ) : (
               <Text style={[Type.body, { color: "#fff" }]}>{m.text}</Text>
@@ -383,12 +475,45 @@ function Bubble({ T, m, read, justSent, onLongPress }: { T: Palette; m: Msg; rea
   }
   return (
     <View style={[styles.bubble, styles.theirs, isImage && styles.imgBubble, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-      {isImage ? (
+      {isAudio ? (
+        <VoiceMessage uri={m.audioUri!} sec={m.audioSec} tint={T.text} track={T.hairline} />
+      ) : isImage ? (
         <Image source={{ uri: m.imageUri }} style={styles.img} contentFit="cover" transition={150} />
       ) : (
         <Text style={[Type.body, { color: T.text }]}>{m.text}</Text>
       )}
       <Text style={[styles.meta, { color: T.textFaint, alignSelf: "flex-end" }]}>{hhmm(m.at)}</Text>
+    </View>
+  );
+}
+
+/** Sesli mesaj oynatıcı balonu — play/pause + ilerleme + süre. */
+function VoiceMessage({ uri, sec, tint, track }: { uri: string; sec?: number; tint: string; track: string }) {
+  const player = useAudioPlayer(uri);
+  const status = useAudioPlayerStatus(player);
+  const dur = status.duration && status.duration > 0 ? status.duration : sec ?? 0;
+  const cur = status.currentTime ?? 0;
+  const progress = dur > 0 ? Math.min(cur / dur, 1) : 0;
+  const playing = status.playing;
+  const toggle = () => {
+    tapH();
+    if (playing) {
+      player.pause();
+      return;
+    }
+    if (status.didJustFinish || (dur > 0 && cur >= dur - 0.05)) player.seekTo(0);
+    player.play();
+  };
+  const shown = playing || cur > 0.05 ? cur : dur;
+  return (
+    <View style={styles.voiceRow}>
+      <Pressable onPress={toggle} hitSlop={8}>
+        <Ionicons name={playing ? "pause" : "play"} size={22} color={tint} />
+      </Pressable>
+      <View style={[styles.voiceTrack, { backgroundColor: track }]}>
+        <View style={[styles.voiceFill, { backgroundColor: tint, width: `${progress * 100}%` }]} />
+      </View>
+      <Text style={[styles.voiceTime, { color: tint }]}>{mmss(shown * 1000)}</Text>
     </View>
   );
 }
@@ -443,6 +568,15 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2,
   },
   send: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  recBar: {
+    flex: 1, flexDirection: "row", alignItems: "center", gap: 8, height: 44,
+    paddingHorizontal: 14, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2,
+  },
+  recDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#FF3B30" },
+  voiceRow: { flexDirection: "row", alignItems: "center", gap: 10, minWidth: 168, paddingVertical: 2 },
+  voiceTrack: { flex: 1, height: 4, borderRadius: 2, overflow: "hidden", minWidth: 92 },
+  voiceFill: { height: 4, borderRadius: 2 },
+  voiceTime: { fontSize: 11, minWidth: 32, textAlign: "right" },
   editBar: {
     flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 8,
     borderTopWidth: StyleSheet.hairlineWidth * 2,

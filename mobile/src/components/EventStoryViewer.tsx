@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { Image } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { sendStoryReply } from "@/lib/chat";
+import { tapH } from "@/lib/haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
@@ -60,6 +63,10 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
   const [menuOpen, setMenuOpen] = useState(false);
   // Pinch ile yakınlaştırma sürerken otomatik ilerlemeyi durdur.
   const [zooming, setZooming] = useState(false);
+  // Story'e yanıt (gerçek kişide DM): yazarken otomatik ilerleme durur.
+  const [reply, setReply] = useState("");
+  const [replying, setReplying] = useState(false);
+  const [sentFlash, setSentFlash] = useState(false);
   const progress = useSharedValue(0);
 
   // İsteğe bağlı pinch-to-zoom: parmakla yakınlaştır, bırakınca normale döner.
@@ -102,13 +109,13 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
   // Aktif segment için zamanlayıcıyı başlat (reanimated withTiming + runOnJS).
   // Menü açıkken durdur; menü kapanınca segment baştan ilerler.
   useEffect(() => {
-    if (!segment || menuOpen || zooming) return;
+    if (!segment || menuOpen || zooming || replying) return;
     progress.value = 0;
     progress.value = withTiming(1, { duration: SEGMENT_MS }, (finished) => {
       if (finished) runOnJS(advance)();
     });
     return () => { cancelAnimation(progress); };
-  }, [gi, si, segment, advance, progress, menuOpen, zooming]);
+  }, [gi, si, segment, advance, progress, menuOpen, zooming, replying]);
 
   // Segment değişince zoom'u sıfırla (yeni görsel yakınlaştırılmış başlamasın).
   useEffect(() => {
@@ -148,6 +155,21 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
     cancelAnimation(progress);
     onDeleteSegment?.(gi, si);
   }, [onDeleteSegment, gi, si, progress]);
+
+  // Story'e yanıt → karşı tarafın DM'ine gönder (Instagram tarzı), "Gönderildi ✓" göster.
+  const onSendReply = useCallback(async () => {
+    const g = groups[gi];
+    const txt = reply.trim();
+    if (!g || !txt) return;
+    tapH();
+    setReply("");
+    Keyboard.dismiss();
+    const ok = await sendStoryReply(g.id, txt);
+    if (ok) {
+      setSentFlash(true);
+      setTimeout(() => setSentFlash(false), 1600);
+    }
+  }, [groups, gi, reply]);
 
   // Dokunma: sol yarı = geri, sağ yarı = ileri. Yakınlaştırılmışken gezinme yok.
   const tapNav = Gesture.Tap()
@@ -285,6 +307,37 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
             </View>
           </View>
         ) : null}
+
+        {/* Gerçek kişi story'sine yanıt → DM (Instagram tarzı) */}
+        {isRealPerson ? (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.replyWrap}
+          >
+            {sentFlash ? (
+              <View style={styles.sentFlash}>
+                <Text style={styles.sentFlashTxt}>Gönderildi ✓</Text>
+              </View>
+            ) : null}
+            <View style={[styles.replyBar, { paddingBottom: insets.bottom + 10 }]}>
+              <TextInput
+                value={reply}
+                onChangeText={setReply}
+                onFocus={() => setReplying(true)}
+                onBlur={() => setReplying(false)}
+                placeholder={`${group.name} kişisine yanıt ver…`}
+                placeholderTextColor="rgba(255,255,255,0.65)"
+                style={styles.replyInput}
+                returnKeyType="send"
+                onSubmitEditing={onSendReply}
+                blurOnSubmit
+              />
+              <Pressable onPress={onSendReply} hitSlop={8} style={styles.replySend}>
+                <Ionicons name="send" size={19} color="#fff" />
+              </Pressable>
+            </View>
+          </KeyboardAvoidingView>
+        ) : null}
       </View>
       </GestureHandlerRootView>
     </Modal>
@@ -327,4 +380,20 @@ const styles = StyleSheet.create({
     color: "#fff", textAlign: "center", backgroundColor: "rgba(0,0,0,0.45)",
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.md, overflow: "hidden",
   },
+  replyWrap: { position: "absolute", left: 0, right: 0, bottom: 0 },
+  replyBar: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 10 },
+  replyInput: {
+    flex: 1, height: 46, borderRadius: 23, borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: "rgba(255,255,255,0.55)", paddingHorizontal: 18, color: "#fff", fontSize: 15,
+    backgroundColor: "rgba(0,0,0,0.35)",
+  },
+  replySend: {
+    width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  sentFlash: {
+    alignSelf: "center", backgroundColor: "rgba(0,0,0,0.72)",
+    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginBottom: 10,
+  },
+  sentFlashTxt: { color: "#fff", fontWeight: "700" },
 });

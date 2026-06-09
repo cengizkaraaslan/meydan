@@ -27,7 +27,33 @@ export interface Msg {
   text: string;
   at: number;
   imageUri?: string; // yerel fotoğraf mesajı (backend'e gitmez)
+  audioUri?: string; // yerel sesli mesaj (backend'e gitmez)
+  audioSec?: number; // sesli mesaj süresi (saniye)
   pending?: boolean; // gönderiliyor (henüz backend onayı yok)
+}
+
+/**
+ * Story izleyiciden gerçek kişiye DM yanıtı gönderir (Instagram tarzı).
+ * useChat hook'una bağlı olmadan ensureMatch + sendMessage yapar; mesaj sohbette görünür.
+ */
+export async function sendStoryReply(personId: string, text: string): Promise<boolean> {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  try {
+    const did = await getOrCreateDeviceId();
+    const person = getPerson(personId);
+    const mk = await apiEnsureMatch({
+      deviceId: did,
+      partnerId: personId,
+      partnerName: person?.name ?? personId,
+      partnerAvatar: person?.avatar ?? "",
+    });
+    if (!mk) return false;
+    const sent = await apiSendMessage({ matchKey: mk, senderDeviceId: did, text: trimmed });
+    return !!sent;
+  } catch {
+    return false;
+  }
 }
 
 const OPENER = "Selam! 👋 Yaklaşan etkinliklerden hangisine gidiyorsun?";
@@ -184,6 +210,28 @@ export function useChat(personId: string) {
     [matchKey, deviceId, localImgs, refetch, botReply],
   );
 
+  // Sesli mesaj: yerelde tutulur (offline foto ile aynı depo). Alıcı mock bot olduğu
+  // için R2'ye yüklenmez; gönderince bot kısa bir cevap verir.
+  const sendVoice = useCallback(
+    async (uri: string, sec: number) => {
+      if (!matchKey) return;
+      counter.current += 1;
+      const local: Msg = {
+        id: `voice_${counter.current}_${Date.now()}`,
+        fromMe: true,
+        text: "",
+        at: Date.now(),
+        audioUri: uri,
+        audioSec: Math.max(1, Math.round(sec)),
+      };
+      const next = [...localImgs, local];
+      setLocalImgs(next);
+      await AsyncStorage.setItem(imgKey(matchKey), JSON.stringify(next));
+      botReply("🎤 sesli mesaj");
+    },
+    [matchKey, localImgs, botReply],
+  );
+
   /** Metin mesajını düzenler (yalnız kendi & 10 dk içinde). Başarıda refetch. */
   const editMessage = useCallback(
     async (id: string, text: string): Promise<{ ok: boolean; reason?: string }> => {
@@ -208,9 +256,9 @@ export function useChat(personId: string) {
   const deleteMessage = useCallback(
     async (id: string): Promise<{ ok: boolean; reason?: string }> => {
       if (!matchKey) return { ok: false, reason: "invalid" };
-      // Yerel (offline fallback) fotoğraf mesajı
+      // Yerel (offline) foto VEYA sesli mesaj — yerel depodan çıkar.
       const local = localImgs.find((m) => m.id === id);
-      if (local && (id.startsWith("img_") || local.imageUri)) {
+      if (local) {
         const next = localImgs.filter((m) => m.id !== id);
         setLocalImgs(next);
         await AsyncStorage.setItem(imgKey(matchKey), JSON.stringify(next));
@@ -241,5 +289,5 @@ export function useChat(personId: string) {
     return all;
   }, [serverMsgs, localImgs, pending]);
 
-  return { messages, typing, send, sendImage, editMessage, deleteMessage, ready: !!matchKey };
+  return { messages, typing, send, sendImage, sendVoice, editMessage, deleteMessage, ready: !!matchKey };
 }
