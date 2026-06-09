@@ -7,6 +7,7 @@ export type EventCategory =
   | "SERGI"
   | "ATOLYE"
   | "COCUK"
+  | "FUAR"
   | "DIGER";
 
 /**
@@ -132,6 +133,7 @@ export const CATEGORY_LABELS: Record<EventCategory, string> = {
   SERGI: "Sergi",
   ATOLYE: "Atölye",
   COCUK: "Çocuk",
+  FUAR: "Fuar",
   DIGER: "Diğer",
 };
 
@@ -166,6 +168,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   BILKENT: "Bilkent Üniversitesi",
   ITU: "İTÜ",
   BOGAZICI: "Boğaziçi Üniversitesi",
+  TOBB: "TOBB Fuar Takvimi",
   INSTAGRAM: "Instagram",
   MANUAL: "Manuel",
 };

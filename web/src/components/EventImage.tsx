@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { CalendarDays, Music2, Gift, Theater, Trophy, Image as ImageIcon, Mic2, Sparkles, Baby } from "lucide-react";
+import { CalendarDays, Music2, Gift, Theater, Trophy, Image as ImageIcon, Mic2, Sparkles, Baby, Building2 } from "lucide-react";
 import type { EventCategory } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ const CATEGORY_FALLBACK_IMG: Record<EventCategory, string> = {
   SERGI:    "https://images.unsplash.com/photo-1577720580479-7d839d829c73?w=1200&q=80",
   ATOLYE:   "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1200&q=80",
   COCUK:    "https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?w=1200&q=80",
+  FUAR:     "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80",
   DIGER:    "https://images.unsplash.com/photo-1429962714451-bb934ecdc4ec?w=1200&q=80",
 };
 
@@ -41,6 +42,7 @@ const CATEGORY_ICON: Record<EventCategory, typeof CalendarDays> = {
   SERGI:    ImageIcon,
   ATOLYE:   Gift,
   COCUK:    Baby,
+  FUAR:     Building2,
   DIGER:    CalendarDays,
 };
 
@@ -53,6 +55,7 @@ const CATEGORY_GRADIENT: Record<EventCategory, string> = {
   SERGI:    "from-cyan-500/30 via-blue-500/20 to-indigo-500/30",
   ATOLYE:   "from-emerald-500/30 via-lime-500/20 to-yellow-500/30",
   COCUK:    "from-pink-500/30 via-rose-500/20 to-red-500/30",
+  FUAR:     "from-blue-500/30 via-sky-500/20 to-indigo-500/30",
   DIGER:    "from-zinc-500/30 via-slate-500/20 to-neutral-500/30",
 };
 

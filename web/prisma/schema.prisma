@@ -45,6 +45,7 @@ enum EventCategory {
   SERGI
   ATOLYE
   COCUK
+  FUAR
   DIGER
 }
 

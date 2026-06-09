@@ -70,6 +70,7 @@ export function guessCategory(text: string): EventCategory {
   if (/(tiyatro|oyun|sahne|müzikal|muzikal|gösteri|gosteri)/.test(t)) return "TIYATRO";
   if (/(stand[\s-]?up|komedi|tek kişilik)/.test(t)) return "STANDUP";
   if (/(spor|maç|mac|koşu|kosu|turnuva|yürüyüş|yuruyus|bisiklet|atletizm|champions league|gp\b|motogp|formula)/.test(t)) return "SPOR";
+  if (/(fuar|fair|expo|kongre|congress|summit|zirve)/.test(t)) return "FUAR";
   if (/(sergi|exhibition|müze|muze|galeri|bienal)/.test(t)) return "SERGI";
   if (/(atölye|atolye|workshop|kurs|seminer|eğitim|egitim|tasarım|tasarim)/.test(t)) return "ATOLYE";
   if (/(çocuk|cocuk|kids|junior|aile eğlencesi|aile eglencesi)/.test(t)) return "COCUK";

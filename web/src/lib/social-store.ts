@@ -206,7 +206,7 @@ export async function markNotifsRead(deviceId: string) {
 // ─── Sistem (etkinlik) gönderileri ───────────────────────────────────────────
 const CAT_LABEL: Record<string, string> = {
   KONSER: "konser", FESTIVAL: "festival", TIYATRO: "tiyatro", STANDUP: "stand-up",
-  SPOR: "spor", SERGI: "sergi", ATOLYE: "atölye", COCUK: "çocuk", DIGER: "etkinlik",
+  SPOR: "spor", SERGI: "sergi", ATOLYE: "atölye", COCUK: "çocuk", FUAR: "fuar", DIGER: "etkinlik",
 };
 
 export interface SystemEventInput {

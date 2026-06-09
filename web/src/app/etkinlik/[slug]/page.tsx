@@ -86,6 +86,7 @@ const SCHEMA_TYPE: Record<EventCategory, string> = {
   SERGI: "ExhibitionEvent",
   ATOLYE: "EducationEvent",
   COCUK: "ChildrensEvent",
+  FUAR: "ExhibitionEvent",
   DIGER: "Event",
 };
 

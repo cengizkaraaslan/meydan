@@ -15,6 +15,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   SERGI: "Sergi",
   ATOLYE: "Atölye",
   COCUK: "Çocuk",
+  FUAR: "Fuar",
   DIGER: "Diğer",
 };
 
