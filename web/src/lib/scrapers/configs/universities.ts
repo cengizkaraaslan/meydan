@@ -81,6 +81,10 @@ export const UNIVERSITY_CONFIGS: MunicipalityConfig[] = [
     baseUrl: "https://selcuk.edu.tr",
     eventListPath: "/icerik/duyurular",
     city: "Konya",
+    // selcuk.edu.tr: eksik ara-sertifika zinciri → undici "fetch failed" (UNABLE_TO_VERIFY_LEAF_SIGNATURE).
+    // insecureTLS ile geçilir; tarayıcı UA'sı da veriliyor (bot UA'sını da kısıtlayabiliyor).
+    insecureTLS: true,
+    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36" },
     selectors: { card: ".announcement-card", title: ".announcement-card__title", date: ".announcement-card__date", venue: ".announcement-card__category", link: ".announcement-card__link" },
   },
 

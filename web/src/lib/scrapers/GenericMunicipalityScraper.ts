@@ -9,6 +9,10 @@ export interface MunicipalityConfig {
   /** Etkinlik listeleme sayfasının path'i (baseUrl'e relative veya full) */
   eventListPath: string;
   city: string;
+  /** Opsiyonel HTTP header override (örn. bot UA'sını 403'leyen siteler için tarayıcı User-Agent). */
+  headers?: Record<string, string>;
+  /** Eksik sertifika zincirli (.edu.tr/.gov.tr'de yaygın) siteler için TLS doğrulamasını gevşet. */
+  insecureTLS?: boolean;
   /** Opsiyonel CSS selector overrides (sitenin yapısına göre) */
   selectors?: {
     card?: string;
@@ -125,7 +129,10 @@ export class GenericMunicipalityScraper extends MunicipalityScraper {
     if (this.config.api) return this.fetchFromApi(this.config.api);
 
     try {
-      const html = await this.httpGet(this.listingUrl);
+      const html = await this.httpGet(this.listingUrl, undefined, {
+        headers: this.config.headers,
+        insecureTLS: this.config.insecureTLS,
+      });
       const $ = cheerio.load(html);
 
       const cards = $(this.selectors.card) as unknown as AnyCheerio;
@@ -207,7 +214,10 @@ export class GenericMunicipalityScraper extends MunicipalityScraper {
       const apiUrl = api.url.startsWith("http")
         ? api.url
         : new URL(api.url, this.baseUrl).toString();
-      const raw = await this.httpGet(apiUrl);
+      const raw = await this.httpGet(apiUrl, undefined, {
+        headers: this.config.headers,
+        insecureTLS: this.config.insecureTLS,
+      });
       const json: unknown = JSON.parse(raw);
       const list = (api.listPath
         ? api.listPath.split(".").reduce<any>((acc, k) => acc?.[k], json)

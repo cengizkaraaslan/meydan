@@ -90,19 +90,40 @@ export abstract class BaseScraper {
     });
   }
 
-  protected async httpGet(url: string, signal?: AbortSignal): Promise<string> {
+  protected async httpGet(
+    url: string,
+    signal?: AbortSignal,
+    opts?: { headers?: Record<string, string>; insecureTLS?: boolean },
+  ): Promise<string> {
     // Timeout şart: yavaş/asılı kalan site (örn. 180sn) tüm cron'u kilitlemesin.
-    const res = await fetch(url, {
+    // opts.headers: bot UA'sını 403'leyen siteler için tarayıcı UA'sı verilebilir.
+    // opts.insecureTLS: eksik ara-sertifika zincirli (.edu.tr/.gov.tr'de yaygın) sitelerde
+    //   undici leaf imzasını doğrulayamayıp "fetch failed" atıyor → o config için doğrulama gevşetilir.
+    const init: RequestInit & { dispatcher?: unknown } = {
       headers: {
         "User-Agent": this.userAgent,
         Accept: "text/html,application/xhtml+xml",
         "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
+        ...opts?.headers,
       },
       signal: signal ?? AbortSignal.timeout(this.defaultTimeoutMs),
-    });
+    };
+    if (opts?.insecureTLS) init.dispatcher = await getInsecureDispatcher();
+    const res = await fetch(url, init);
     if (!res.ok) {
       throw new Error(`${this.source} ${url} responded ${res.status}`);
     }
     return res.text();
   }
+}
+
+// Eksik sertifika zincirli siteler için tek seferlik (cache'li) gevşek-TLS dispatcher.
+// undici dinamik import: yalnız gerektiğinde + sunucu yolunda yüklenir (client bundle'a girmez).
+let insecureDispatcher: unknown;
+async function getInsecureDispatcher(): Promise<unknown> {
+  if (!insecureDispatcher) {
+    const { Agent } = await import("undici");
+    insecureDispatcher = new Agent({ connect: { rejectUnauthorized: false } });
+  }
+  return insecureDispatcher;
 }
