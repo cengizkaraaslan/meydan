@@ -63,6 +63,8 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
   const [menuOpen, setMenuOpen] = useState(false);
   // Pinch ile yakınlaştırma sürerken otomatik ilerlemeyi durdur.
   const [zooming, setZooming] = useState(false);
+  // Görsel yüklenemezse (bozuk/ölü URL — ör. eski local story) siyah ekran yerine uyarı.
+  const [imgError, setImgError] = useState(false);
   // Story'e yanıt (gerçek kişide DM): yazarken otomatik ilerleme durur.
   const [reply, setReply] = useState("");
   const [replying, setReplying] = useState(false);
@@ -122,6 +124,7 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
     scale.value = 1;
     tx.value = 0;
     ty.value = 0;
+    setImgError(false); // yeni segmentte hata bayrağını sıfırla
   }, [gi, si, scale, tx, ty]);
 
   const prev = useCallback(() => {
@@ -218,7 +221,23 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
         <GestureDetector gesture={gesture}>
           <Animated.View style={StyleSheet.absoluteFill}>
             <Animated.View style={[StyleSheet.absoluteFill, imgStyle]}>
-              <Image source={{ uri: segment.uri }} style={StyleSheet.absoluteFill} contentFit="contain" transition={150} />
+              {imgError ? (
+                <View style={styles.imgFallback}>
+                  <Text style={{ fontSize: 44, marginBottom: 10 }}>🖼️</Text>
+                  <Text style={[Type.body, { color: "#fff", textAlign: "center" }]}>Görsel yüklenemedi</Text>
+                  <Text style={[Type.label, { color: "rgba(255,255,255,0.6)", textAlign: "center", marginTop: 6, paddingHorizontal: 30 }]}>
+                    Bu story'nin görseli artık erişilemiyor (eski/silinmiş olabilir).
+                  </Text>
+                </View>
+              ) : (
+                <Image
+                  source={{ uri: segment.uri }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="contain"
+                  transition={150}
+                  onError={() => setImgError(true)}
+                />
+              )}
             </Animated.View>
           </Animated.View>
         </GestureDetector>
@@ -357,6 +376,7 @@ function SegmentBar({ state, progress }: { state: "done" | "active" | "pending";
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000" },
+  imgFallback: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "#0a0a0f" },
   bars: { position: "absolute", left: 10, right: 10, flexDirection: "row", gap: 4 },
   barTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.3)", overflow: "hidden" },
   barFill: { height: 3, borderRadius: 2, backgroundColor: "#fff" },
