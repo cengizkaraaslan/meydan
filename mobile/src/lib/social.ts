@@ -1,3 +1,4 @@
+import * as FileSystem from "expo-file-system/legacy";
 import { API_BASE } from "./api";
 import { getOrCreateDeviceId } from "./device";
 
@@ -175,19 +176,23 @@ export async function uploadImageResult(
   kind: "story" | "post" = "post",
 ): Promise<{ url: string } | { error: string }> {
   try {
-    const { type, ext } = guessType(uri);
-    const form = new FormData();
-    // RN FormData dosya formatı
-    form.append("file", { uri, name: `img.${ext}`, type } as unknown as Blob);
-    form.append("kind", kind);
-    const res = await fetch(`${API_BASE}/api/v1/social/upload`, { method: "POST", body: form });
+    const { type } = guessType(uri);
+    // RN'de fetch+FormData {uri,name,type} bu sürümde "Unsupported FormDataPart
+    // implementation" hatası veriyor → expo-file-system uploadAsync (dosyadan multipart).
+    const res = await FileSystem.uploadAsync(`${API_BASE}/api/v1/social/upload`, uri, {
+      httpMethod: "POST",
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      fieldName: "file",
+      mimeType: type,
+      parameters: { kind },
+    });
     let data: { ok?: boolean; url?: string; error?: string } | null = null;
     try {
-      data = (await res.json()) as { ok?: boolean; url?: string; error?: string };
+      data = JSON.parse(res.body) as { ok?: boolean; url?: string; error?: string };
     } catch {
       /* gövde JSON değil */
     }
-    if (!res.ok || !data?.ok || !data?.url) {
+    if (res.status < 200 || res.status >= 300 || !data?.ok || !data?.url) {
       return { error: data?.error ? String(data.error) : `Sunucu hatası (HTTP ${res.status})` };
     }
     // publicUrl göreli (/api/r2-image/...) dönebilir → mobilde render için mutlak yap.
