@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+
+const PREVIEW_HERO_H = Math.round(Dimensions.get("window").height * 0.56);
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
@@ -750,61 +752,110 @@ export default function ProfileScreen() {
               ? (ageFromBirthDate(dprof.birthDate) ?? (dprof.age.trim() ? Number(dprof.age) : null))
               : null;
             const interests = dprof.interests.filter((i) => i.trim());
+            // Doldurulmuş profil alanları (il/ilçe/cinsiyet/ilişki durumu vb.) — sadece dolu olanlar.
+            const genderLabel = gender === "male" ? "Erkek" : gender === "female" ? "Kadın" : gender ? "Diğer" : null;
+            const langs = dprof.languages.filter((l) => l.trim());
+            const detailRows: { label: string; value: string }[] = [];
+            if (city) detailRows.push({ label: "İl", value: city });
+            if (district) detailRows.push({ label: "İlçe", value: district });
+            if (genderLabel) detailRows.push({ label: "Cinsiyet", value: genderLabel });
+            if (dprof.goal) detailRows.push({ label: "İlişki durumu", value: dprof.goal });
+            if (dprof.heightCm?.trim()) detailRows.push({ label: "Boy", value: `${dprof.heightCm.trim()} cm` });
+            if (dprof.weightKg?.trim()) detailRows.push({ label: "Kilo", value: `${dprof.weightKg.trim()} kg` });
+            if (langs.length) detailRows.push({ label: "Diller", value: langs.join(", ") });
+            if (dprof.zodiac) detailRows.push({ label: "Burç", value: dprof.zodiac });
+            if (dprof.education) detailRows.push({ label: "Eğitim", value: dprof.education });
+            if (dprof.drinking) detailRows.push({ label: "Alkol", value: dprof.drinking });
+            if (dprof.smoking) detailRows.push({ label: "Sigara", value: dprof.smoking });
+            if (dprof.exercise) detailRows.push({ label: "Spor", value: dprof.exercise });
             return (
               <ScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 40, paddingHorizontal: 16 }}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
               >
-                {/* Bilgi şeridi + kapat */}
-                <View style={styles.previewBar}>
-                  <View style={[styles.previewBadge, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-                    <Text style={[Type.label, { color: T.textDim }]} numberOfLines={1}>👁️ Önizleme — profilini görenler bunu görür</Text>
+                {/* HERO — tam genişlik fotoğraf (başkasının gördüğü kisi profili gibi) */}
+                <View style={{ height: PREVIEW_HERO_H, width: "100%" }}>
+                  <Image
+                    source={{ uri: resolveAvatar(photoUri, user?.name, gender) }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                    transition={250}
+                  />
+                  <LinearGradient
+                    colors={["transparent", "transparent", "rgba(8,7,13,0.35)", T.bg]}
+                    locations={[0, 0.5, 0.72, 1]}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  {/* Önizleme pili + kapat */}
+                  <View style={[styles.previewTopRow, { top: insets.top + 8 }]}>
+                    <View style={[styles.previewBadge, { backgroundColor: "rgba(0,0,0,0.5)", borderColor: T.hairline }]}>
+                      <Text style={[Type.label, { color: "#fff" }]} numberOfLines={1}>👁️ Önizleme — profilini görenler bunu görür</Text>
+                    </View>
+                    <Pressable onPress={() => { tapH(); setPreviewOpen(false); }} hitSlop={10} style={[styles.circleBtn, { backgroundColor: "rgba(0,0,0,0.5)", borderColor: T.hairline }]}>
+                      <Text style={{ fontSize: 18, color: "#fff" }}>✕</Text>
+                    </Pressable>
                   </View>
-                  <Pressable onPress={() => { tapH(); setPreviewOpen(false); }} hitSlop={10} style={[styles.circleBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-                    <Text style={{ fontSize: 18, color: T.text }}>✕</Text>
-                  </Pressable>
-                </View>
-
-                {/* Public kart: avatar + ad (+ yaş) */}
-                <Animated.View entering={FadeIn.duration(300)} style={[styles.previewCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
-                  <View style={styles.previewHeader}>
-                    <StoryAvatar uri={resolveAvatar(photoUri, user?.name, gender)} name={user?.name ?? "✦"} size={104} hasStory={stories.length > 0} />
-                    <Text style={[Type.h1, { color: T.text, marginTop: Space.md, textAlign: "center" }]}>
+                  {/* İsim + konum + story sayısı (alt overlay) */}
+                  <View style={styles.previewHeroName}>
+                    <Text style={[Type.hero, { color: "#fff" }]}>
                       {user?.name ?? "Sen"}{previewAge != null ? `, ${previewAge}` : ""}
                     </Text>
+                    {city ? (
+                      <Text style={[Type.body, { color: "rgba(255,255,255,0.9)", marginTop: 4, fontWeight: "700" }]} numberOfLines={1}>
+                        📍 {city}{district ? ` · ${district}` : ""}
+                      </Text>
+                    ) : null}
+                    <Text style={[Type.body, { color: "rgba(255,255,255,0.8)", marginTop: 6, fontWeight: "600" }]}>
+                      📸 {stories.length} story
+                    </Text>
                   </View>
+                </View>
 
-                  {/* Story şeridi — yalnızca story varsa */}
+                {/* İçerik kartları */}
+                <View style={{ paddingHorizontal: 16, gap: 14, marginTop: 6 }}>
+                  {/* Story şeridi */}
                   {stories.length > 0 && (
-                    <View style={{ marginTop: Space.lg }}>
-                      <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>Story'ler</Text>
+                    <View style={[styles.previewCard, { backgroundColor: T.surface, borderColor: T.hairline, marginTop: 0 }]}>
+                      <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>STORY'LER</Text>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Space.md, paddingVertical: 2 }}>
                         {stories.map((s) => (
                           <View key={s.ts} style={styles.previewStoryItem}>
                             <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.storyRing}>
                               <Image source={{ uri: s.uri }} style={[styles.storyThumb, { borderColor: T.bg }]} contentFit="cover" transition={200} />
                             </LinearGradient>
-                            {s.caption ? (
-                              <Text style={[Type.micro, { color: T.textDim, maxWidth: 64, textAlign: "center" }]} numberOfLines={1}>{s.caption}</Text>
-                            ) : null}
                           </View>
                         ))}
                       </ScrollView>
                     </View>
                   )}
 
-                  {/* Hakkımda (bio) — public */}
+                  {/* HAKKINDA */}
                   {dprof.about.trim() ? (
-                    <View style={{ marginTop: Space.lg }}>
-                      <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>Hakkımda</Text>
+                    <View style={[styles.previewCard, { backgroundColor: T.surface, borderColor: T.hairline, marginTop: 0 }]}>
+                      <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>HAKKINDA</Text>
                       <Text style={[Type.body, { color: T.text }]}>{dprof.about.trim()}</Text>
                     </View>
                   ) : null}
 
-                  {/* İlgi alanları — public */}
+                  {/* BİLGİLER — il/ilçe/cinsiyet/ilişki durumu/boy... (dolu olanlar) */}
+                  {detailRows.length > 0 && (
+                    <View style={[styles.previewCard, { backgroundColor: T.surface, borderColor: T.hairline, marginTop: 0 }]}>
+                      <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>BİLGİLER</Text>
+                      {detailRows.map((row) => (
+                        <View key={row.label} style={[styles.previewDetailRow, { borderColor: T.hairline }]}>
+                          <Text style={[Type.label, { color: T.textDim }]}>{row.label}</Text>
+                          <Text style={[Type.body, { color: T.text, fontWeight: "600", flexShrink: 1, textAlign: "right" }]} numberOfLines={1}>
+                            {row.value}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* İLGİ ALANLARI */}
                   {interests.length > 0 && (
-                    <View style={{ marginTop: Space.lg }}>
-                      <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>İlgi alanları</Text>
+                    <View style={[styles.previewCard, { backgroundColor: T.surface, borderColor: T.hairline, marginTop: 0 }]}>
+                      <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>İLGİ ALANLARI</Text>
                       <View style={styles.previewChips}>
                         {interests.map((i) => (
                           <View key={i} style={[styles.previewChip, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
@@ -815,11 +866,11 @@ export default function ProfileScreen() {
                     </View>
                   )}
 
-                  {/* Herkese açık sosyal hesaplar (pub=true) */}
-                  <View style={{ marginTop: Space.lg }}>
-                    <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>Sosyal hesaplar</Text>
-                    {publicSocials.length > 0 ? (
-                      publicSocials.map((s) => (
+                  {/* SOSYAL HESAPLAR — herkese açık (pub=true) */}
+                  {publicSocials.length > 0 && (
+                    <View style={[styles.previewCard, { backgroundColor: T.surface, borderColor: T.hairline, marginTop: 0 }]}>
+                      <Text style={[Type.label, { color: T.textFaint, marginBottom: Space.sm }]}>SOSYAL HESAPLAR</Text>
+                      {publicSocials.map((s) => (
                         <View key={s.key} style={[styles.previewSocialRow, { borderColor: T.hairline }]}>
                           <Text style={{ fontSize: 18 }}>{s.icon}</Text>
                           <View style={{ flex: 1 }}>
@@ -827,12 +878,10 @@ export default function ProfileScreen() {
                             <Text style={[Type.label, { color: T.textFaint }]} numberOfLines={1}>{social[s.key].handle.trim()}</Text>
                           </View>
                         </View>
-                      ))
-                    ) : (
-                      <Text style={[Type.label, { color: T.textFaint }]}>Herkese açık hesap yok</Text>
-                    )}
-                  </View>
-                </Animated.View>
+                      ))}
+                    </View>
+                  )}
+                </View>
               </ScrollView>
             );
           })()}
@@ -947,4 +996,7 @@ const styles = StyleSheet.create({
   previewChips: { flexDirection: "row", flexWrap: "wrap", gap: Space.sm },
   previewChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
   previewSocialRow: { flexDirection: "row", alignItems: "center", gap: Space.md, paddingVertical: Space.md, borderBottomWidth: StyleSheet.hairlineWidth },
+  previewDetailRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },
+  previewTopRow: { position: "absolute", left: 16, right: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, zIndex: 5 },
+  previewHeroName: { position: "absolute", left: 16, right: 16, bottom: 14 },
 });
