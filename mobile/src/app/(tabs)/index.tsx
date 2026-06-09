@@ -235,8 +235,12 @@ export default function DiscoverScreen() {
                 gömülü yatay VirtualizedList, login sonrası fresh mount'ta cache dolu gelince
                 genişliği 0 ölçüp BOŞ kalıyordu (ancak pull-refresh ile geliyordu). ≤6 öğe
                 olduğundan sanallaştırma gereksiz; ScrollView mount'ta güvenilir çizer. */}
+            {/* NOT: hero'da reanimated `entering` KULLANMA. Temiz kurulumda (uninstall+
+                reinstall) intro/Walkthrough overlay'i üstte olduğundan ekran kapalıyken
+                mount oluyor; entering animasyonu slider'ı opacity:0/kayık bırakıp ancak
+                refresh'te düzeltiyordu. Düz View → her zaman görünür. */}
             {featured.length > 0 && (
-              <Animated.View entering={FadeInDown.delay(55).duration(420)}>
+              <View>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -251,7 +255,7 @@ export default function DiscoverScreen() {
                       <HeroCard key={item.id} event={item} width={HERO_W} />
                     ))}
                 </ScrollView>
-              </Animated.View>
+              </View>
             )}
 
             {/* Kategori çipleri */}
