@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Swi
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
@@ -217,8 +218,21 @@ export default function ProfileScreen() {
     setUploadingAvatar(true);
     void (async () => {
       try {
-        // 1) Yerel görseli sunucuya (R2) yükle → public URL.
-        const url = await uploadImage(uri, "post");
+        // 0) Küçült + sıkıştır: sunucu 6 MB sınırı (tam çözünürlük foto bunu aşıp
+        //    yüklemeyi düşürüyordu) + hız. max 1024px, JPEG q0.8.
+        let uploadUri = uri;
+        try {
+          const m = await ImageManipulator.manipulateAsync(
+            uri,
+            [{ resize: { width: 1024 } }],
+            { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+          );
+          if (m?.uri) uploadUri = m.uri;
+        } catch {
+          /* küçültme başarısızsa orijinali dene */
+        }
+        // 1) Görseli sunucuya (R2) yükle → public URL.
+        const url = await uploadImage(uploadUri, "post");
         if (!url) {
           Alert.alert(
             "Avatar yüklenemedi",
