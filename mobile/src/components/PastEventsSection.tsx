@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -147,16 +147,17 @@ export function PastEventsSection() {
           </Pressable>
         }
       />
-      <FlatList
+      {/* Dikey ScrollView içinde yatay VirtualizedList ilk mount'ta 0 genişlik ölçüp boş
+          kalıyordu (refresh ile geliyordu). ≤ birkaç öğe → ScrollView güvenilir çizer. */}
+      <ScrollView
         horizontal
-        data={items}
-        keyExtractor={(it) => it.event.id}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ gap: Space.md, paddingRight: Space.md }}
-        renderItem={({ item, index }) => (
-          <PolaroidCard item={item} T={T} delay={Math.min(index, 8) * 60} />
-        )}
-      />
+      >
+        {items.map((item, index) => (
+          <PolaroidCard key={item.event.id} item={item} T={T} delay={Math.min(index, 8) * 60} />
+        ))}
+      </ScrollView>
     </View>
   );
 }

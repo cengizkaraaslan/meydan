@@ -96,12 +96,14 @@ export async function detectCity(): Promise<string | null> {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") return null;
-    // Önce son bilinen konum (anında döner); yoksa taze konum al. Low accuracy bazı
-    // cihazlarda ilk açılışta takılıp null dönüyordu → Balanced + lastKnown fallback.
-    let pos = await Location.getLastKnownPositionAsync();
-    if (!pos) {
-      pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    }
+    // TAZE konumu önce dene: bayat getLastKnownPositionAsync (cihazın eski fix'i, ör.
+    // başka şehirden) yanlış şehir verip cache'e kilitleniyordu. 6sn'de gelmezse son
+    // bilinen konuma düş (bazı cihazlarda taze fix gecikiyor).
+    let pos: Location.LocationObject | null = await Promise.race<Location.LocationObject | null>([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
+    ]).catch(() => null);
+    if (!pos) pos = await Location.getLastKnownPositionAsync();
     if (!pos) return null;
     const geo = await Location.reverseGeocodeAsync({
       latitude: pos.coords.latitude,
@@ -137,8 +139,14 @@ export function useDetectedCity() {
           setCity(cached);
           setStatus("ok");
         }
-        // Cache'i tazelemek için arka planda tespiti yine de tetikle (state'e dokunmadan).
-        detectCity().catch(() => undefined);
+        // Arka planda taze tespit: FARKLI şehir çıkarsa oturum içinde kendiliğinden düzelt
+        // (bayat/yanlış cache "Eskişehir takılı" sorununu çözer; manuel seçim useActiveCity'de
+        // zaten önceliklidir, onu ezmez).
+        detectCity()
+          .then((fresh) => {
+            if (alive && fresh && fresh !== cached) setCity(fresh);
+          })
+          .catch(() => undefined);
         return;
       }
       // Cache yok: ilk tespit edilen şehir uygulanır.
