@@ -43,6 +43,10 @@ interface Props {
   /** Çıktı genişliği (px). */
   outWidth?: number;
   title?: string;
+  /** true → kendi Modal'ını AÇMAZ; içeriği döner (üst sihirbazın tek Modal'ı içine gömülür). */
+  embedded?: boolean;
+  /** Onay butonu etiketi (sihirbazda "İleri", tek başına "Uygula"). */
+  confirmLabel?: string;
   onDone: (uri: string) => void;
   onCancel: () => void;
 }
@@ -52,7 +56,7 @@ interface Props {
  * Sabit oranlı çerçeve; görsel sürüklenip iki parmakla yakınlaştırılır,
  * çerçevede görünen alan kırpılır (expo-image-manipulator).
  */
-export function ImageCropper({ uri, aspect = 1, outWidth = 1080, title, onDone, onCancel }: Props) {
+export function ImageCropper({ uri, aspect = 1, outWidth = 1080, title, embedded, confirmLabel, onDone, onCancel }: Props) {
   const { width: SW, height: SH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { t: T } = useTheme();
@@ -177,37 +181,43 @@ export function ImageCropper({ uri, aspect = 1, outWidth = 1080, title, onDone, 
     }
   };
 
-  return (
-    <Modal visible={!!uri} animationType="slide" onRequestClose={onCancel} statusBarTranslucent>
-      <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000" }}>
-        <View style={{ flex: 1, paddingTop: insets.top + 8 }}>
-          <Text style={[Type.h2, { color: "#fff", textAlign: "center", marginBottom: 4 }]}>{title ?? "Kırp"}</Text>
-          <Text style={[Type.label, { color: "rgba(255,255,255,0.55)", textAlign: "center", marginBottom: 12 }]}>
-            Sürükle • iki parmakla yakınlaştır
-          </Text>
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <View style={[styles.frame, { width: FW, height: FH, borderColor: T.primary }]}>
-              {base && uri ? (
-                <GestureDetector gesture={composed}>
-                  <Animated.View style={[{ width: base.w, height: base.h }, aStyle]}>
-                    <Image source={{ uri }} style={{ width: base.w, height: base.h }} contentFit="fill" />
-                  </Animated.View>
-                </GestureDetector>
-              ) : (
-                <ActivityIndicator color="#fff" />
-              )}
-            </View>
-          </View>
-          <View style={[styles.bar, { paddingBottom: insets.bottom + 16 }]}>
-            <Pressable onPress={() => { tapH(); onCancel(); }} style={[styles.btn, { backgroundColor: "rgba(255,255,255,0.12)" }]}>
-              <Text style={[Type.title, { color: "#fff" }]}>{t("cancel")}</Text>
-            </Pressable>
-            <Pressable onPress={confirm} disabled={busy || !base} style={[styles.btn, { backgroundColor: T.primary, opacity: busy || !base ? 0.6 : 1 }]}>
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={[Type.title, { color: "#fff" }]}>{t("f_apply")}</Text>}
-            </Pressable>
+  const inner = (
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000" }}>
+      <View style={{ flex: 1, paddingTop: insets.top + 8 }}>
+        <Text style={[Type.h2, { color: "#fff", textAlign: "center", marginBottom: 4 }]}>{title ?? "Kırp"}</Text>
+        <Text style={[Type.label, { color: "rgba(255,255,255,0.55)", textAlign: "center", marginBottom: 12 }]}>
+          Sürükle • iki parmakla yakınlaştır
+        </Text>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <View style={[styles.frame, { width: FW, height: FH, borderColor: T.primary }]}>
+            {base && uri ? (
+              <GestureDetector gesture={composed}>
+                <Animated.View style={[{ width: base.w, height: base.h }, aStyle]}>
+                  <Image source={{ uri }} style={{ width: base.w, height: base.h }} contentFit="fill" />
+                </Animated.View>
+              </GestureDetector>
+            ) : (
+              <ActivityIndicator color="#fff" />
+            )}
           </View>
         </View>
-      </GestureHandlerRootView>
+        <View style={[styles.bar, { paddingBottom: insets.bottom + 16 }]}>
+          <Pressable onPress={() => { tapH(); onCancel(); }} style={[styles.btn, { backgroundColor: "rgba(255,255,255,0.12)" }]}>
+            <Text style={[Type.title, { color: "#fff" }]}>{t("cancel")}</Text>
+          </Pressable>
+          <Pressable onPress={confirm} disabled={busy || !base} style={[styles.btn, { backgroundColor: T.primary, opacity: busy || !base ? 0.6 : 1 }]}>
+            {busy ? <ActivityIndicator color="#fff" /> : <Text style={[Type.title, { color: "#fff" }]}>{confirmLabel ?? t("f_apply")}</Text>}
+          </Pressable>
+        </View>
+      </View>
+    </GestureHandlerRootView>
+  );
+
+  // Sihirbaz içinde (embedded): kendi Modal'ını açma, içeriği döndür.
+  if (embedded) return inner;
+  return (
+    <Modal visible={!!uri} animationType="slide" onRequestClose={onCancel} statusBarTranslucent>
+      {inner}
     </Modal>
   );
 }

@@ -59,12 +59,14 @@ function AdjustSlider({
 function ImageAdjust({
   uri,
   outWidth = 1080,
+  embedded,
   onDone,
   onBack,
   onCancel,
 }: {
   uri: string | null;
   outWidth?: number;
+  embedded?: boolean;
   onDone: (uri: string) => void;
   onBack: () => void;
   onCancel: () => void;
@@ -128,8 +130,7 @@ function ImageAdjust({
     }
   };
 
-  return (
-    <Modal visible={!!uri} animationType="slide" onRequestClose={onCancel} statusBarTranslucent>
+  const inner = (
       <View style={{ flex: 1, backgroundColor: "#000", paddingTop: insets.top + 8 }}>
         <Text style={[Type.h2, { color: "#fff", textAlign: "center", marginBottom: 10 }]}>{t("f_apply")}</Text>
 
@@ -196,6 +197,13 @@ function ImageAdjust({
           </Pressable>
         </View>
       </View>
+  );
+
+  // Sihirbaz içinde (embedded): kendi Modal'ını açma, içeriği döndür.
+  if (embedded) return inner;
+  return (
+    <Modal visible={!!uri} animationType="slide" onRequestClose={onCancel} statusBarTranslucent>
+      {inner}
     </Modal>
   );
 }
@@ -217,35 +225,56 @@ interface Props {
  */
 export function ImageEditor({ uri, aspect = 1, outWidth = 1080, title, noCrop, onDone, onCancel }: Props) {
   const [cropped, setCropped] = useState<string | null>(null);
+  const [step, setStep] = useState<"crop" | "adjust">(noCrop ? "adjust" : "crop");
 
   useEffect(() => {
     if (!uri) {
       setCropped(null);
+      setStep(noCrop ? "adjust" : "crop");
       return;
     }
-    if (noCrop) setCropped(uri); // kırpmayı atla → doğrudan filtre (oran korunur, zoom yok)
+    if (noCrop) {
+      setCropped(uri); // kırpmayı atla → doğrudan filtre
+      setStep("adjust");
+    } else {
+      setCropped(null);
+      setStep("crop");
+    }
   }, [uri, noCrop]);
 
+  const close = () => {
+    setCropped(null);
+    onCancel();
+  };
+
+  // İKİ ADIMLI SİHİRBAZ — TEK Modal. "İleri" deyince adım YERİNDE değişir (Instagram
+  // gibi); ayrı modal kapanıp açılmaz. 1) Kırp → İleri → 2) Filtre → Bitir.
   return (
-    <>
-      {!noCrop ? (
-        <ImageCropper
-          uri={cropped ? null : uri}
-          aspect={aspect}
-          outWidth={outWidth}
-          title={title}
-          onDone={setCropped}
-          onCancel={onCancel}
-        />
-      ) : null}
-      <ImageAdjust
-        uri={cropped}
-        outWidth={outWidth}
-        onDone={(u) => { setCropped(null); onDone(u); }}
-        onBack={() => { if (noCrop) { setCropped(null); onCancel(); } else setCropped(null); }}
-        onCancel={() => { setCropped(null); onCancel(); }}
-      />
-    </>
+    <Modal visible={!!uri} animationType="slide" onRequestClose={close} statusBarTranslucent>
+      <View style={{ flex: 1, backgroundColor: "#000" }}>
+        {step === "crop" && !noCrop ? (
+          <ImageCropper
+            embedded
+            uri={uri}
+            aspect={aspect}
+            outWidth={outWidth}
+            title={title}
+            confirmLabel="İleri →"
+            onDone={(c) => { setCropped(c); setStep("adjust"); }}
+            onCancel={close}
+          />
+        ) : (
+          <ImageAdjust
+            embedded
+            uri={cropped}
+            outWidth={outWidth}
+            onDone={(u) => { setCropped(null); onDone(u); }}
+            onBack={() => { if (noCrop) close(); else setStep("crop"); }}
+            onCancel={close}
+          />
+        )}
+      </View>
+    </Modal>
   );
 }
 
