@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
@@ -188,6 +188,7 @@ export default function ProfileScreen() {
   // Profil fotoğrafı — kullanıcı kendi seçtiği görseli ayarlayabilir (yerelde + DB'ye senkron).
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
   const [cropUri, setCropUri] = useState<string | null>(null); // kırpma ekranına gidecek ham görsel
+  const [uploadingAvatar, setUploadingAvatar] = useState(false); // avatar sunucuya yükleniyor mu
   const [gender, setGender] = useState<string | null>(null);
   useEffect(() => {
     AsyncStorage.getItem("meydanfest:avatar").then(setAvatarOverride);
@@ -213,19 +214,32 @@ export default function ProfileScreen() {
     setCropUri(null);
     setAvatarOverride(uri); // hızlı önizleme (yerel)
     AsyncStorage.setItem("meydanfest:avatar", uri);
+    setUploadingAvatar(true);
     void (async () => {
-      // Yerel görseli sunucuya (R2) yükle → public URL. Başarısızsa yerelde kalır.
-      const url = await uploadImage(uri, "post");
-      if (url) {
+      try {
+        // 1) Yerel görseli sunucuya (R2) yükle → public URL.
+        const url = await uploadImage(uri, "post");
+        if (!url) {
+          Alert.alert(
+            "Avatar yüklenemedi",
+            "Sunucuya bağlanılamadı ya da yükleme reddedildi. İnternetini kontrol edip tekrar dene.\n\n(Şu an yalnız bu cihazda görünür, hesabına kaydedilmedi.)",
+          );
+          return;
+        }
         setAvatarOverride(url);
         AsyncStorage.setItem("meydanfest:avatar", url);
-        syncProfile({ avatar: url }); // DB'ye GERÇEK URL gider
         if (prev && prev !== url) deleteLocalFile(prev);
-      } else {
-        // Yükleme olmadıysa en azından yerel yolu senkronla (eski davranış).
-        syncProfile({ avatar: uri });
-        showToast("Avatar yüklenemedi (çevrimdışı?) — yerelde kayıtlı");
-        if (prev && prev !== uri) deleteLocalFile(prev);
+        // 2) Public URL'i profile (hesaba) kaydet → reinstall'da geri gelir.
+        const ok = await syncProfile({ avatar: url });
+        if (!ok) {
+          Alert.alert("Kaydedilemedi", "Avatar yüklendi ama profile kaydedilemedi. Daha sonra tekrar dene.");
+        } else {
+          showToast("Avatar güncellendi ✓");
+        }
+      } catch {
+        Alert.alert("Avatar hatası", "Beklenmeyen bir hata oluştu. Lütfen tekrar dene.");
+      } finally {
+        setUploadingAvatar(false);
       }
     })();
   };
@@ -379,13 +393,19 @@ export default function ProfileScreen() {
 
         {/* Profil başlığı */}
         <Animated.View entering={FadeInDown.duration(450)} style={styles.header}>
-          <Pressable onPress={changePhoto} style={styles.avatarWrap}>
+          <Pressable onPress={changePhoto} style={styles.avatarWrap} disabled={uploadingAvatar}>
             {/* Story yüklediyse avatarda Instagram-tarzı halka (StoryAvatar) */}
             <StoryAvatar uri={resolveAvatar(photoUri, user?.name, gender)} name={user?.name ?? "✦"} size={84} hasStory={stories.length > 0} />
-            {/* Düzenle rozeti — fotoğrafı değiştir */}
-            <View style={[styles.avatarEdit, { backgroundColor: T.primary, borderColor: T.bg }]}>
-              <Text style={{ fontSize: 13 }}>📷</Text>
-            </View>
+            {/* Yükleniyorsa avatar üstünde dönen loading; değilse düzenle rozeti */}
+            {uploadingAvatar ? (
+              <View style={styles.avatarLoading} pointerEvents="none">
+                <ActivityIndicator size="large" color="#fff" />
+              </View>
+            ) : (
+              <View style={[styles.avatarEdit, { backgroundColor: T.primary, borderColor: T.bg }]}>
+                <Text style={{ fontSize: 13 }}>📷</Text>
+              </View>
+            )}
           </Pressable>
           <Text style={[Type.h1, { color: T.text, marginTop: Space.md }]}>{user ? user.name : t("guest")}</Text>
           <Text style={[Type.label, { color: T.textFaint, marginTop: 4 }]}>{user?.email || t("exploring")}</Text>
@@ -820,6 +840,17 @@ const styles = StyleSheet.create({
   circleBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2 },
   header: { alignItems: "center", marginBottom: Space.xl },
   avatarWrap: { alignItems: "center", justifyContent: "center" },
+  avatarLoading: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: Radius.pill,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   avatar: { width: 86, height: 86, borderRadius: Radius.pill, alignItems: "center", justifyContent: "center" },
   avatarMark: { fontSize: 34, color: "#fff", fontWeight: "800" },
   avatarEdit: { position: "absolute", right: -2, bottom: -2, width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 2 },

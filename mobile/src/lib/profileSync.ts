@@ -94,15 +94,16 @@ export async function syncProfile(data: {
   drinking?: string | null;
   smoking?: string | null;
   exercise?: string | null;
-}): Promise<void> {
+}): Promise<boolean> {
   try {
     const deviceId = await getProfileKey();
-    await fetch(`${API_BASE}/api/v1/profile`, {
+    const res = await fetch(`${API_BASE}/api/v1/profile`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": "meydanfest-app" },
       body: JSON.stringify({ deviceId, ...data }),
     });
+    return res.ok;
   } catch {
-    /* best-effort */
+    return false;
   }
 }
