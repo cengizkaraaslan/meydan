@@ -10,10 +10,11 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
+import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Radius, Type } from "@/theme/aurora";
+import { Radius, Type, glow } from "@/theme/aurora";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
@@ -140,43 +141,56 @@ export default function MesajlarScreen() {
               </Text>
             </View>
           }
-          renderItem={({ item }) => <ConvoRow T={T} c={item} onPress={() => openChat(item.id)} />}
+          renderItem={({ item, index }) => <ConvoRow T={T} c={item} index={index} onPress={() => openChat(item.id)} />}
         />
       )}
     </View>
   );
 }
 
-function ConvoRow({ T, c, onPress }: { T: Palette; c: Conversation; onPress: () => void }) {
+function ConvoRow({ T, c, index, onPress }: { T: Palette; c: Conversation; index: number; onPress: () => void }) {
   const unread = c.unread > 0;
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
-    >
-      <View>
-        <Image source={{ uri: c.avatar }} style={styles.avatar} contentFit="cover" transition={150} />
-        {c.online && <View style={[styles.onlineDot, { backgroundColor: T.success, borderColor: T.bg }]} />}
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[Type.title, { color: T.text, fontWeight: unread ? "800" : "600" }]} numberOfLines={1}>
-          {c.name}
-        </Text>
-        <Text
-          style={[Type.label, { color: unread ? T.text : T.textDim, marginTop: 2, fontWeight: unread ? "700" : "400" }]}
-          numberOfLines={1}
-        >
-          {c.lastText ?? "Yeni eşleşme — selam ver 👋"}
-        </Text>
-      </View>
-      {unread ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{c.unread > 99 ? "99+" : c.unread}</Text>
+    // Kademeli giriş: her satır sırayla aşağıdan belirir (premium his).
+    <Animated.View entering={FadeInDown.delay(Math.min(index, 12) * 45).duration(380)}>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [styles.row, { transform: [{ scale: pressed ? 0.98 : 1 }], opacity: pressed ? 0.92 : 1 }]}
+      >
+        {/* Okunmamışta sol gradient şerit */}
+        {unread ? (
+          <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.unreadBar} />
+        ) : null}
+
+        <View>
+          <Image source={{ uri: c.avatar }} style={styles.avatar} contentFit="cover" transition={150} />
+          {c.online ? <View style={[styles.onlineDot, { backgroundColor: T.success, borderColor: T.bg }]} /> : null}
         </View>
-      ) : (
-        <Text style={{ color: T.textFaint, fontSize: 20 }}>›</Text>
-      )}
-    </Pressable>
+
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+            <Text style={[Type.title, { color: T.text, fontWeight: unread ? "800" : "600", flexShrink: 1 }]} numberOfLines={1}>
+              {c.name}
+            </Text>
+            {c.online ? <Text style={[Type.label, { color: T.success, fontSize: 11, fontWeight: "700" }]}>Aktif</Text> : null}
+          </View>
+          <Text
+            style={[Type.label, { color: unread ? T.text : T.textDim, marginTop: 2, fontWeight: unread ? "700" : "400" }]}
+            numberOfLines={1}
+          >
+            {c.lastText ?? "Yeni eşleşme — selam ver 👋"}
+          </Text>
+        </View>
+
+        {unread ? (
+          <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.badge, glow(T.primary, 10, 0.5)]}>
+            <Text style={styles.badgeText}>{c.unread > 99 ? "99+" : c.unread}</Text>
+          </LinearGradient>
+        ) : (
+          <Text style={{ color: T.textFaint, fontSize: 20 }}>›</Text>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -240,11 +254,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 2.5,
   },
+  unreadBar: { position: "absolute", left: 0, top: 10, bottom: 10, width: 3, borderRadius: 2 },
   badge: {
     minWidth: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "#FF3B30",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 6,
