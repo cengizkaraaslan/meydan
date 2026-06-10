@@ -138,7 +138,7 @@ export const ISKUR_PROVIDER: CourseProvider = {
   selector: "",
 };
 
-const NOISE = /menü|menu|iletişim|iletisim|anasayfa|giriş|giris|kayıt ol|hakkında|duyuru|haber|tüm haklar|copyright|çerez|cookie|^ara$|^more$|devamı|detay|^kurslar$|^branşlar$|^branslar$|^kategoriler$|^tümü$|galeri|birimler|yayın/i;
+const NOISE = /menü|menu|iletişim|iletisim|anasayfa|giriş|giris|kayıt ol|hakkında|duyuru|haber|tüm haklar|copyright|çerez|cookie|^ara$|^more$|devamı|detay|incele|^kurslar$|^branşlar$|^branslar$|^kategoriler$|^tümü$|galeri|birimler|yayın/i;
 
 async function fetchProvider(p: CourseProvider): Promise<CourseItem[]> {
   try {
