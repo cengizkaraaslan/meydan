@@ -199,15 +199,17 @@ export async function listMatches(deviceId: string): Promise<MatchView[]> {
         const prof = profMap.get(r.partnerId);
         const usr = userMap.get(r.partnerId);
         // Gerçek ad/avatar varsa onu kullan; yoksa kayıtlı değer (mock kişiler için).
+        // Avatar yalnız http(s) ise geçerli — "file://" yerel yolları başka cihazda yüklenmez, ele.
+        const httpAvatar = (u: string | null | undefined) => (u && /^https?:\/\//.test(u) ? u : null);
         const realName = prof?.name || usr?.name || null;
-        const realAvatar = prof?.avatar || usr?.image || null;
+        const realAvatar = httpAvatar(prof?.avatar) || httpAvatar(usr?.image) || httpAvatar(r.partnerAvatar) || null;
         // Kayıtlı isim partnerId'nin kendisiyse (eski hata) onu gösterme.
         const storedName = r.partnerName && r.partnerName !== r.partnerId ? r.partnerName : null;
         out.push({
           matchKey: r.matchKey,
           partnerId: r.partnerId,
           partnerName: realName || storedName || "Kullanıcı",
-          partnerAvatar: realAvatar || r.partnerAvatar,
+          partnerAvatar: realAvatar, // yalnız geçerli http avatar; yoksa null → mobil fallback üretir
           lastMessage: last?.text ?? null,
           lastAt: last ? last.createdAt.toISOString() : null,
           unread,

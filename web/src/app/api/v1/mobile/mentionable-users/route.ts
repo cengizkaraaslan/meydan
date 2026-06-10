@@ -63,8 +63,10 @@ export async function GET(request: NextRequest) {
       }
     };
     // Önce mobil profiller (deviceId = /kisi için doğru kimlik), sonra web User'lar.
-    profiles.forEach((p) => add(p.email, p.name, p.avatar, p.deviceId));
-    users.forEach((u) => add(u.email, u.name, u.image, u.id));
+    // Avatar yalnız http(s) ise geçerli ("file://" yerel yolları başka cihazda yüklenmez).
+    const httpAvatar = (u: string | null) => (u && /^https?:\/\//.test(u) ? u : null);
+    profiles.forEach((p) => add(p.email, p.name, httpAvatar(p.avatar), p.deviceId));
+    users.forEach((u) => add(u.email, u.name, httpAvatar(u.image), u.id));
 
     const data = [...byEmail.values()]
       .sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email, "tr"))
