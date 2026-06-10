@@ -65,6 +65,12 @@
       ],
       "@react-native-community/datetimepicker",
       [
+        "expo-calendar",
+        {
+          "calendarPermission": "MeydanFest, beğendiğin etkinlikleri telefonunun takvimine eklemek için takvime erişir."
+        }
+      ],
+      [
         "react-native-android-widget",
         {
           "widgets": [

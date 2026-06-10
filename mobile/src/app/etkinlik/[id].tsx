@@ -160,6 +160,8 @@ export default function EventDetail() {
   const [storySrcModal, setStorySrcModal] = useState(false);
   // "Story paylaşıldı" gösterişli başarı modalı (Alert yerine).
   const [storyShared, setStoryShared] = useState(false);
+  // Story sunucuya yüklenirken: "+" butonunda + kendi avatarımda dönen loading.
+  const [uploadingStory, setUploadingStory] = useState(false);
 
   // katılacaklar listesi modal'ı (eski tek liste — korunuyor)
   const [listOpen, setListOpen] = useState(false);
@@ -547,29 +549,34 @@ export default function EventDetail() {
   const onStoryEdited = async (editedUri: string) => {
     if (!event) { setStoryUri(null); return; }
     setStoryUri(null); // editörü kapat
-    const story: Story = {
-      uri: editedUri,
-      caption: "",
-      eventSlug: event.slug,
-      ts: Date.now(),
-      eventTitle: event.title,
-      city: event.city,
-    };
-    await addStory(story); // R2'ye yükler + DB'ye kaydeder (reaktif → her ekranda anında)
-    // best-effort API (varsa /api/stories; yoksa sadece local kalır)
+    setUploadingStory(true); // "+" + kendi avatarımda loading başlasın
     try {
-      const deviceId = await getDeviceId();
-      await fetch(`${API_BASE}/api/stories`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": "meydanfest-app" },
-        body: JSON.stringify({ deviceId, eventSlug: event.slug, caption: "" }),
-      });
-    } catch {
-      /* yok say */
+      const story: Story = {
+        uri: editedUri,
+        caption: "",
+        eventSlug: event.slug,
+        ts: Date.now(),
+        eventTitle: event.title,
+        city: event.city,
+      };
+      await addStory(story); // R2'ye yükler + DB'ye kaydeder (reaktif → her ekranda anında)
+      // best-effort API (varsa /api/stories; yoksa sadece local kalır)
+      try {
+        const deviceId = await getDeviceId();
+        await fetch(`${API_BASE}/api/stories`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": "meydanfest-app" },
+          body: JSON.stringify({ deviceId, eventSlug: event.slug, caption: "" }),
+        });
+      } catch {
+        /* yok say */
+      }
+      successH();
+      setStoryShared(true); // gösterişli başarı modalı
+      reloadStories(); // şerit anında güncellensin
+    } finally {
+      setUploadingStory(false); // yükleme bitti → loading kalksın
     }
-    successH();
-    setStoryShared(true); // gösterişli başarı modalı
-    reloadStories(); // şerit anında güncellensin
   };
 
   if (loading) return <View style={{ flex: 1, backgroundColor: T.bg }}><Loader /></View>;
@@ -828,6 +835,7 @@ export default function EventDetail() {
               mockGroups={mockGroups}
               onOpen={openStoryViewer}
               onShare={pickStory}
+              uploading={uploadingStory}
             />
           </Animated.View>
 

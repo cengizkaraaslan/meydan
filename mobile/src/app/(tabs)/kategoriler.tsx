@@ -12,7 +12,7 @@ import { API_BASE, fetchEvents, type ApiEvent } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useActiveCity, ALL_CITIES, districtsFor } from "@/lib/location";
-import { tapH } from "@/lib/haptics";
+import { tapH, tapHaptic } from "@/lib/haptics";
 
 const PRICE_LABELS: Record<"all" | "free" | "paid" | "student", string> = {
   all: "f_all",
@@ -46,6 +46,8 @@ export default function KategorilerScreen() {
   const [district, setDistrict] = useState<string | null>(null);
   const [districts, setDistricts] = useState<string[]>([]);
   const [events, setEvents] = useState<ApiEvent[]>([]);
+  // Kategori başına etkinlik sayısı (şehir + ücretsiz filtresine göre) → tile rozetinde.
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   // Pagination: page = yüklü son sayfa, totalPages = sunucudaki toplam sayfa.
   const [page, setPage] = useState(1);
@@ -85,6 +87,34 @@ export default function KategorilerScreen() {
       alive = false;
     };
   }, [cityFilter]);
+
+  // Her kategoride kaç etkinlik var → tile rozeti. Şehir/ücretsiz filtresi değişince
+  // yeniden say. Sadece meta.total okunur (page_size=1, hafif). 9 kategori paralel.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const entries = await Promise.all(
+        CATEGORIES.map(async (c) => {
+          try {
+            const res = await fetchEvents({
+              city: cityFilter ?? undefined,
+              category: c.key,
+              freeOnly: priceFilter === "free",
+              page: 1,
+              pageSize: 1,
+            });
+            return [c.key, res.meta.total] as const;
+          } catch {
+            return [c.key, 0] as const;
+          }
+        }),
+      );
+      if (alive) setCounts(Object.fromEntries(entries));
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [cityFilter, priceFilter]);
 
   // Etkinlikleri çek. Şehir + fiyat (free) filtresi sunucu tarafında uygulanır.
   // Kategori dizisi `selected` değiştiğinde (string'e çevrilerek) yeniden tetiklenir.
@@ -175,7 +205,8 @@ export default function KategorilerScreen() {
   }, [events, selected, priceFilter, district]);
 
   const toggleCategory = (key: string) => {
-    tapH();
+    // Sadece titreşim — kategori dokunuşunda click SESİ çalma (tapHaptic, tapH değil).
+    tapHaptic();
     setSelected((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
@@ -317,8 +348,9 @@ export default function KategorilerScreen() {
         <View style={styles.grid}>
           {CATEGORIES.map((item, i) => {
             const active = selected.includes(item.key);
-            // Seçili tile zaten beyaz çerçeve + ✓ + güçlü glow ile belli oluyor;
-            // diğerlerini KARARTMIYORUZ (eski 0.4 opacity "bozuk/karardı" gibi duruyordu).
+            const count = counts[item.key];
+            // Seçili değilse GİZLEME yok: sadece üstüne hafif koyu scrim koyup rengi
+            // soluklaştırırız (emoji/yazı/rozet net kalır → "sadece rengi değişir").
             return (
               <Animated.View
                 key={item.key}
@@ -335,15 +367,24 @@ export default function KategorilerScreen() {
                       active && styles.tileActive,
                     ]}
                   >
+                    {/* Pasif tile: rengi soluklaştıran scrim (içeriğin ALTINDA). */}
+                    {!active ? <View style={styles.tileDim} pointerEvents="none" /> : null}
                     {active ? (
                       <View style={styles.check}>
                         <Text style={styles.checkTxt}>✓</Text>
                       </View>
                     ) : null}
                     <Text style={styles.emoji}>{item.emoji}</Text>
-                    <Text style={[Type.title, styles.tileLabel]} numberOfLines={1}>
-                      {item.label}
-                    </Text>
+                    <View style={styles.tileBottom}>
+                      <Text style={[Type.title, styles.tileLabel]} numberOfLines={1}>
+                        {item.label}
+                      </Text>
+                      {count !== undefined ? (
+                        <View style={styles.countChip}>
+                          <Text style={styles.countTxt}>{count}</Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </LinearGradient>
                 </Pressable>
               </Animated.View>
@@ -433,6 +474,27 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth * 4,
     borderColor: "rgba(255,255,255,0.9)",
   },
+  // Pasif tile rengini soluklaştıran scrim (içerik üstte kaldığı için gizlemez).
+  tileDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(8,7,13,0.5)",
+  },
+  tileBottom: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Space.sm,
+  },
+  countChip: {
+    minWidth: 24,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  countTxt: { color: "#fff", fontSize: 12, fontWeight: "800" },
   check: {
     position: "absolute",
     top: 8,
@@ -446,7 +508,7 @@ const styles = StyleSheet.create({
   },
   checkTxt: { fontSize: 13, fontWeight: "900", color: "#1A1430" },
   emoji: { fontSize: 30 },
-  tileLabel: { color: "#fff" },
+  tileLabel: { color: "#fff", flexShrink: 1 },
   results: { marginTop: Space.xl, paddingHorizontal: 16 },
   hint: {
     textAlign: "center",

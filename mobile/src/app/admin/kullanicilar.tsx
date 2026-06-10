@@ -350,8 +350,8 @@ const styles = StyleSheet.create({
   avatar: { width: 46, height: 46, borderRadius: 23 },
   avatarFallback: { alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2 },
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: Radius.pill,
     borderWidth: StyleSheet.hairlineWidth * 2,
   },
