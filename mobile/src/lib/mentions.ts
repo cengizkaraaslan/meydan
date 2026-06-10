@@ -6,6 +6,16 @@ export interface MentionUser {
   email: string;
   name: string | null;
   avatar: string | null;
+  /** Profile gitmek için kimlik (mobil deviceId / web User.id); yoksa null. */
+  id: string | null;
+}
+
+/** Bir email'e karşılık gelen kullanıcıyı bul (mention'a tıklayınca profile gitmek için). */
+export async function resolveMentionUser(email: string): Promise<MentionUser | null> {
+  const e = email.trim().toLowerCase();
+  if (!e) return null;
+  const list = await searchMentionUsers(e);
+  return list.find((u) => u.email.toLowerCase() === e) ?? list[0] ?? null;
 }
 
 /** Mention autocomplete için kullanıcı ara (ad/email). Boş q ilk birkaç kullanıcıyı döner. */

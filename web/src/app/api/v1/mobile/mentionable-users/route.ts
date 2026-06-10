@@ -7,6 +7,8 @@ interface MentionUser {
   email: string;
   name: string | null;
   avatar: string | null;
+  /** Profile gitmek için kimlik (mobil kullanıcıda deviceId; yoksa web User.id). */
+  id: string | null;
 }
 
 // GET /api/v1/mobile/mentionable-users?q=...
@@ -29,7 +31,7 @@ export async function GET(request: NextRequest) {
     const [profiles, users] = await Promise.all([
       db.mobileProfile.findMany({
         where: { email: { not: null }, ...like },
-        select: { email: true, name: true, avatar: true },
+        select: { email: true, name: true, avatar: true, deviceId: true },
         take: 20,
       }),
       db.user.findMany({
@@ -41,26 +43,28 @@ export async function GET(request: NextRequest) {
               ],
             }
           : {},
-        select: { email: true, name: true, image: true },
+        select: { id: true, email: true, name: true, image: true },
         take: 20,
       }),
     ]);
 
-    // email → en zengin kayıt (ad/avatar dolu olanı tercih et).
+    // email → en zengin kayıt (ad/avatar/id dolu olanı tercih et). Mobil deviceId önceliklidir.
     const byEmail = new Map<string, MentionUser>();
-    const add = (email: string | null, name: string | null, avatar: string | null) => {
+    const add = (email: string | null, name: string | null, avatar: string | null, id: string | null) => {
       const e = email?.trim().toLowerCase();
       if (!e) return;
       const existing = byEmail.get(e);
       if (!existing) {
-        byEmail.set(e, { email: e, name: name ?? null, avatar: avatar ?? null });
+        byEmail.set(e, { email: e, name: name ?? null, avatar: avatar ?? null, id: id ?? null });
       } else {
         if (!existing.name && name) existing.name = name;
         if (!existing.avatar && avatar) existing.avatar = avatar;
+        if (!existing.id && id) existing.id = id;
       }
     };
-    profiles.forEach((p) => add(p.email, p.name, p.avatar));
-    users.forEach((u) => add(u.email, u.name, u.image));
+    // Önce mobil profiller (deviceId = /kisi için doğru kimlik), sonra web User'lar.
+    profiles.forEach((p) => add(p.email, p.name, p.avatar, p.deviceId));
+    users.forEach((u) => add(u.email, u.name, u.image, u.id));
 
     const data = [...byEmail.values()]
       .sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email, "tr"))
