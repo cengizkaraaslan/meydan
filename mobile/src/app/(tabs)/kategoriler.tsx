@@ -476,7 +476,11 @@ const styles = StyleSheet.create({
   },
   // Pasif tile rengini soluklaştıran scrim (içerik üstte kaldığı için gizlemez).
   tileDim: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: "rgba(8,7,13,0.5)",
   },
   tileBottom: {

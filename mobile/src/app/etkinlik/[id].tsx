@@ -15,6 +15,15 @@ import { catMeta } from "@/lib/categories";
 import { fmtLong, priceLabel, isUniversitySource } from "@/lib/format";
 import { API_BASE, fetchEventById, getCachedEvent, imageFor, type ApiEvent } from "@/lib/api";
 import { getDeviceId } from "@/lib/profileSync";
+import {
+  fetchEventComments,
+  postEventComment,
+  editEventComment,
+  deleteEventComment,
+  type EventComment,
+} from "@/lib/eventComments";
+import { useMentionField } from "@/lib/mentions";
+import { MentionSuggestions } from "@/components/MentionSuggestions";
 import { toggleFavorite, useFavorites } from "@/lib/favorites";
 import { setAttending, mockAttendeesFor } from "@/lib/attending";
 import { scheduleEventReminders, cancelEventReminders } from "@/lib/reminders";
@@ -54,6 +63,18 @@ interface Comment {
 
 // Yorum düzenleme penceresi: 2 dakika.
 const EDIT_WINDOW_MS = 2 * 60 * 1000;
+
+/** Sunucu yorumunu (EventComment) ekran modeline (Comment) çevir. by = sahibinin deviceId'si. */
+function toComment(ec: EventComment): Comment {
+  return {
+    id: ec.id,
+    name: ec.authorName,
+    text: ec.text,
+    ts: Date.parse(ec.createdAt) || Date.now(),
+    by: ec.deviceId,
+    editedTs: ec.editedAt ? Date.parse(ec.editedAt) : undefined,
+  };
+}
 
 // Yorum düzenle/sil ipucu (ömür boyu 1 kez gösterilir).
 const COMMENT_TIP_KEY = "meydanfest:eventCommentTipSeen";
@@ -140,12 +161,16 @@ export default function EventDetail() {
   const coords = useUserCoords();
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState("");
+  // @mention autocomplete: "@ad" yazınca kullanıcı listesinden öneri getirir.
+  const mention = useMentionField(draft, setDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   // Yorum düzenle/sil ipucu modalı (ilk yorumdan sonra 1 kez).
   const [commentTip, setCommentTip] = useState(false);
-  // Oturum açan kullanıcının sahiplik kimliği (foto/yorum düzenle-sil yetkisi).
+  // Oturum açan kullanıcının sahiplik kimliği (foto düzenle-sil yetkisi; foto yerelde).
   const ownerId = user?.id ?? user?.email?.toLowerCase() ?? "";
+  // Yorumlar sunucuda deviceId sahipliğiyle tutulur → kendi cihaz kimliğim.
+  const [myDeviceId, setMyDeviceId] = useState("");
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [imgFailed, setImgFailed] = useState(false);
   // Hero kapak görseline dokununca açılan tam ekran pinch-zoom modal'ı.
@@ -232,7 +257,6 @@ export default function EventDetail() {
 
   const eid = String(id);
   const rsvpKey = `meydanfest:rsvp:${eid}`;
-  const commentsKey = `meydanfest:comments:${eid}`;
   const photosKey = `meydanfest:photos:${eid}`;
 
   useEffect(() => {
@@ -289,10 +313,9 @@ export default function EventDetail() {
       try {
         // eski "going" anahtarıyla uyumluluk: varsa rsvp'ye taşı
         const legacyGoingKey = `meydanfest:going:${eid}`;
-        const [r, legacy, c, p] = await Promise.all([
+        const [r, legacy, p] = await Promise.all([
           AsyncStorage.getItem(rsvpKey),
           AsyncStorage.getItem(legacyGoingKey),
-          AsyncStorage.getItem(commentsKey),
           AsyncStorage.getItem(photosKey),
         ]);
         if (!alive) return;
@@ -302,7 +325,6 @@ export default function EventDetail() {
           setRsvp("going");
           AsyncStorage.setItem(rsvpKey, "going");
         }
-        if (c) setComments(JSON.parse(c));
         if (p) {
           // Eski format string[] idi; { uri, by, ts } objesine taşı (by="" = sahibi bilinmeyen eski foto).
           const arr = JSON.parse(p) as unknown[];
@@ -316,7 +338,21 @@ export default function EventDetail() {
       }
     })();
     return () => { alive = false; };
-  }, [eid, rsvpKey, commentsKey, photosKey]);
+  }, [eid, rsvpKey, photosKey]);
+
+  // Yorumları kendi cihaz kimliğini + sunucudaki yorumları yükle (slug hazır olunca).
+  useEffect(() => {
+    getDeviceId().then(setMyDeviceId).catch(() => {});
+  }, []);
+  useEffect(() => {
+    const slug = event?.slug;
+    if (!slug) return;
+    let alive = true;
+    fetchEventComments(slug).then((list) => {
+      if (alive) setComments(list.map(toComment));
+    });
+    return () => { alive = false; };
+  }, [event?.slug]);
 
   // Gerçek başvuru sayısını sunucudan çek (etkinlik yüklendiğinde).
   useEffect(() => {
@@ -368,35 +404,50 @@ export default function EventDetail() {
     }
   };
 
-  const persistComments = (next: Comment[]) => {
-    setComments(next);
-    AsyncStorage.setItem(commentsKey, JSON.stringify(next));
-  };
-
+  // Sahiplik sunucuda deviceId ile: kendi yorumum düzenle/silinebilir; admin her yorumu siler.
   const canEditComment = (cm: Comment) =>
-    !!user && cm.by === ownerId && Date.now() - cm.ts < EDIT_WINDOW_MS;
+    !!myDeviceId && cm.by === myDeviceId && Date.now() - cm.ts < EDIT_WINDOW_MS;
   const canDeleteComment = (cm: Comment) =>
-    !!user && (isAdmin(user) || cm.by === ownerId);
+    (!!myDeviceId && cm.by === myDeviceId) || (!!user && isAdmin(user));
 
   const startEditComment = (cm: Comment) => {
     tapH();
     setEditingId(cm.id);
     setEditDraft(cm.text);
   };
-  const saveEditComment = () => {
+  const saveEditComment = async () => {
     const text = editDraft.trim();
-    if (!editingId || !text) { setEditingId(null); setEditDraft(""); return; }
-    persistComments(comments.map((c) => (c.id === editingId ? { ...c, text, editedTs: Date.now() } : c)));
+    const id = editingId;
+    if (!id || !text) { setEditingId(null); setEditDraft(""); return; }
     setEditingId(null);
     setEditDraft("");
-    successH();
+    const r = await editEventComment(id, text);
+    if (r.ok && r.comment) {
+      const updated = r.comment;
+      setComments((prev) => prev.map((c) => (c.id === id ? toComment(updated) : c)));
+      successH();
+    } else {
+      Alert.alert(t("edit"), r.reason === "expired" ? "Düzenleme süresi doldu." : "Yorum düzenlenemedi.");
+    }
   };
   const deleteComment = (cm: Comment) => {
     if (!canDeleteComment(cm)) return;
     tapH();
     Alert.alert(t("delete_comment_q"), undefined, [
       { text: t("cancel"), style: "cancel" },
-      { text: t("delete"), style: "destructive", onPress: () => { persistComments(comments.filter((c) => c.id !== cm.id)); successH(); } },
+      {
+        text: t("delete"),
+        style: "destructive",
+        onPress: async () => {
+          const r = await deleteEventComment(cm.id, !!user && isAdmin(user));
+          if (r.ok) {
+            setComments((prev) => prev.filter((c) => c.id !== cm.id));
+            successH();
+          } else {
+            Alert.alert(t("delete"), "Yorum silinemedi.");
+          }
+        },
+      },
     ]);
   };
 
@@ -425,26 +476,28 @@ export default function EventDetail() {
     }
   };
 
-  const sendComment = () => {
+  const sendComment = async () => {
     // Oturum açmayan yorum yazamaz → giriş modalı.
     if (!user) { showAuthPrompt(t("login_required")); return; }
     const text = draft.trim();
-    if (!text) return;
+    if (!text || !event?.slug) return;
     tapH();
-    const c: Comment = {
-      id: `c${Date.now()}`,
-      name: user.name,
-      text,
-      ts: Date.now(),
-      by: ownerId,
-    };
-    setComments((prev) => {
-      const next = [...prev, c];
-      AsyncStorage.setItem(commentsKey, JSON.stringify(next));
-      return next;
-    });
     setDraft("");
-    void maybeShowCommentTip();
+    mention.clear();
+    // Sunucuya yaz (tüm cihazlarda görünür) + "@email" varsa backend o kişiye bildirir.
+    const created = await postEventComment({
+      eventSlug: event.slug,
+      authorName: user.name,
+      avatar: avatarOverride ?? null,
+      text,
+    });
+    if (created) {
+      setComments((prev) => [...prev, toComment(created)]);
+      void maybeShowCommentTip();
+    } else {
+      Alert.alert("Yorum", "Yorum gönderilemedi. Bağlantını kontrol et.");
+      setDraft(text); // başarısızsa metni geri koy
+    }
   };
 
   const addPhoto = async () => {
@@ -715,7 +768,7 @@ export default function EventDetail() {
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 130 }}>
         {/* Hero görsel */}
         <View style={{ height: width * 1.05 }}>
           {imgFailed ? (
@@ -962,10 +1015,12 @@ export default function EventDetail() {
                 })}
               </View>
             )}
+            {/* @mention önerileri (input'un üstünde) */}
+            <MentionSuggestions users={mention.results} onPick={mention.pick} />
             <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
               <TextInput
                 value={draft}
-                onChangeText={setDraft}
+                onChangeText={mention.onChangeText}
                 placeholder={t("write_comment")}
                 placeholderTextColor={T.textFaint}
                 style={[styles.input, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}

@@ -14,6 +14,34 @@ export interface WidgetEvent {
   startsAt: string;
   isFree: boolean;
   category: string;
+  /** Etkileşim sayıları — uygulama detay ekranıyla aynı deterministik formülle üretilir. */
+  going: number;
+  maybe: number;
+  interested: number;
+  comments: number;
+}
+
+/** Etkinlik id'sinden deterministik sayı (attending.ts hashEventId ile AYNI). */
+function hashEventId(eventId: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < eventId.length; i++) {
+    h ^= eventId.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+/**
+ * Bir kategori için katılımcı sayısı — attending.ts mockAttendeesFor ile AYNI sayıyı verir
+ * (baseCounts + seed%3): going 5–7, maybe 4–6, interested 3–5. Böylece widget ile detay
+ * ekranındaki rakamlar tutarlı olur.
+ */
+function catCount(eventId: string, cat: "going" | "maybe" | "interested"): number {
+  const base = hashEventId(eventId);
+  const catOffset = cat === "going" ? 0 : cat === "maybe" ? 1 : 2;
+  const seed = base + catOffset * 101;
+  const baseCounts = cat === "going" ? 5 : cat === "maybe" ? 4 : 3;
+  return baseCounts + (seed % 3);
 }
 
 /** AsyncStorage headless'ta bazen erişilemez — şehir okuma fetch'i ASLA engellememeli. */
@@ -53,6 +81,10 @@ export async function loadWidgetEvent(): Promise<WidgetEvent | null> {
       const list = await fetchList(params);
       const ev = list.find((e) => typeof e?.title === "string" && (e.title as string).trim());
       if (ev) {
+        const eid = String(ev.id ?? ev.slug ?? ev.title ?? "");
+        // Yorum sayısı: varsa gerçek (comment_count), yoksa id'den deterministik (3–24).
+        const realComments = Number(ev.comment_count);
+        const comments = Number.isFinite(realComments) && realComments > 0 ? realComments : 3 + (hashEventId(eid + "c") % 22);
         return {
           title: String(ev.title ?? ""),
           venue: String(ev.venue ?? ""),
@@ -60,6 +92,10 @@ export async function loadWidgetEvent(): Promise<WidgetEvent | null> {
           startsAt: String(ev.starts_at ?? ""),
           isFree: Boolean(ev.is_free),
           category: String(ev.category ?? ""),
+          going: catCount(eid, "going"),
+          maybe: catCount(eid, "maybe"),
+          interested: catCount(eid, "interested"),
+          comments,
         };
       }
     } catch (e) {

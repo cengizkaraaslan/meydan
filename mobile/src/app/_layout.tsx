@@ -16,7 +16,7 @@ import { Walkthrough } from "@/components/Walkthrough";
 import { GlobalSignInPrompt } from "@/components/SignInPrompt";
 import { FavHintModal } from "@/components/FavHintModal";
 import { onReplayTour } from "@/lib/prefs";
-import { initNotifications, scheduleNearbyTeaser, useNearbyNotificationNav } from "@/lib/notify";
+import { initNotifications, registerPushToken, scheduleNearbyTeaser, useNearbyNotificationNav } from "@/lib/notify";
 
 // Native splash'ı biz kontrol edelim (yoksa üstte takılı kalabiliyor).
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -29,10 +29,16 @@ function RootNavigator() {
   // Bildirime dokununca kişi profiline yönlendir.
   useNearbyNotificationNav();
 
-  // Giriş yapıldıysa: izin iste + birazdan "yakındaki kişi" bildirimi planla.
+  // Giriş yapıldıysa: izin iste + push token'ı (email ile) kaydet + "yakındaki kişi" planla.
+  // Email değişince (login/logout) token yeniden kaydedilir → @mention doğru cihaza gider.
   useEffect(() => {
-    if (authed) initNotifications().then(() => scheduleNearbyTeaser());
-  }, [authed]);
+    if (authed) {
+      initNotifications().then(() => {
+        scheduleNearbyTeaser();
+        void registerPushToken(user?.email ?? null);
+      });
+    }
+  }, [authed, user?.email]);
 
   // Hazır olana kadar boş (intro animasyonu üstte gösteriliyor).
   if (!authReady || !themeReady) return null;

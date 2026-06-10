@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import { router } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { useEffect } from "react";
@@ -61,7 +62,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-/** Bildirim izni iste + Android kanalını hazırla (best-effort). */
+/** Bildirim izni iste + Android kanallarını hazırla (best-effort). */
 export async function initNotifications(): Promise<void> {
   try {
     await Notifications.requestPermissionsAsync();
@@ -73,8 +74,42 @@ export async function initNotifications(): Promise<void> {
       name: "Yakındakiler",
       importance: Notifications.AndroidImportance.HIGH,
     });
+    // Uzaktan bildirimler (yorum/mesaj @mention) — Expo push bu kanalı kullanır.
+    await Notifications.setNotificationChannelAsync("mentions", {
+      name: "Mesaj ve bahsetmeler",
+      importance: Notifications.AndroidImportance.HIGH,
+    });
   } catch {
     // ör. iOS / web — kanal yok, sorun değil
+  }
+}
+
+/**
+ * Uzaktan bildirim için Expo push token'ı al ve backend'e (deviceId + email ile) kaydet.
+ * Girişli kullanıcıda email gönderilir → başkası "@email" yazınca bu cihaza bildirim gelir.
+ * İzin yoksa / FCM yapılandırılmamışsa / ağ hatasında sessizce geçer.
+ */
+export async function registerPushToken(email: string | null): Promise<void> {
+  try {
+    const perm = await Notifications.getPermissionsAsync();
+    let granted = perm.granted;
+    if (!granted) {
+      const req = await Notifications.requestPermissionsAsync();
+      granted = req.granted;
+    }
+    if (!granted) return;
+    const projectId = (Constants.expoConfig?.extra?.eas as { projectId?: string } | undefined)?.projectId;
+    const resp = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+    const token = resp.data;
+    if (!token) return;
+    const deviceId = await getDeviceId();
+    await fetch(`${API_BASE}/api/v1/mobile/push-token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId, token, email: email ?? null }),
+    });
+  } catch {
+    // izin yok / native modül-FCM eksik / ağ → sessizce geç
   }
 }
 
@@ -134,15 +169,33 @@ export async function scheduleProximityPing(name: string): Promise<void> {
   }
 }
 
-/** Bildirime dokununca ilgili kişi ekranına yönlendir. */
+/** Bildirim verisinden ilgili ekrana yönlendir (hem dokunma hem soğuk başlangıç). */
+function routeFromNotification(data: Record<string, unknown> | undefined): void {
+  if (!data) return;
+  // 1) Açık deep-link (yorum/mesaj @mention): data.url = "/etkinlik/<slug>" | "/mesajlar" | "/".
+  if (typeof data.url === "string" && data.url.startsWith("/")) {
+    router.push(data.url as never);
+    return;
+  }
+  // 2) Bilinen alanlar: etkinlik hatırlatıcısı / DM / yakındaki kişi.
+  if (typeof data.eventId === "string") router.push(`/etkinlik/${data.eventId}`);
+  else if (typeof data.partnerId === "string") router.push(`/sohbet/${data.partnerId}`);
+  else if (data.matchKey) router.push("/mesajlar" as never);
+  else if (typeof data.personId === "string") router.push(`/kisi/${data.personId}`);
+}
+
+/** Bildirime dokununca (veya bildirimle açılınca) ilgili içeriğe yönlendir. */
 export function useNearbyNotificationNav(): void {
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
-      const data = resp.notification.request.content.data ?? {};
-      // Etkinlik hatırlatıcısı → etkinlik detayına; yakındaki kişi → profil.
-      if (data.eventId) router.push(`/etkinlik/${data.eventId}`);
-      else if (data.personId) router.push(`/kisi/${data.personId}`);
+      routeFromNotification(resp.notification.request.content.data as Record<string, unknown> | undefined);
     });
+    // Soğuk başlangıç: uygulama bir bildirime dokunularak açıldıysa o içeriğe git.
+    Notifications.getLastNotificationResponseAsync()
+      .then((resp) => {
+        if (resp) routeFromNotification(resp.notification.request.content.data as Record<string, unknown> | undefined);
+      })
+      .catch(() => {});
     return () => sub.remove();
   }, []);
 }

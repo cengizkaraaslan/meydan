@@ -4,6 +4,20 @@ import type { WidgetEvent } from "./widgetData";
 
 const MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 
+/** Kategori kodu → Türkçe etiket (rozet için). */
+const CATEGORY_LABEL: Record<string, string> = {
+  KONSER: "Konser",
+  FESTIVAL: "Festival",
+  TIYATRO: "Tiyatro",
+  STANDUP: "Stand-up",
+  SPOR: "Spor",
+  SERGI: "Sergi",
+  ATOLYE: "Atölye",
+  COCUK: "Çocuk",
+  FUAR: "Fuar",
+  DIGER: "Etkinlik",
+};
+
 /** ISO tarihi "12 Haz · 20:00" biçimine çevirir (headless'ta locale'e bağımlı değil). */
 function formatDate(iso: string): string {
   try {
@@ -17,11 +31,33 @@ function formatDate(iso: string): string {
   }
 }
 
+/** Tek bir etkileşim sayacı: emoji + sayı (renkli, kompakt çip). */
+function Stat({ emoji, value, color }: { emoji: string; value: number; color: `#${string}` }) {
+  return (
+    <FlexWidget
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#1C1730",
+        borderRadius: 9,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+        marginRight: 6,
+      }}
+    >
+      <TextWidget text={emoji} style={{ fontSize: 11 }} />
+      <TextWidget text={` ${value}`} style={{ fontSize: 12, fontWeight: "700", color }} />
+    </FlexWidget>
+  );
+}
+
 /**
- * Ana ekran widget'ı — Aurora koyu kart: "MEYDAN" başlık + yaklaşan etkinlik
- * (başlık, mekân·şehir, tarih, ücretsiz/kategori rozeti). Dokun → uygulamayı açar.
+ * Ana ekran widget'ı — Aurora koyu kart: başlık + kategori (sağ üst) + etkinlik
+ * (başlık, mekân·şehir) + etkileşim sayaçları (katılacak/belki/ilgili/yorum) + tarih.
+ * Dokun → uygulamayı açar.
  */
 export function EventWidget({ event }: { event: WidgetEvent | null }) {
+  const categoryLabel = event ? (event.isFree ? "Ücretsiz" : CATEGORY_LABEL[event.category] || "Etkinlik") : "";
   return (
     <FlexWidget
       clickAction="OPEN_APP"
@@ -35,11 +71,31 @@ export function EventWidget({ event }: { event: WidgetEvent | null }) {
         borderRadius: 22,
       }}
     >
-      <FlexWidget style={{ flexDirection: "row", alignItems: "center" }}>
-        <TextWidget text="MEYDAN" style={{ fontSize: 12, fontWeight: "700", color: "#A78BFA" }} />
-        <TextWidget text="  ·  yakınındaki etkinlik" style={{ fontSize: 11, color: "#8B83A3" }} />
+      {/* Üst bar: marka (sol) + kategori rozeti (SAĞA yaslı) */}
+      <FlexWidget style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "match_parent" }}>
+        <FlexWidget style={{ flexDirection: "row", alignItems: "center" }}>
+          <TextWidget text="MEYDAN" style={{ fontSize: 12, fontWeight: "700", color: "#A78BFA" }} />
+          <TextWidget text="  ·  yakınındaki etkinlik" style={{ fontSize: 11, color: "#8B83A3" }} />
+        </FlexWidget>
+        {event ? (
+          <TextWidget
+            text={categoryLabel}
+            style={{
+              fontSize: 11,
+              fontWeight: "700",
+              color: "#0E0B1A",
+              backgroundColor: event.isFree ? "#34D399" : "#A78BFA",
+              borderRadius: 10,
+              paddingHorizontal: 9,
+              paddingVertical: 3,
+            }}
+          />
+        ) : (
+          <TextWidget text="" style={{ fontSize: 11 }} />
+        )}
       </FlexWidget>
 
+      {/* Orta: başlık + mekân·şehir */}
       {event ? (
         <FlexWidget style={{ flexDirection: "column" }}>
           <TextWidget
@@ -52,37 +108,31 @@ export function EventWidget({ event }: { event: WidgetEvent | null }) {
             text={[event.venue, event.city].filter(Boolean).join(" · ")}
             maxLines={1}
             truncate="END"
-            style={{ fontSize: 12, color: "#C9C3D9", marginTop: 4 }}
+            style={{ fontSize: 12, color: "#C9C3D9", marginTop: 3 }}
           />
         </FlexWidget>
       ) : (
-        <TextWidget
-          text="Dokun ve yakınındaki etkinlikleri keşfet"
-          style={{ fontSize: 14, color: "#C9C3D9" }}
-        />
+        <TextWidget text="Dokun ve yakınındaki etkinlikleri keşfet" style={{ fontSize: 14, color: "#C9C3D9" }} />
       )}
 
-      <FlexWidget style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+      {/* Etkileşim sayaçları: katılacak · belki · ilgili · yorum */}
+      {event ? (
+        <FlexWidget style={{ flexDirection: "row", alignItems: "center" }}>
+          <Stat emoji="✅" value={event.going} color="#34D399" />
+          <Stat emoji="🤔" value={event.maybe} color="#FBBF24" />
+          <Stat emoji="⭐" value={event.interested} color="#60A5FA" />
+          <Stat emoji="💬" value={event.comments} color="#C9C3D9" />
+        </FlexWidget>
+      ) : (
+        <FlexWidget style={{ flexDirection: "row" }} />
+      )}
+
+      {/* Alt: tarih */}
+      <FlexWidget style={{ flexDirection: "row", alignItems: "center" }}>
         <TextWidget
-          text={event ? formatDate(event.startsAt) : ""}
+          text={event ? `🗓  ${formatDate(event.startsAt)}` : ""}
           style={{ fontSize: 12, fontWeight: "600", color: "#A78BFA" }}
         />
-        {event ? (
-          <TextWidget
-            text={event.isFree ? "Ücretsiz" : event.category || "Etkinlik"}
-            style={{
-              fontSize: 11,
-              fontWeight: "600",
-              color: "#0E0B1A",
-              backgroundColor: "#A78BFA",
-              borderRadius: 10,
-              paddingHorizontal: 8,
-              paddingVertical: 2,
-            }}
-          />
-        ) : (
-          <TextWidget text="" style={{ fontSize: 11 }} />
-        )}
       </FlexWidget>
     </FlexWidget>
   );

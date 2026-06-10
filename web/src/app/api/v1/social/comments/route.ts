@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { listComments, addComment } from "@/lib/social-store";
+import { extractMentionEmails, notifyEmails, preview } from "@/lib/mention-notify";
 
 export const dynamic = "force-dynamic";
 
@@ -24,5 +25,17 @@ export async function POST(request: NextRequest) {
   const text = body.text?.trim();
   if (!postId || !deviceId || !text) return NextResponse.json({ error: "postId/deviceId/text zorunlu" }, { status: 400 });
   const comment = await addComment({ postId, deviceId, authorName: body.authorName ?? null, text });
+
+  // @mention → bahsedilen email'lere bildirim (Meydan duvarına yönlendir).
+  const emails = extractMentionEmails(text);
+  if (emails.length) {
+    const who = body.authorName?.trim() || "Biri";
+    void notifyEmails(emails, {
+      title: `${who} bir yorumda senden bahsetti`,
+      body: preview(text),
+      data: { type: "feed_comment", postId, url: "/" },
+    }).catch(() => {});
+  }
+
   return NextResponse.json({ ok: true, comment });
 }

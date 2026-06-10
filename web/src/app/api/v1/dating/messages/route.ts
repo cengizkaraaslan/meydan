@@ -72,6 +72,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "matchKey, senderDeviceId ve text zorunlu" }, { status: 400 });
   }
   const message = await sendMessage({ matchKey, senderDeviceId, text });
+
+  // Alıcıya önizlemeli bildirim (Instagram tarzı) + @mention. Bot/sistem göndericiyi atla.
+  if (!senderDeviceId.startsWith("bot_")) {
+    void (async () => {
+      const recipients = await recipientDevicesForMatch(matchKey, senderDeviceId);
+      const name = (await deviceDisplayName(senderDeviceId)) || "Yeni mesaj";
+      const bodyText = text.startsWith(IMG_PREFIX) ? "📷 Fotoğraf" : preview(text, 140);
+      const data = { type: "dm", matchKey, partnerId: senderDeviceId, url: "/mesajlar" };
+      if (recipients.length) {
+        await notifyDevices(recipients, { title: name, body: bodyText, data });
+      }
+      // DM içinde @email geçtiyse o kişilere de bildir (alıcıdan bağımsız).
+      const emails = extractMentionEmails(text);
+      if (emails.length) {
+        await notifyEmails(emails, { title: `${name} senden bahsetti`, body: bodyText, data });
+      }
+    })().catch(() => {});
+  }
+
   return NextResponse.json({ ok: true, message });
 }
 
