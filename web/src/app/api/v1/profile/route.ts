@@ -103,7 +103,12 @@ export async function POST(request: NextRequest) {
   if ("bio" in body) data.bio = strOrNull(body.bio);
   if ("lookingFor" in body) data.lookingFor = normalizeLookingFor(body.lookingFor);
   if ("photos" in body) data.photos = strOrNull(body.photos);
-  if ("avatar" in body) data.avatar = strOrNull(body.avatar);
+  if ("avatar" in body) {
+    // Güvenlik: yalnız http(s) public URL veya null kabul et. "file://" gibi YEREL yollar
+    // başka cihazda yüklenmez → yoksay (mevcut avatar korunur), DB'ye yazma.
+    const a = strOrNull(body.avatar);
+    if (a === null || /^https?:\/\//.test(a)) data.avatar = a;
+  }
   if ("lat" in body) data.lat = numOrNull(body.lat);
   if ("lng" in body) data.lng = numOrNull(body.lng);
   if ("birthDate" in body) data.birthDate = strOrNull(body.birthDate);
