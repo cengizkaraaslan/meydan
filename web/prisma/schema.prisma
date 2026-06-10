@@ -440,6 +440,18 @@ model EventCommentMobile {
   @@index([eventSlug])
 }
 
+/// Mobil etkinlik fotoğrafı — deviceId bazlı, sunucu kaynaklı (tüm cihazlarda ortak).
+/// url = R2'ye yüklenen public görsel adresi.
+model EventPhotoMobile {
+  id        String   @id @default(cuid())
+  eventSlug String
+  deviceId  String
+  url       String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([eventSlug])
+}
+
 /// Mobil bildirim tercihi (#25). deviceId bazlı, cihaz başına tekil.
 /// mode: "all" | "none" | "filtered". cities/categories virgülle ayrık (filtered modunda eşleşme için).
 model NotifPref {

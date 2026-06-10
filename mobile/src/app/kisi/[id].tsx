@@ -13,6 +13,7 @@ import { useT } from "@/lib/i18n";
 import { useCanSeeAges } from "@/lib/dprofile";
 import { tapH, impactH } from "@/lib/haptics";
 import { fetchFollowing, followUser, unfollowUser, followIdForPerson, fetchStoriesFor, type MobileStoryView } from "@/lib/social";
+import { getOrCreateDeviceId } from "@/lib/device";
 import { personStats as getPersonStats } from "@/lib/personStats";
 import { EventStoryViewer, type StoryGroup } from "@/components/EventStoryViewer";
 
@@ -64,6 +65,10 @@ export default function PersonScreen() {
 
   const stats = React.useMemo(() => personStats(String(id)), [id]);
   const followId = React.useMemo(() => followIdForPerson(String(id)), [id]);
+  // Kendi profilim mi? (kendimi takip edemem). Takip kimliği = cihaz id'si.
+  const [myId, setMyId] = React.useState("");
+  React.useEffect(() => { getOrCreateDeviceId().then(setMyId).catch(() => {}); }, []);
+  const isSelf = !!myId && (followId === myId || String(id) === myId);
 
   const [isFollowing, setIsFollowing] = React.useState(false);
   const [followBusy, setFollowBusy] = React.useState(false);
@@ -267,7 +272,8 @@ export default function PersonScreen() {
             </View>
           </Animated.View>
 
-          {/* Takip et / Takip ediliyor */}
+          {/* Takip et / Takip ediliyor — kendi profilimde GÖSTERME (kendimi takip edemem). */}
+          {!isSelf ? (
           <Animated.View entering={FadeInDown.delay(285).duration(460)} style={{ marginTop: 8 }}>
             <Pressable
               onPress={toggleFollow}
@@ -297,6 +303,7 @@ export default function PersonScreen() {
               )}
             </Pressable>
           </Animated.View>
+          ) : null}
 
           {/* Mesaj Gönder */}
           <Animated.View entering={FadeInDown.delay(340).duration(460)}>

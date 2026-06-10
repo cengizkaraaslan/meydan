@@ -25,6 +25,12 @@ import {
 import { useMentionField } from "@/lib/mentions";
 import { MentionSuggestions } from "@/components/MentionSuggestions";
 import { MentionText } from "@/components/MentionText";
+import {
+  fetchEventPhotos,
+  postEventPhoto,
+  deleteEventPhoto as apiDeleteEventPhoto,
+  type EventPhoto,
+} from "@/lib/eventPhotos";
 import { toggleFavorite, useFavorites } from "@/lib/favorites";
 import { setAttending, mockAttendeesFor } from "@/lib/attending";
 import { scheduleEventReminders, cancelEventReminders } from "@/lib/reminders";
@@ -98,9 +104,15 @@ function relTime(ts: number): string {
 
 /** Etkinliğe eklenen fotoğraf. `by` = yükleyen kullanıcı id'si (sahiplik/silme için). */
 interface Photo {
+  id: string;
   uri: string;
-  by: string;
+  by: string; // yükleyenin deviceId'si (sahiplik)
   ts: number;
+}
+
+/** Sunucu fotoğrafını (EventPhoto) ekran modeline (Photo) çevir. */
+function toPhoto(ep: EventPhoto): Photo {
+  return { id: ep.id, uri: ep.url, by: ep.deviceId, ts: Date.parse(ep.createdAt) || Date.now() };
 }
 
 type Rsvp = "going" | "maybe" | "interested";
@@ -168,9 +180,7 @@ export default function EventDetail() {
   const [editDraft, setEditDraft] = useState("");
   // Yorum düzenle/sil ipucu modalı (ilk yorumdan sonra 1 kez).
   const [commentTip, setCommentTip] = useState(false);
-  // Oturum açan kullanıcının sahiplik kimliği (foto düzenle-sil yetkisi; foto yerelde).
-  const ownerId = user?.id ?? user?.email?.toLowerCase() ?? "";
-  // Yorumlar sunucuda deviceId sahipliğiyle tutulur → kendi cihaz kimliğim.
+  // Yorum & fotoğraflar sunucuda deviceId sahipliğiyle tutulur → kendi cihaz kimliğim.
   const [myDeviceId, setMyDeviceId] = useState("");
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [imgFailed, setImgFailed] = useState(false);
@@ -258,7 +268,6 @@ export default function EventDetail() {
 
   const eid = String(id);
   const rsvpKey = `meydanfest:rsvp:${eid}`;
-  const photosKey = `meydanfest:photos:${eid}`;
 
   useEffect(() => {
     // 1) Bellek cache (tıklanan etkinlik aynen aktarılır — ağır JSON parametresi yok).
@@ -314,10 +323,9 @@ export default function EventDetail() {
       try {
         // eski "going" anahtarıyla uyumluluk: varsa rsvp'ye taşı
         const legacyGoingKey = `meydanfest:going:${eid}`;
-        const [r, legacy, p] = await Promise.all([
+        const [r, legacy] = await Promise.all([
           AsyncStorage.getItem(rsvpKey),
           AsyncStorage.getItem(legacyGoingKey),
-          AsyncStorage.getItem(photosKey),
         ]);
         if (!alive) return;
         if (r === "going" || r === "maybe" || r === "interested") {
@@ -326,22 +334,14 @@ export default function EventDetail() {
           setRsvp("going");
           AsyncStorage.setItem(rsvpKey, "going");
         }
-        if (p) {
-          // Eski format string[] idi; { uri, by, ts } objesine taşı (by="" = sahibi bilinmeyen eski foto).
-          const arr = JSON.parse(p) as unknown[];
-          const migrated: Photo[] = arr.map((x) =>
-            typeof x === "string" ? { uri: x, by: "", ts: 0 } : (x as Photo),
-          );
-          setPhotos(migrated);
-        }
       } catch {
         /* yok say */
       }
     })();
     return () => { alive = false; };
-  }, [eid, rsvpKey, photosKey]);
+  }, [eid, rsvpKey]);
 
-  // Yorumları kendi cihaz kimliğini + sunucudaki yorumları yükle (slug hazır olunca).
+  // Kendi cihaz kimliğini + sunucudaki yorum & fotoğrafları yükle (slug hazır olunca).
   useEffect(() => {
     getDeviceId().then(setMyDeviceId).catch(() => {});
   }, []);
@@ -351,6 +351,9 @@ export default function EventDetail() {
     let alive = true;
     fetchEventComments(slug).then((list) => {
       if (alive) setComments(list.map(toComment));
+    });
+    fetchEventPhotos(slug).then((list) => {
+      if (alive) setPhotos(list.map(toPhoto));
     });
     return () => { alive = false; };
   }, [event?.slug]);
@@ -516,20 +519,24 @@ export default function EventDetail() {
       quality: 0.7,
     });
     if (res.canceled || !res.assets?.length) return;
-    // Yerel görseli R2'ye yükle → public URL sakla. Best-effort: null dönerse yerel uri ile devam.
+    // Görseli R2'ye yükle → public URL'i sunucuya kaydet (tüm cihazlarda görünür).
     const localUri = res.assets[0].uri;
     const uploaded = await uploadImage(localUri, "post");
-    const photo: Photo = { uri: uploaded ?? localUri, by: ownerId, ts: Date.now() };
-    setPhotos((prev) => {
-      const next = [...prev, photo];
-      AsyncStorage.setItem(photosKey, JSON.stringify(next));
-      return next;
-    });
-    successH();
+    if (!uploaded || !event?.slug) {
+      Alert.alert("Fotoğraf", "Fotoğraf yüklenemedi. Bağlantını kontrol et.");
+      return;
+    }
+    const created = await postEventPhoto(event.slug, uploaded);
+    if (created) {
+      setPhotos((prev) => [...prev, toPhoto(created)]);
+      successH();
+    } else {
+      Alert.alert("Fotoğraf", "Fotoğraf kaydedilemedi. Tekrar dene.");
+    }
   };
 
-  // Foto silinebilir mi? Sahibi (kendi yüklediği), admin ya da sahibi bilinmeyen eski foto (cihaza ait).
-  const canDeletePhoto = (p: Photo) => !!user && (isAdmin(user) || !p.by || p.by === ownerId);
+  // Foto silinebilir mi? Kendi yüklediğim (deviceId) ya da admin.
+  const canDeletePhoto = (p: Photo) => (!!myDeviceId && p.by === myDeviceId) || (!!user && isAdmin(user));
 
   const deletePhoto = (index: number) => {
     const p = photos[index];
@@ -540,13 +547,14 @@ export default function EventDetail() {
       {
         text: t("delete"),
         style: "destructive",
-        onPress: () => {
-          setPhotos((prev) => {
-            const next = prev.filter((_, i) => i !== index);
-            AsyncStorage.setItem(photosKey, JSON.stringify(next));
-            return next;
-          });
-          successH();
+        onPress: async () => {
+          const r = await apiDeleteEventPhoto(p.id, !!user && isAdmin(user));
+          if (r.ok) {
+            setPhotos((prev) => prev.filter((x) => x.id !== p.id));
+            successH();
+          } else {
+            Alert.alert(t("delete"), "Fotoğraf silinemedi.");
+          }
         },
       },
     ]);
