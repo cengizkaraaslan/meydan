@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { getPerson, type Person } from "@/lib/people";
+import { resolveAvatar } from "@/lib/avatar";
 import { useChat, canEditMsg, type Msg } from "@/lib/chat";
 import { useAuth } from "@/lib/auth";
 import { useTheme, type Palette } from "@/lib/theme";
@@ -62,7 +63,7 @@ export default function ChatScreen() {
           city: "",
           distanceKm: 0,
           online: false,
-          avatar: pAvatar || "",
+          avatar: resolveAvatar(pAvatar, pName, "male"),
           bio: "",
           interests: [],
           gender: "male",

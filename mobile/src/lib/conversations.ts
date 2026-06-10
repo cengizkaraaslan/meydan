@@ -1,6 +1,7 @@
 import { apiFetchMatches } from "./api";
 import { getOrCreateDeviceId } from "./device";
 import { getPerson } from "./people";
+import { resolveAvatar } from "./avatar";
 
 /** Anasayfadaki sohbet balonu için: backend'teki eşleşmeler + okunmamış sayısı. */
 export interface Conversation {
@@ -27,10 +28,12 @@ export async function listConversations(): Promise<Conversation[]> {
   const matches = await apiFetchMatches(deviceId);
   return matches.map((m) => {
     const p = getPerson(m.partnerId);
+    const name = p?.name ?? m.partnerName;
     return {
       id: m.partnerId,
-      name: p?.name ?? m.partnerName,
-      avatar: p?.avatar ?? m.partnerAvatar,
+      name,
+      // Avatar boşsa isimden üretilen fallback (boş kalmasın).
+      avatar: resolveAvatar(p?.avatar ?? m.partnerAvatar, name, null),
       online: p?.online ?? false,
       lastText: previewText(m.lastMessage),
       unread: m.unread,
