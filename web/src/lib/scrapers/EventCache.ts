@@ -37,6 +37,7 @@ interface CachedRow {
   city: string;
   country: string | null;
   district: string | null;
+  organizer: string | null;
   startsAt: Date;
   endsAt: Date | null;
   priceMin: number | null;
@@ -61,6 +62,7 @@ function rowToListItem(r: CachedRow): EventListItem {
     city: r.city,
     country: r.country ?? undefined,
     district: r.district ?? undefined,
+    organizer: r.organizer ?? undefined,
     startsAt: r.startsAt,
     endsAt: r.endsAt ?? undefined,
     priceMin: r.priceMin ?? undefined,
@@ -75,7 +77,7 @@ function rowToListItem(r: CachedRow): EventListItem {
 
 const SELECT = {
   id: true, slug: true, source: true, externalId: true, title: true, description: true,
-  category: true, venue: true, city: true, country: true, district: true, startsAt: true, endsAt: true,
+  category: true, venue: true, city: true, country: true, district: true, organizer: true, startsAt: true, endsAt: true,
   priceMin: true, priceMax: true, isFree: true, ticketUrl: true, imageUrl: true,
   artist: true, featured: true,
 } as const;
@@ -122,7 +124,7 @@ export async function setEventsForSource(
   if (!isDbConfigured || events.length === 0) return 0;
   let written = 0;
   const now = new Date();
-  const writtenForFeed: { slug: string; title: string; city: string; category: string; imageUrl: string | null }[] = [];
+  const writtenForFeed: { slug: string; title: string; city: string; category: string; imageUrl: string | null; startsAt: Date }[] = [];
 
   // Her event için upsert verisi + (feed için) özet hazırla.
   const items = events.map((e) => {
@@ -135,6 +137,7 @@ export async function setEventsForSource(
       city: e.city,
       country: e.country ?? null,
       district: e.district ?? null,
+      organizer: e.organizer ?? null,
       startsAt: e.startsAt,
       endsAt: e.endsAt ?? null,
       priceMin: e.priceMin ?? null,
@@ -159,12 +162,19 @@ export async function setEventsForSource(
   // Tek tek `await` (her biri ayrı round-trip) yüzlerce event'te 60sn serverless
   // limitini aşıyordu. Parçalara böl ve her parçayı TEK transaction'da batch'le
   // → round-trip yığılması biter (silme yok; katılım/yorum FK'leri korunur).
+  // Yalnızca DB'ye GERÇEKTEN yazılan event'lerin slug'larını feed'e ekle. Aksi halde
+  // upsert'i düşen (constraint/slug çakışması vb.) bir event için db.event'te karşılığı
+  // olmayan "Sistem" gönderisi üretilir → "Etkinliğe git → bulunamadı" (404) kartı oluşur.
+  const pushFeed = (it: (typeof items)[number]) =>
+    writtenForFeed.push({ slug: it.data.slug, title: it.data.title, city: it.data.city, category: String(it.data.category), imageUrl: it.data.imageUrl, startsAt: it.data.startsAt });
+
   const CHUNK = 50;
   try {
     for (let i = 0; i < items.length; i += CHUNK) {
       const chunk = items.slice(i, i + CHUNK);
       await db.$transaction(chunk.map(upsertOne));
       written += chunk.length;
+      for (const it of chunk) pushFeed(it);
     }
   } catch (err) {
     console.warn(
@@ -172,17 +182,16 @@ export async function setEventsForSource(
       err instanceof Error ? err.message : err,
     );
     written = 0;
+    writtenForFeed.length = 0;
     for (const it of items) {
       try {
         await upsertOne(it);
         written++;
+        pushFeed(it);
       } catch {
-        /* tek kayıt hatasını yut */
+        /* tek kayıt hatasını yut — feed'e de eklenmez */
       }
     }
-  }
-  for (const it of items) {
-    writtenForFeed.push({ slug: it.data.slug, title: it.data.title, city: it.data.city, category: String(it.data.category), imageUrl: it.data.imageUrl });
   }
   // Meydan duvarına "Sistem" etkinlik gönderileri (eventSlug ile idempotent — yalnız yeniler eklenir).
   try {

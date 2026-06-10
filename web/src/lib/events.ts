@@ -19,6 +19,7 @@ interface ManualEventRow {
   venue: string;
   city: string;
   district: string | null;
+  organizer: string | null;
   startsAt: Date;
   endsAt: Date | null;
   priceMin: number | null;
@@ -28,9 +29,26 @@ interface ManualEventRow {
   imageUrl: string | null;
   artist: string | null;
   featured: boolean;
+  creatorEmail: string | null;
+  creatorName: string | null;
+}
+
+/**
+ * Manuel/USER etkinlikte "Düzenleyen" kimliği. creatorEmail oluşturanın profil
+ * anahtarıdır (mobil /kisi/<id>). Gizli (creatorHidden) etkinlikte mobil tarafı
+ * creatorName'i BOŞ gönderir → ne organizer ismini ne de kimliği yayımlarız.
+ */
+function creatorIdentity(r: { creatorEmail: string | null; creatorName: string | null }): {
+  organizer?: string;
+  organizerId?: string;
+} {
+  const name = r.creatorName?.trim();
+  if (!name) return {}; // gizli/anonim → boş bırak
+  return { organizer: name, organizerId: r.creatorEmail?.trim() || undefined };
 }
 
 function manualRowToListItem(r: ManualEventRow): EventListItem {
+  const creator = creatorIdentity(r);
   return {
     id: r.id,
     slug: r.slug,
@@ -42,6 +60,10 @@ function manualRowToListItem(r: ManualEventRow): EventListItem {
     venue: r.venue,
     city: r.city,
     district: r.district ?? undefined,
+    // Manuel etkinlikte düzenleyen = oluşturan kişi (gizli değilse). r.organizer
+    // genelde boş; creatorName varsa onu organizer olarak öne çıkarırız.
+    organizer: creator.organizer ?? r.organizer ?? undefined,
+    organizerId: creator.organizerId,
     startsAt: r.startsAt,
     endsAt: r.endsAt ?? undefined,
     priceMin: r.priceMin ?? undefined,
@@ -64,6 +86,7 @@ const MANUAL_SELECT = {
   venue: true,
   city: true,
   district: true,
+  organizer: true,
   startsAt: true,
   endsAt: true,
   priceMin: true,
@@ -73,6 +96,8 @@ const MANUAL_SELECT = {
   imageUrl: true,
   artist: true,
   featured: true,
+  creatorEmail: true,
+  creatorName: true,
 } as const;
 
 /**
@@ -288,7 +313,9 @@ export async function getEvents(filters: EventFilters = {}): Promise<EventQueryR
   const rows = deduped.slice((page - 1) * pageSize, page * pageSize);
 
   return {
-    events: rows.map((r) => ({
+    events: rows.map((r) => {
+      const creator = creatorIdentity(r);
+      return {
       id: r.id,
       slug: r.slug,
       source: r.source,
@@ -299,6 +326,10 @@ export async function getEvents(filters: EventFilters = {}): Promise<EventQueryR
       venue: r.venue,
       city: r.city,
       country: r.country ?? undefined,
+      // Kullanıcı etkinliğinde düzenleyen = oluşturan (gizli değilse). Scraped'lerde
+      // creator boş → r.organizer (kurum/festival metni) kalır, organizerId boş.
+      organizer: creator.organizer ?? r.organizer ?? undefined,
+      organizerId: creator.organizerId,
       startsAt: r.startsAt,
       endsAt: r.endsAt ?? undefined,
       priceMin: r.priceMin ?? undefined,
@@ -310,7 +341,8 @@ export async function getEvents(filters: EventFilters = {}): Promise<EventQueryR
       featured: r.featured,
       attendeeCount: r._count.attendances,
       commentCount: r._count.comments,
-    })),
+      };
+    }),
     total,
     page,
     pageSize,
@@ -321,18 +353,27 @@ export async function getEvents(filters: EventFilters = {}): Promise<EventQueryR
 export async function getEventBySlug(slug: string): Promise<EventListItem | null> {
   if (useMockData) {
     // Önce DB'deki kullanıcı oluşturmuş MANUAL etkinliğe bak, sonra cache/static.
+    // SON ÇARE: snapshot/static'te yoksa GERÇEK db.event'e düş — mock modda bile
+    // scrape edilmiş etkinlikler (üniversite/Meydan sistem gönderileri) slug ile açılsın
+    // (aksi halde detayda "Etkinlik bulunamadı" veriyordu).
     return (
       (await getManualEventBySlug(slug)) ??
       (await getCachedEventBySlug(slug)) ??
       STATIC_EVENTS.find((e) => e.slug === slug) ??
-      null
+      (isDbConfigured ? await dbEventBySlug(slug) : null)
     );
   }
+  return dbEventBySlug(slug);
+}
+
+/** Gerçek db.event'ten slug ile etkinlik (EventListItem). Mock-fallback ve normal path ortak. */
+async function dbEventBySlug(slug: string): Promise<EventListItem | null> {
   const row = await db.event.findUnique({
     where: { slug },
     include: { _count: { select: { attendances: true, comments: true } } },
   });
   if (!row) return null;
+  const creator = creatorIdentity(row);
   return {
     id: row.id,
     slug: row.slug,
@@ -343,6 +384,8 @@ export async function getEventBySlug(slug: string): Promise<EventListItem | null
     category: row.category,
     venue: row.venue,
     city: row.city,
+    organizer: creator.organizer ?? row.organizer ?? undefined,
+    organizerId: creator.organizerId,
     startsAt: row.startsAt,
     endsAt: row.endsAt ?? undefined,
     priceMin: row.priceMin ?? undefined,
@@ -419,6 +462,7 @@ export async function getFeaturedEvents(limit = 6): Promise<EventListItem[]> {
     category: r.category,
     venue: r.venue,
     city: r.city,
+    organizer: r.organizer ?? undefined,
     startsAt: r.startsAt,
     endsAt: r.endsAt ?? undefined,
     priceMin: r.priceMin ?? undefined,

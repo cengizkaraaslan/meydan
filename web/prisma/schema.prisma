@@ -474,6 +474,8 @@ model Event {
   venue         String
   city          String
   country       String?
+  /// Etkinliği düzenleyen kurum/kişi (üniv. adı, festival organizatörü, manuel etkinlikte oluşturan). Scraped'lerde çoğunlukla null.
+  organizer     String?
   startsAt      DateTime
   endsAt        DateTime?
   priceMin      Float?

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { Calendar, MapPin, ExternalLink, BellRing, ArrowLeft, CalendarPlus, Star } from "lucide-react";
+import { Calendar, MapPin, ExternalLink, BellRing, ArrowLeft, CalendarPlus, Star, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { RsvpButtons } from "@/components/RsvpButtons";
 import { Comments } from "@/components/Comments";
@@ -23,7 +23,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { isTruncated, getFullDescription } from "@/lib/enrich-description";
 import { formatEventDate, formatPrice } from "@/lib/utils";
 import { SOURCE_LABELS, isUniversitySource } from "@/lib/types";
-import { seedLikeCount, seedLikersFor } from "@/lib/social-data";
+import { seedLikeCount, seedLikersFor, profileSlugFromEmail } from "@/lib/social-data";
 import { auth } from "@/auth";
 import { getRsvp } from "@/lib/rsvp-store";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
@@ -217,7 +217,7 @@ export default async function EventDetailPage({
               ) : event.isFree ? (
                 <Badge variant="free">{tCommon("free")}</Badge>
               ) : (
-                <Badge variant="default">{formatPrice(event.priceMin, event.priceMax, event.isFree)}</Badge>
+                <Badge variant="default">{formatPrice(event.priceMin, event.priceMax, event.isFree, event.category)}</Badge>
               )}
               <Badge variant="outline">{SOURCE_LABELS[event.source]}</Badge>
             </div>
@@ -231,6 +231,21 @@ export default async function EventDetailPage({
               <span className="inline-flex items-center gap-2">
                 <MapPin className="size-4" /> {event.venue}, {event.city}
               </span>
+              {event.organizer && (
+                <span className="inline-flex items-center gap-2">
+                  <Building2 className="size-4" /> Düzenleyen:{" "}
+                  {event.organizerId ? (
+                    <Link
+                      href={`/profil/${profileSlugFromEmail(event.organizerId)}`}
+                      className="text-[var(--primary)] hover:underline"
+                    >
+                      {event.organizer}
+                    </Link>
+                  ) : (
+                    event.organizer
+                  )}
+                </span>
+              )}
               {weather && (
                 <span
                   className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[var(--primary)]/10 to-[var(--accent)]/10 backdrop-blur px-2.5 py-1 text-xs font-medium border border-[var(--border)]"
@@ -363,7 +378,7 @@ export default async function EventDetailPage({
               <div className="mt-1 text-2xl font-bold">
                 {isUniversitySource(event.source)
                   ? "🎓 Öğrenciye açık"
-                  : formatPrice(event.priceMin, event.priceMax, event.isFree)}
+                  : formatPrice(event.priceMin, event.priceMax, event.isFree, event.category)}
               </div>
               {isUniversitySource(event.source) && (
                 <div className="mt-1 text-xs text-[var(--muted)]">

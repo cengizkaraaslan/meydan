@@ -39,8 +39,36 @@ export async function listFeed(input: { deviceId: string; filter: "all" | "follo
     where = { authorId: { in: [...ids, deviceId, "system"] } };
   }
 
-  const posts = await db.mobilePost.findMany({ where, orderBy: { createdAt: "desc" }, skip: offset, take: PAGE });
+  let posts = await db.mobilePost.findMany({ where, orderBy: { createdAt: "desc" }, skip: offset, take: PAGE });
   if (posts.length === 0) return [];
+
+  // Sistem (etkinlik) gönderilerinden, eventSlug'ı db.event'te karşılığı OLMAYAN ya da
+  // etkinliği GEÇMİŞTE kalmış olanları ele. Üniversite idari duyuruları ("…Ele Alındı",
+  // "…Düzenlendi") geçmiş tarihli haberlerdir — gerçek (gelecek) etkinlik değiller;
+  // ayrıca canlı API mock/snapshot modunda bunların slug'ını çözemediği için detayda
+  // "Etkinliğe git → bulunamadı" veriyorlardı. Yalnız GELECEK etkinliklerin sistem
+  // gönderileri akışta kalsın.
+  const sysSlugs = [
+    ...new Set(
+      posts
+        .filter((p) => p.authorId === "system" && p.eventSlug)
+        .map((p) => p.eventSlug as string),
+    ),
+  ];
+  if (sysSlugs.length > 0) {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const existing = await db.event.findMany({
+      where: { slug: { in: sysSlugs }, startsAt: { gte: todayStart } },
+      select: { slug: true },
+    });
+    const liveSlugs = new Set(existing.map((e) => e.slug));
+    posts = posts.filter(
+      (p) => p.authorId !== "system" || !p.eventSlug || liveSlugs.has(p.eventSlug),
+    );
+    if (posts.length === 0) return [];
+  }
+
   const ids = posts.map((p) => p.id);
 
   const [reacts, myReacts, comments] = await Promise.all([
@@ -215,6 +243,7 @@ export interface SystemEventInput {
   city: string;
   category: string;
   imageUrl?: string | null;
+  startsAt?: Date | string | null;
 }
 
 function systemPostText(e: SystemEventInput): string {
@@ -229,6 +258,15 @@ function systemPostText(e: SystemEventInput): string {
  */
 export async function syncSystemPostsForEvents(events: SystemEventInput[]): Promise<number> {
   if (!isDbConfigured || events.length === 0) return 0;
+  // Yalnız GELECEK etkinlikler için sistem gönderisi üret — geçmiş tarihli üniversite
+  // idari duyuruları ("…Ele Alındı" vb.) akışı kirletmesin (startsAt verilmişse).
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  events = events.filter((e) => {
+    if (e.startsAt == null) return true;
+    const ms = typeof e.startsAt === "string" ? Date.parse(e.startsAt) : e.startsAt.getTime();
+    return Number.isNaN(ms) || ms >= todayStart.getTime();
+  });
   const slugs = events.map((e) => e.slug).filter(Boolean);
   if (slugs.length === 0) return 0;
   try {

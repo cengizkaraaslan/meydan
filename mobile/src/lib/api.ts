@@ -26,6 +26,10 @@ export interface ApiEvent {
   ticket_url: string | null;
   image_url: string | null;
   artist: string | null;
+  /** Etkinliği düzenleyen (üniversite adı / festival organizatörü / oluşturan kişi). */
+  organizer?: string | null;
+  /** Düzenleyen bir kullanıcıysa profil kimliği — varsa isim tıklanınca profile gider. */
+  organizer_id?: string | null;
 }
 
 export interface EventsMeta {

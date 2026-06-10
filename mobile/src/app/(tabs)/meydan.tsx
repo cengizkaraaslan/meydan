@@ -30,7 +30,7 @@ import { StoryAvatar } from "@/components/StoryAvatar";
 import { Loader, SectionHeader, EmptyState } from "@/ui/atoms";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
-import { tapH, mediumH, successH, impactH } from "@/lib/haptics";
+import { tapH, mediumH, successH, impactH, tapHaptic } from "@/lib/haptics";
 import { getOrCreateDeviceId } from "@/lib/device";
 import { useStories, addStory } from "@/lib/stories";
 import { useAuth } from "@/lib/auth";
@@ -351,7 +351,8 @@ export default function MeydanScreen() {
     if (!trimmed || posting) return;
     setPosting(true);
     try {
-      const ok = await createPost({ text: trimmed });
+      // İsim + avatarı gönder ki gönderi "Meydanlı" yerine kişinin adıyla ve avatarıyla görünsün.
+      const ok = await createPost({ text: trimmed, authorName: user?.name || undefined, authorAvatar: myAvatar || undefined });
       if (ok) {
         successH();
         setCompose("");
@@ -364,7 +365,7 @@ export default function MeydanScreen() {
     } finally {
       setPosting(false);
     }
-  }, [compose, posting, filter, load, maybeShowTip]);
+  }, [compose, posting, filter, load, maybeShowTip, user?.name, myAvatar]);
 
   // 📷 Foto gönderi: seçilen görseli R2'ye yükle → createPost (opsiyonel composer metniyle) → feed yenile.
   const postPhotoFromUri = useCallback(
@@ -510,8 +511,8 @@ export default function MeydanScreen() {
     ({ item, index }: { item: FeedItem; index: number }) => (
       <Animated.View entering={FadeInDown.delay(Math.min(index, 8) * 45).duration(380).springify()}>
         {item.kind === "event" ? (
-          <View style={[styles.eventWrap, { borderColor: T.hairline }]}>
-            <Text style={[Type.label, { color: T.gold, marginBottom: 8 }]}>✨ Yeni etkinlik</Text>
+          <View style={[styles.eventWrap, { borderColor: T.hairline, backgroundColor: T.surface }]}>
+            <Text style={[Type.label, { color: T.gold, marginBottom: 8, marginLeft: 4 }]}>✨ Yeni etkinlik</Text>
             <EventRow event={item.event} />
           </View>
         ) : (
@@ -543,7 +544,7 @@ export default function MeydanScreen() {
           <Text style={[Type.label, { color: T.textFaint }]}>Topluluk duvarı</Text>
         </View>
         <Pressable
-          onPress={() => { tapH(); setComposerOpen((v) => !v); }}
+          onPress={() => { tapHaptic(); setComposerOpen((v) => !v); }}
           style={[
             styles.composeToggle,
             composerOpen
@@ -656,6 +657,11 @@ export default function MeydanScreen() {
           entering={FadeInDown.duration(260)}
           style={[styles.composer, { backgroundColor: T.surface, borderColor: T.hairline }]}
         >
+          {/* Kim paylaşıyor — avatar + ad (kullanıcının kendi profili). */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <StoryAvatar uri={myAvatar} name={myName} size={36} />
+            <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>{myName}</Text>
+          </View>
           <TextInput
             value={compose}
             onChangeText={setCompose}
@@ -898,7 +904,7 @@ const styles = StyleSheet.create({
   composerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
   photoBtn: { width: 44, height: 40, borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center", justifyContent: "center" },
   shareBtn: { borderRadius: Radius.pill, paddingHorizontal: 22, paddingVertical: 10, minWidth: 90, alignItems: "center", justifyContent: "center" },
-  eventWrap: { marginHorizontal: 16, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, borderStyle: "dashed", padding: 12 },
+  eventWrap: { marginHorizontal: 16, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 14 },
   tipScrim: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 28 },
   tipCard: { width: "100%", maxWidth: 360, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 20 },
   tipBtn: { alignSelf: "flex-end", borderRadius: Radius.pill, paddingHorizontal: 22, paddingVertical: 10, alignItems: "center", justifyContent: "center" },

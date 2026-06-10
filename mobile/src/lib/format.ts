@@ -44,11 +44,14 @@ export function isUniversitySource(source?: string | null): boolean {
  */
 export function priceLabel(e: {
   source?: string | null;
+  category?: string | null;
   is_free: boolean;
   price_min: number | null;
   price_max: number | null;
 }): string {
   if (isUniversitySource(e.source)) return "🎓 Öğrenciye açık";
+  // Festivalde fiyat bilgisi yoksa "Biletli" deme — fiyat yazmıyorsa ücretsizdir.
+  if (e.category === "FESTIVAL" && !e.is_free && e.price_min == null) return "Ücretsiz";
   return fmtPrice(e);
 }
 

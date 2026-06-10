@@ -489,6 +489,8 @@ export class FestivallTrScraper extends BaseScraper {
       venue: venue || city,
       city,
       district: structured.district,
+      // "DÜZENLEYEN" bölümünden çıkardığımız organizatör (varsa). JSON-LD organizer'ı da fallback.
+      organizer: structured.organizer ?? ld?.organizer?.name ?? undefined,
       startsAt,
       endsAt,
       isFree,

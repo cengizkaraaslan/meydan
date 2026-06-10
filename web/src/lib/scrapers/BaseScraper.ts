@@ -1,4 +1,5 @@
 import type { EventSource, ScrapedEvent } from "../types";
+import { isUniversitySource } from "../types";
 import { slugify } from "../utils";
 
 export interface ScraperResult {
@@ -55,6 +56,9 @@ export abstract class BaseScraper {
       city: this.normalizeCity(e.city),
       venue: e.venue.trim(),
       isFree: e.isFree || (e.priceMin === 0 && e.priceMax === 0),
+      // Üniversite etkinliklerinde düzenleyen = üniversite adı (kaynağın displayName'i).
+      // Scraper kendi organizer'ını set ettiyse (festival vb.) ona dokunma.
+      organizer: e.organizer ?? (isUniversitySource(String(this.source)) ? this.displayName : undefined),
     };
   }
 

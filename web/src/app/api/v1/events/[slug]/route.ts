@@ -65,6 +65,9 @@ export async function GET(
       category: event.category,
       venue: event.venue,
       city: event.city,
+      organizer: event.organizer ?? null,
+      // Düzenleyen bir kullanıcıysa profil kimliği (mobil /kisi/<id>); scraped'lerde null.
+      organizer_id: event.organizerId ?? null,
       starts_at: event.startsAt.toISOString(),
       ends_at: event.endsAt?.toISOString() ?? null,
       price_min: event.priceMin ?? null,

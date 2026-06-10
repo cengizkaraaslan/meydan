@@ -49,6 +49,7 @@ export async function createEventAction(
 ): Promise<CreateEventResult> {
   const session = await auth().catch(() => null);
   const email = session?.user?.email ?? null;
+  const creatorName = session?.user?.name?.trim() || null;
   if (!email) {
     return { ok: false, error: "Etkinlik oluşturmak için giriş yapmalısın" };
   }
@@ -100,6 +101,9 @@ export async function createEventAction(
         hidden: false,
         featured: false,
         creatorEmail: email,
+        creatorName,
+        // Düzenleyen = oluşturanın adı (varsa) — etkinlik detayında "Düzenleyen: …" gösterilir.
+        organizer: creatorName,
       },
       select: { slug: true },
     });

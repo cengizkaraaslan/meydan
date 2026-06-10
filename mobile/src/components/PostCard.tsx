@@ -196,7 +196,8 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
             </Pressable>
           )
         ) : (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          // "Sen" + "⋯" satırın üstüne hizalı (dikey ortada değil, biraz yukarıda).
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "flex-start", marginTop: -2 }}>
             <View style={[styles.followPill, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}>
               <Text style={[Type.label, { color: T.textFaint }]}>Sen</Text>
             </View>
@@ -240,19 +241,19 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 14, gap: 10, ...glow("#000", 10, 0.15) },
+  card: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 16, gap: 10, ...glow("#000", 10, 0.15) },
   head: { flexDirection: "row", alignItems: "center", gap: 10 },
   followPill: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6 },
   moreBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2 },
   eventTag: { alignSelf: "flex-start", borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, maxWidth: "100%" },
   media: { width: "100%", height: 220, borderRadius: Radius.md, marginTop: 2 },
-  footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 2 },
+  footer: { flexDirection: "row", alignItems: "center", gap: 18, marginTop: 4 },
   likeBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 7 },
   summary: { flexDirection: "row", marginLeft: 2 },
   summaryEmoji: { fontSize: 12 },
   pickerWrap: { position: "absolute", bottom: "100%", left: 0, marginBottom: 8, zIndex: 20 },
   // Sistem / etkinlik kartı
-  sysCard: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 14, gap: 8, ...glow("#000", 10, 0.15) },
+  sysCard: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 16, gap: 8, ...glow("#000", 10, 0.15) },
   sysHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   sysIcon: { fontSize: 18 },
   sysBadge: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 8, paddingVertical: 3 },

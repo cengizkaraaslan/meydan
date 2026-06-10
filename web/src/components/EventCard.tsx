@@ -74,7 +74,7 @@ export function EventCard({ event, index = 0 }: { event: EventListItem; index?: 
               <Badge variant="free">{tCommon("free")}</Badge>
             ) : (
               <Badge variant="default" className="bg-[var(--background)]/95 backdrop-blur">
-                {formatPrice(event.priceMin, event.priceMax, event.isFree)}
+                {formatPrice(event.priceMin, event.priceMax, event.isFree, event.category)}
               </Badge>
             )}
             {event.featured && <Badge variant="warning">✨ Öne çıkan</Badge>}

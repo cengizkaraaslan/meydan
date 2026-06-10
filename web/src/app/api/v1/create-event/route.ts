@@ -121,6 +121,8 @@ export async function POST(request: NextRequest) {
       tiktok: body.tiktok?.trim() || null,
       creatorEmail: body.creatorEmail?.trim() || null,
       creatorName: body.creatorName?.trim() || null,
+      // Düzenleyen = oluşturanın adı (varsa) — etkinlik detayında gösterilir.
+      organizer: body.creatorName?.trim() || null,
     },
   });
 

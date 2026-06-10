@@ -9,6 +9,7 @@ import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Animated, { FadeIn, FadeInDown, FadeOut, ZoomIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { catMeta } from "@/lib/categories";
 import { fmtLong, priceLabel, isUniversitySource } from "@/lib/format";
@@ -732,7 +733,7 @@ export default function EventDetail() {
             <Pressable onPress={() => { tapH(); tryLeave(); }} style={[styles.circleBtn, { borderColor: T.hairline }]}><Text style={styles.circleTxt}>←</Text></Pressable>
             <View style={{ flexDirection: "row", gap: 10 }}>
               <Pressable onPress={() => { tapH(); addEventToCalendar(event); }} style={[styles.circleBtn, { borderColor: T.hairline }]}><Text style={{ fontSize: 15 }}>📅</Text></Pressable>
-              <Pressable onPress={share} style={[styles.circleBtn, { borderColor: T.hairline }]}><Text style={styles.circleTxt}>↗</Text></Pressable>
+              <Pressable onPress={share} style={[styles.circleBtn, { borderColor: T.hairline }]}><Ionicons name="share-social-outline" size={17} color="#fff" /></Pressable>
               <Pressable
                 onPress={async () => {
                   // Oturum açmayan favori ekleyemez → giriş modalı.
@@ -782,6 +783,19 @@ export default function EventDetail() {
               onPress={event.ticket_url ? openTicket : undefined}
               actionLabel={event.ticket_url ? (isUniversitySource(event.source) || event.is_free ? t("go_detail") : t("buy_ticket")) : undefined}
             />
+            {event.organizer ? (
+              <>
+                <View style={[styles.sep, { backgroundColor: T.hairline }]} />
+                <InfoRow
+                  T={T}
+                  icon="🧑‍💼"
+                  label="Düzenleyen"
+                  value={event.organizer}
+                  onPress={event.organizer_id ? () => { tapH(); router.push(`/kisi/${event.organizer_id}`); } : undefined}
+                  actionLabel={event.organizer_id ? "Profili gör" : undefined}
+                />
+              </>
+            ) : null}
             {event.artist ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="🎤" label={t("artist")} value={event.artist} /></>) : null}
           </Animated.View>
 

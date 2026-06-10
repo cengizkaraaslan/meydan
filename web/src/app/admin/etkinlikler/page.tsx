@@ -31,7 +31,7 @@ export default function AdminEventsPage() {
                 <td className="px-4 py-3">{CATEGORY_LABELS[e.category]}</td>
                 <td className="px-4 py-3">{SOURCE_LABELS[e.source]}</td>
                 <td className="px-4 py-3">{formatEventDate(e.startsAt)}</td>
-                <td className="px-4 py-3">{isUniversitySource(e.source) ? "🎓 Öğrenciye açık" : formatPrice(e.priceMin, e.priceMax, e.isFree)}</td>
+                <td className="px-4 py-3">{isUniversitySource(e.source) ? "🎓 Öğrenciye açık" : formatPrice(e.priceMin, e.priceMax, e.isFree, e.category)}</td>
                 <td className="px-4 py-3 text-end">
                   <button className="text-xs text-[var(--primary)] hover:underline me-3">Düzenle</button>
                   <button className="text-xs text-[var(--danger)] hover:underline">Gizle</button>

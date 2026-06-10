@@ -116,6 +116,9 @@ export async function GET(request: NextRequest) {
         venue: e.venue,
         city: e.city,
         country: e.country ?? null,
+        organizer: e.organizer ?? null,
+        // Düzenleyen bir kullanıcıysa profil kimliği (mobil /kisi/<id>); scraped'lerde null.
+        organizer_id: e.organizerId ?? null,
         starts_at: e.startsAt.toISOString(),
         ends_at: e.endsAt?.toISOString() ?? null,
         price_min: e.priceMin ?? null,

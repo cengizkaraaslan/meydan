@@ -246,7 +246,7 @@ export function EventCalendar({ events, initialYear, initialMonth, cityFilter }:
                           <div className={`text-xs font-medium mt-0.5 ${e.isFree ? "text-[var(--success)]" : ""}`}>
                             {isUniversitySource(e.source)
                               ? "🎓 Öğrenciye açık"
-                              : formatPrice(e.priceMin, e.priceMax, e.isFree)}
+                              : formatPrice(e.priceMin, e.priceMax, e.isFree, e.category)}
                           </div>
                         </div>
                       </div>

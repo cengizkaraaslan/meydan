@@ -56,6 +56,15 @@ export interface ScrapedEvent {
   country?: string;
   /** İl içinde ilçe (örn. "Kadıköy", "Çankaya") - opsiyonel. Filtre için kullanılır. */
   district?: string;
+  /** Etkinliği düzenleyen kurum/kişi (üniv. adı, festival organizatörü, manuel etkinlikte oluşturan). Scraped'lerde çoğunlukla yok. */
+  organizer?: string;
+  /**
+   * Düzenleyen bir KULLANICI ise profil kimliği (manuel/USER etkinlikte oluşturanın
+   * creatorEmail/deviceId'si). Mobil "Düzenleyen" ismine tıklayınca /kisi/<id> profiline
+   * gitmek için. Scraped (üniv./festival) etkinliklerde profil yok → boş. creatorHidden
+   * (gizli) etkinliklerde organizer ile birlikte boş bırakılır.
+   */
+  organizerId?: string;
   startsAt: Date;
   endsAt?: Date;
   priceMin?: number;

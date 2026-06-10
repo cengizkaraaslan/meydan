@@ -5,8 +5,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatPrice(min?: number | null, max?: number | null, isFree?: boolean): string {
+export function formatPrice(
+  min?: number | null,
+  max?: number | null,
+  isFree?: boolean,
+  category?: string,
+): string {
   if (isFree) return "Ücretsiz";
+  // Festivaller çoğunlukla ücretsiz halk/şehir festivali ve kaynaklarda fiyat verisi YOK.
+  // Fiyat yoksa "Biletli" damgalamak yanıltıcı → festival + fiyatsız ise "Ücretsiz" göster.
+  if (category === "FESTIVAL" && min == null && max == null) return "Ücretsiz";
   // Ücretli ama fiyat verisi yok → yanıltıcı "Fiyat bilgisi yok" yerine net "Biletli".
   // (Çoğu biletleme sitesi fiyatı liste sayfasında vermez; karta tıklayınca bilet sayfası açılır.)
   if (min == null && max == null) return "🎟️ Biletli";
