@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getOrCreateDeviceId } from "./device";
+import { getProfileKey } from "./profileSync";
 import { getPerson } from "./people";
 import { uploadImage } from "./social";
 import {
@@ -40,7 +40,7 @@ export async function sendStoryReply(personId: string, text: string): Promise<bo
   const trimmed = text.trim();
   if (!trimmed) return false;
   try {
-    const did = await getOrCreateDeviceId();
+    const did = await getProfileKey();
     const person = getPerson(personId);
     const mk = await apiEnsureMatch({
       deviceId: did,
@@ -106,7 +106,7 @@ export function useChat(personId: string, override?: { name?: string | null; ava
   useEffect(() => {
     let alive = true;
     (async () => {
-      const did = await getOrCreateDeviceId();
+      const did = await getProfileKey();
       if (!alive) return;
       setDeviceId(did);
       const person = getPerson(personId);

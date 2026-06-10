@@ -32,7 +32,9 @@ export function setAccountKey(email: string | null): void {
   const e = email?.trim().toLowerCase();
   accountKey = e ? `acct:${e}` : null;
 }
-async function getProfileKey(): Promise<string> {
+/** Hesap-bazlı kimlik: girişliyse "acct:<email>", değilse cihaz id. Sohbet/profil bunu kullanır
+ *  → aynı cihazda farklı hesaplar AYRI sohbet/profil görür. */
+export async function getProfileKey(): Promise<string> {
   return accountKey ?? (await getDeviceId());
 }
 
@@ -68,6 +70,11 @@ export async function restoreAvatar(): Promise<void> {
   if (avatar) {
     await AsyncStorage.setItem(KEY_AVATAR, avatar);
     avatarListeners.forEach((l) => l(avatar));
+  } else {
+    // Bu hesabın sunucuda avatarı yok → önceki hesaptan kalan YEREL avatarı temizle
+    // (başka hesaba girince eski avatar görünmesin).
+    await AsyncStorage.removeItem(KEY_AVATAR);
+    avatarListeners.forEach((l) => l(""));
   }
 }
 

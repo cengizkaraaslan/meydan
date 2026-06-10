@@ -1,5 +1,5 @@
 import { apiFetchMatches } from "./api";
-import { getOrCreateDeviceId } from "./device";
+import { getProfileKey } from "./profileSync";
 import { getPerson } from "./people";
 import { resolveAvatar } from "./avatar";
 
@@ -24,7 +24,7 @@ function previewText(text: string | null): string | null {
 
 /** Backend'ten eşleşme özetlerini çekip sohbet listesine dönüştürür (yeni→eski). */
 export async function listConversations(): Promise<Conversation[]> {
-  const deviceId = await getOrCreateDeviceId();
+  const deviceId = await getProfileKey();
   const matches = await apiFetchMatches(deviceId);
   return matches.map((m) => {
     const p = getPerson(m.partnerId);
