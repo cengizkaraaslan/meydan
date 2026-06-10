@@ -7,6 +7,7 @@ import { Radius, Type, glow } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
 import { tapHaptic, impactHaptic } from "@/lib/haptics";
 import { StoryAvatar } from "@/components/StoryAvatar";
+import { MentionText } from "@/components/MentionText";
 import { ReactionPicker } from "@/components/ReactionPicker";
 import { type FeedPost } from "@/lib/social";
 
@@ -155,7 +156,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
               <Image source={{ uri: post.imageUrl }} style={styles.sysThumb} contentFit="cover" transition={200} />
             ) : null}
             {post.text ? (
-              <Text style={[Type.body, { color: T.text, flex: 1 }]} numberOfLines={6}>{post.text}</Text>
+              <MentionText text={post.text} style={[Type.body, { color: T.text, flex: 1 }]} numberOfLines={6} />
             ) : null}
           </View>
 
@@ -231,7 +232,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
       ) : null}
 
       {/* Metin — soldan biraz içeride dursun (avatara yapışmasın). */}
-      {post.text ? <Text style={[Type.body, { color: T.text, marginTop: 2, marginLeft: 8 }]}>{post.text}</Text> : null}
+      {post.text ? <MentionText text={post.text} style={[Type.body, { color: T.text, marginTop: 2, marginLeft: 8 }]} /> : null}
 
       {/* Görsel */}
       {post.imageUrl ? (

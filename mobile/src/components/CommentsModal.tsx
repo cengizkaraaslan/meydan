@@ -19,6 +19,7 @@ import { StoryAvatar } from "@/components/StoryAvatar";
 import { addComment, fetchComments, type PostComment } from "@/lib/social";
 import { useMentionField } from "@/lib/mentions";
 import { MentionSuggestions } from "@/components/MentionSuggestions";
+import { MentionText } from "@/components/MentionText";
 
 function relTime(iso: string): string {
   const ts = new Date(iso).getTime();
@@ -123,7 +124,7 @@ export function CommentsModal({ postId, authorName, onClose, onAdded }: Props) {
                       </Text>
                       <Text style={[Type.micro, { color: T.textFaint }]}>{relTime(item.createdAt)}</Text>
                     </View>
-                    <Text style={[Type.body, { color: T.textDim, marginTop: 2 }]}>{item.text}</Text>
+                    <MentionText text={item.text} style={[Type.body, { color: T.textDim, marginTop: 2 }]} />
                   </View>
                 </View>
               )}

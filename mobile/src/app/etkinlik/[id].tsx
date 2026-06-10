@@ -24,6 +24,7 @@ import {
 } from "@/lib/eventComments";
 import { useMentionField } from "@/lib/mentions";
 import { MentionSuggestions } from "@/components/MentionSuggestions";
+import { MentionText } from "@/components/MentionText";
 import { toggleFavorite, useFavorites } from "@/lib/favorites";
 import { setAttending, mockAttendeesFor } from "@/lib/attending";
 import { scheduleEventReminders, cancelEventReminders } from "@/lib/reminders";
@@ -1008,7 +1009,7 @@ export default function EventDetail() {
                           </View>
                         </View>
                       ) : (
-                        <Text style={[Type.body, { color: T.text, lineHeight: 20 }]}>{cm.text}</Text>
+                        <MentionText text={cm.text} style={[Type.body, { color: T.text, lineHeight: 20 }]} />
                       )}
                     </Pressable>
                   );
