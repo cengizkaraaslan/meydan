@@ -6,7 +6,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Space, Type, glow } from "@/theme/aurora";
-import { getPerson } from "@/lib/people";
+import { getPerson, type Person } from "@/lib/people";
+import { resolveAvatar } from "@/lib/avatar";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useCanSeeAges } from "@/lib/dprofile";
@@ -36,12 +37,30 @@ function personStats(id: string): { storyCount: number; eventCount: number } {
 }
 
 export default function PersonScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, name: paramName, avatar: paramAvatar } = useLocalSearchParams<{ id: string; name?: string; avatar?: string }>();
   const insets = useSafeAreaInsets();
   const { t: T } = useTheme();
   const { t } = useT();
   const canSeeAges = useCanSeeAges();
-  const person = getPerson(String(id));
+  // Mock listede yoksa (gerçek Meydan kullanıcısı) gönderiden gelen ad/avatarla minimal
+  // bir profil üret — "kişi bulunamadı" yerine isim+avatarla açılsın.
+  const person: Person | undefined = React.useMemo(() => {
+    const p = getPerson(String(id));
+    if (p) return p;
+    if (!paramName && !paramAvatar) return undefined;
+    return {
+      id: String(id),
+      name: (paramName || "Meydanlı").trim(),
+      age: 0,
+      city: "",
+      distanceKm: 0,
+      online: false,
+      avatar: resolveAvatar(paramAvatar || null, paramName || null, "male"),
+      bio: "",
+      interests: [],
+      gender: "male",
+    };
+  }, [id, paramName, paramAvatar]);
 
   const stats = React.useMemo(() => personStats(String(id)), [id]);
   const followId = React.useMemo(() => followIdForPerson(String(id)), [id]);
@@ -167,13 +186,15 @@ export default function PersonScreen() {
           {/* İsim bloğu — görselin altına biner */}
           <Animated.View entering={FadeInDown.delay(80).duration(480)} style={styles.nameBlock}>
             <Text style={[Type.hero, { color: T.text }]}>
-              {canSeeAges ? `${person.name}, ${person.age}` : person.name}
+              {canSeeAges && person.age ? `${person.name}, ${person.age}` : person.name}
             </Text>
-            <Text style={[Type.body, { color: isVeryClose ? T.success : T.textDim, marginTop: 4, fontWeight: "700" }]}>
-              {isVeryClose
-                ? `📍 ${person.distanceKm} km · ${t("person_nearby")}`
-                : `📍 ${person.distanceKm} km ${t("away")}`}
-            </Text>
+            {person.distanceKm > 0 ? (
+              <Text style={[Type.body, { color: isVeryClose ? T.success : T.textDim, marginTop: 4, fontWeight: "700" }]}>
+                {isVeryClose
+                  ? `📍 ${person.distanceKm} km · ${t("person_nearby")}`
+                  : `📍 ${person.distanceKm} km ${t("away")}`}
+              </Text>
+            ) : null}
             {/* Sayaçlar — story varsa "📸 N story" tıklanabilir (story'leri izle) */}
             <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, gap: 6 }}>
               {personStories.length > 0 ? (
@@ -212,7 +233,7 @@ export default function PersonScreen() {
               <Text style={[Type.label, { color: T.textFaint, marginBottom: 8, letterSpacing: 0.6 }]}>
                 {t("person_about").toUpperCase()}
               </Text>
-              <Text style={[Type.body, { color: T.text, lineHeight: 21 }]}>{person.bio}</Text>
+              <Text style={[Type.body, { color: person.bio ? T.text : T.textFaint, lineHeight: 21 }]}>{person.bio || "Bu kullanıcı henüz bir bilgi paylaşmadı."}</Text>
               {/* TikTok hesabı (mock) */}
               {person.tiktok ? (
                 <Pressable

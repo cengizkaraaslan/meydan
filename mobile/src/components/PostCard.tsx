@@ -115,6 +115,14 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
     try { await onReact(emoji); } finally { setBusy(false); }
   };
 
+  // Gönderi sahibinin profiline git (sistem gönderisinde yok). Ad/avatarı param geçiyoruz
+  // ki gerçek kullanıcıda (mock listede olmayan) profil yine isim+avatarla açılsın.
+  const openAuthor = () => {
+    if (!post.authorId || post.authorId === "system") return;
+    tapHaptic();
+    router.push({ pathname: "/kisi/[id]", params: { id: post.authorId, name: post.authorName ?? "", avatar: post.authorAvatar ?? "" } });
+  };
+
   const openEvent = () => {
     if (isSystem && post.eventSlug) {
       tapHaptic();
@@ -173,15 +181,17 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
       delayLongPress={300}
       style={[styles.card, { backgroundColor: T.surface, borderColor: T.hairline }]}
     >
-      {/* Üst: avatar + ad + zaman + takip / aksiyon */}
+      {/* Üst: avatar + ad + zaman + takip / aksiyon. Avatar/ada dokun → kişinin profili. */}
       <View style={styles.head}>
-        <StoryAvatar uri={post.authorAvatar} name={post.authorName ?? "✦"} size={38} />
-        <View style={{ flex: 1 }}>
-          <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>
-            {post.authorName?.trim() || "Meydanlı"}
-          </Text>
-          <Text style={[Type.label, { color: T.textFaint }]}>{relTime(post.createdAt)}</Text>
-        </View>
+        <Pressable onPress={openAuthor} style={styles.authorTap} hitSlop={4}>
+          <StoryAvatar uri={post.authorAvatar} name={post.authorName ?? "✦"} size={38} />
+          <View style={{ flex: 1 }}>
+            <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>
+              {post.authorName?.trim() || "Meydanlı"}
+            </Text>
+            <Text style={[Type.label, { color: T.textFaint }]}>{relTime(post.createdAt)}</Text>
+          </View>
+        </Pressable>
         {!isMine ? (
           following ? (
             <View style={[styles.followPill, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}>
@@ -196,8 +206,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
             </Pressable>
           )
         ) : (
-          // "Sen" + "⋯" satırın üstüne hizalı (dikey ortada değil, biraz yukarıda).
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "flex-start", marginTop: -2 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <View style={[styles.followPill, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}>
               <Text style={[Type.label, { color: T.textFaint }]}>Sen</Text>
             </View>
@@ -243,6 +252,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
 const styles = StyleSheet.create({
   card: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: 14, gap: 8, ...glow("#000", 10, 0.15) },
   head: { flexDirection: "row", alignItems: "center", gap: 10 },
+  authorTap: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
   followPill: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6 },
   moreBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2 },
   eventTag: { alignSelf: "flex-start", borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, maxWidth: "100%" },
