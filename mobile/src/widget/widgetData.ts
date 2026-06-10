@@ -7,6 +7,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const API_BASE = "https://etkinlikscout.vercel.app";
 const API_KEY = "meydanfest-app";
 
+// Son başarılı etkinlik burada saklanır → widget eklenince/güncellenince ANINDA
+// (ağ beklemeden) gösterilir; arkadan taze veri gelince tazelenir.
+const CACHE_KEY = "meydanfest:widget:lastEvent";
+
 export interface WidgetEvent {
   title: string;
   venue: string;
@@ -67,6 +71,16 @@ async function fetchList(params: Record<string, string>): Promise<Array<Record<s
   return Array.isArray(json?.data) ? json.data : [];
 }
 
+/** Son saklanan etkinliği oku (anında ilk çizim için; ağ beklemez). Yoksa/erişilemezse null. */
+export async function loadCachedWidgetEvent(): Promise<WidgetEvent | null> {
+  try {
+    const raw = await AsyncStorage.getItem(CACHE_KEY);
+    return raw ? (JSON.parse(raw) as WidgetEvent) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function loadWidgetEvent(): Promise<WidgetEvent | null> {
   const city = await readCity();
   const now = new Date().toISOString();
@@ -85,7 +99,7 @@ export async function loadWidgetEvent(): Promise<WidgetEvent | null> {
         // Yorum sayısı: varsa gerçek (comment_count), yoksa id'den deterministik (3–24).
         const realComments = Number(ev.comment_count);
         const comments = Number.isFinite(realComments) && realComments > 0 ? realComments : 3 + (hashEventId(eid + "c") % 22);
-        return {
+        const result: WidgetEvent = {
           title: String(ev.title ?? ""),
           venue: String(ev.venue ?? ""),
           city: String(ev.city ?? ""),
@@ -97,6 +111,9 @@ export async function loadWidgetEvent(): Promise<WidgetEvent | null> {
           interested: catCount(eid, "interested"),
           comments,
         };
+        // Sonraki açılış/eklemede anında göstermek için sakla (best-effort).
+        try { await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(result)); } catch { /* yoksay */ }
+        return result;
       }
     } catch (e) {
       console.warn("[widget] etkinlik çekilemedi:", String(e));

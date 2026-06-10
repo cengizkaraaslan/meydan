@@ -17,6 +17,7 @@ import { GlobalSignInPrompt } from "@/components/SignInPrompt";
 import { FavHintModal } from "@/components/FavHintModal";
 import { onReplayTour } from "@/lib/prefs";
 import { initNotifications, registerPushToken, scheduleNearbyTeaser, useNearbyNotificationNav } from "@/lib/notify";
+import { primeWidget } from "@/widget/widgetTaskHandler";
 
 // Native splash'ı biz kontrol edelim (yoksa üstte takılı kalabiliyor).
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -28,6 +29,9 @@ function RootNavigator() {
 
   // Bildirime dokununca kişi profiline yönlendir.
   useNearbyNotificationNav();
+
+  // Açılışta ana ekran widget'ını besle + tazele (Android) → "hemen gelmiyor" çözülür.
+  useEffect(() => { void primeWidget(); }, []);
 
   // Giriş yapıldıysa: izin iste + push token'ı (email ile) kaydet + "yakındaki kişi" planla.
   // Email değişince (login/logout) token yeniden kaydedilir → @mention doğru cihaza gider.
