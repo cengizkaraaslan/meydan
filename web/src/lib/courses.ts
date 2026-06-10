@@ -109,7 +109,9 @@ export const COURSE_PROVIDERS: CourseProvider[] = [
     // (WebFetch'e 403 verir ama fetchProvider gerçek Chrome UA gönderir → 200.)
     listUrl: "https://belmek.ankara.bel.tr/tumbranslar",
     registerUrl: "https://belmek.ankara.bel.tr/",
-    selector: ".course-title, a[href*='/brans/']",
+    // Yalnız .course-title (39 branş; cheerio .text() çocuk anchor metnini alır).
+    // "Branşı İncele" CTA'sı ayrı link olduğundan dahil olmaz.
+    selector: ".course-title",
   },
   {
     key: "BURSA",
@@ -238,7 +240,7 @@ export const getCourseGroups = unstable_cache(
     }
     return results;
   },
-  ["course-groups-v10"],
+  ["course-groups-v11"],
   { revalidate: 21600 },
 );
 
