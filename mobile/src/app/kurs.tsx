@@ -28,6 +28,7 @@ export default function CourseDetailScreen() {
     provider?: string;
     city?: string;
     url?: string;
+    note?: string;
   }>();
 
   const name = params.name ?? "";
@@ -37,6 +38,9 @@ export default function CourseDetailScreen() {
   const provider = params.provider ?? "";
   const city = params.city ?? "";
   const url = params.url ?? "";
+  const note = params.note ?? "";
+  // İŞKUR ulusal kurs/İEP — belediye kursundan farklı metin/CTA.
+  const isIskur = /İŞKUR|ISKUR|iskur/i.test(provider);
 
   const grad: readonly [string, string] = [T.violet, T.blue];
 
@@ -110,9 +114,14 @@ export default function CourseDetailScreen() {
               <Text style={[Type.body, { color: T.textDim }]}>📍 {city}</Text>
             ) : null}
 
+            {note ? (
+              <Text style={[Type.body, { color: T.textDim }]}>ℹ️ {note}</Text>
+            ) : null}
+
             <Text style={[Type.label, { color: T.textFaint, marginTop: Space.xs }]}>
-              Belediyelerin ücretsiz meslek ve sanat kursu. Kayıt ve güncel
-              bilgiler için belediye sayfasına göz at.
+              {isIskur
+                ? "İŞKUR mesleki eğitim kursu / İşbaşı Eğitim Programı (ücretsiz, cep harçlığı + sigorta). Başvuru ve güncel bilgi için İŞKUR e-Şube'ye git."
+                : "Belediyelerin ücretsiz meslek ve sanat kursu. Kayıt ve güncel bilgiler için belediye sayfasına göz at."}
             </Text>
           </View>
 
@@ -125,7 +134,7 @@ export default function CourseDetailScreen() {
                 end={{ x: 1, y: 1 }}
                 style={[styles.cta, glow(T.primary, 18, 0.5), pressed && { opacity: 0.9 }]}
               >
-                <Text style={[Type.title, { color: "#fff" }]}>Daha fazla bilgi →</Text>
+                <Text style={[Type.title, { color: "#fff" }]}>{isIskur ? "İŞKUR'da başvur →" : "Daha fazla bilgi →"}</Text>
               </LinearGradient>
             )}
           </Pressable>

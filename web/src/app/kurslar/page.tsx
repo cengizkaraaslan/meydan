@@ -23,6 +23,7 @@ export default async function CoursesPage() {
         name: g.provider.name,
         city: g.provider.city,
         registerUrl: g.provider.registerUrl,
+        national: g.provider.national,
       },
       courses: g.courses.map((c) => ({ ...c, slug: courseSlug(g.provider.key, c.name, c.center) })),
     }))
@@ -31,8 +32,17 @@ export default async function CoursesPage() {
   const totalCourses = groups.reduce((s, g) => s + g.courses.length, 0);
 
   // Kullanıcının şehri (cookie) — o şehirde kurs varsa varsayılan filtre olsun.
+  // Ulusal kaynaklarda (İŞKUR) kurs-başına şehri de hesaba kat.
   const cookieCity = (await cookies()).get("meydanfest_city")?.value;
-  const citiesWithCourses = new Set(groups.filter((g) => g.courses.length > 0).map((g) => g.provider.city));
+  const citiesWithCourses = new Set<string>();
+  for (const g of groups) {
+    if (g.courses.length === 0) continue;
+    if (g.provider.national) {
+      for (const c of g.courses) if (c.city) citiesWithCourses.add(c.city);
+    } else {
+      citiesWithCourses.add(g.provider.city);
+    }
+  }
   const defaultCity = cookieCity && citiesWithCourses.has(cookieCity) ? cookieCity : "";
 
   return (

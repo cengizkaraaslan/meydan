@@ -28,11 +28,22 @@ export interface Course {
   image?: string;
   full?: boolean;
   open?: boolean;
+  /** İŞKUR (ulusal): kursun ili/ilçesi + ek bilgi + başvuru bağlantısı. */
+  city?: string;
+  district?: string;
+  note?: string;
+  start?: string;
+  url?: string;
+}
+
+/** Bir belediyenin branş grubu. */
+export interface CourseProviderNational {
+  national?: boolean;
 }
 
 /** Bir belediyenin branş grubu. */
 export interface CourseGroup {
-  provider: CourseProvider;
+  provider: CourseProvider & CourseProviderNational;
   courses: Course[];
 }
 

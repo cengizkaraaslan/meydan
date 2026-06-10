@@ -324,6 +324,10 @@ model PushSubscription {
 model MobileProfile {
   id         String   @id @default(cuid())
   deviceId   String   @unique
+  /// Girişli kullanıcının email'i — @mention bildirimini bu cihaza çözmek için (girişsizse null).
+  email      String?
+  /// Expo push token (uzaktan bildirim). İzin yoksa/çıkışta null.
+  pushToken  String?
   /// Görünen ad (özellikle seed'lenen fake hesaplar için; gerçek cihazlarda boş olabilir).
   name       String?
   /// Sahte/seed hesap mı (mock kişiler DB'ye taşındı → admin'de "Fake" rozeti).
@@ -371,6 +375,8 @@ model MobileProfile {
   isAdmin    Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  @@index([email])
 }
 
 /// Mobil tanışma akışında bir cihazın bir hedefe verdiği beğeni/geçme kararı.
@@ -410,12 +416,16 @@ model EventAttendance {
 
 /// Mobil etkinlik yorumu (#14). deviceId bazlı, authorName denormalize.
 model EventCommentMobile {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   eventSlug  String
   deviceId   String
   authorName String
-  text       String   @db.Text
-  createdAt  DateTime @default(now())
+  /// Yorum yazarının avatarı (denormalize — listede göstermek için).
+  avatar     String?   @db.Text
+  text       String    @db.Text
+  /// Düzenlendiyse zaman damgası (null = düzenlenmemiş).
+  editedAt   DateTime?
+  createdAt  DateTime  @default(now())
 
   @@index([eventSlug])
 }

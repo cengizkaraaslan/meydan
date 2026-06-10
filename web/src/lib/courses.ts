@@ -4,6 +4,9 @@ import { slugify } from "./utils";
 // JS-render siteler (GASMEK vb.) için Playwright ile alınmış branş snapshot'ı.
 // Yenilemek için: node scripts/scrape-courses-pw.mjs
 import snapshot from "../data/courses-snapshot.json";
+// İŞKUR yayındaki kurs/İEP programları (ülke geneli, kurs-başına İl/İlçe).
+// Yenilemek için: node scripts/scrape-iskur-courses.mjs
+import iskurSnapshot from "../data/iskur-snapshot.json";
 
 export interface CourseProvider {
   key: string;
@@ -19,6 +22,8 @@ export interface CourseProvider {
   cardSelector?: string;
   /** Kart içindeki ad selector'ı (cardSelector ile birlikte) */
   nameInCard?: string;
+  /** Ülke geneli kaynak (İŞKUR/MEB): tek şehir değil, kurslar KENDİ şehrini taşır. */
+  national?: boolean;
 }
 
 /** Bir kurs/branş kaydı — sadece ad ya da merkez/tarih/saat/doluluk içeren zengin kayıt. */
@@ -32,6 +37,12 @@ export interface CourseItem {
   image?: string; // branş görseli (KOMEK/GASMEK/İZMEK)
   full?: boolean; // DOLU
   open?: boolean; // Kayıt Alıyor
+  /** Ulusal kaynaklarda (İŞKUR) kursun ili — lokasyon filtresi bunu kullanır. */
+  city?: string;
+  /** Kursun ilçesi (İŞKUR). */
+  district?: string;
+  /** Kursa özel başvuru/detay bağlantısı (İŞKUR). */
+  url?: string;
 }
 
 export interface CourseGroup {
@@ -91,6 +102,21 @@ export const COURSE_PROVIDERS: CourseProvider[] = [
     selector: "h4 a, h4, .kurs h3",
   },
 ];
+
+/**
+ * İŞKUR — ülke geneli "yayındaki" mesleki eğitim kursları + İşbaşı Eğitim Programları (İEP).
+ * Veri Playwright snapshot'ından gelir (KursOnAir.aspx ASP.NET/AjaxPro). Her kayıt KENDİ
+ * İl/İlçesini taşır → lokasyona göre otomatik süzülür. Açık program yoksa boş döner.
+ */
+export const ISKUR_PROVIDER: CourseProvider = {
+  key: "ISKUR",
+  name: "İŞKUR — Kurs & İşbaşı Eğitim",
+  city: "", // ulusal: kurs-başına şehir
+  national: true,
+  listUrl: "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx",
+  registerUrl: "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx",
+  selector: "",
+};
 
 const NOISE = /menü|menu|iletişim|iletisim|anasayfa|giriş|giris|kayıt ol|hakkında|duyuru|haber|tüm haklar|copyright|çerez|cookie|^ara$|^more$|devamı|detay|^kurslar$|^branşlar$|^branslar$|^kategoriler$|^tümü$|galeri|birimler|yayın/i;
 
@@ -181,9 +207,18 @@ export const getCourseGroups = unstable_cache(
         return { provider, courses: merged };
       }),
     );
+    // İŞKUR (ulusal) — snapshot'tan; her kurs kendi İl/İlçesini taşır. center = "İlçe, İl"
+    // hem görünüm hem benzersiz slug için. city alanı lokasyon filtresinde kullanılır.
+    const iskurRaw = ((iskurSnapshot.data?.ISKUR ?? []) as CourseItem[]).map((c) => ({
+      ...c,
+      center: [c.district, c.city].filter(Boolean).join(", ") || c.center,
+    }));
+    if (iskurRaw.length > 0) {
+      results.push({ provider: ISKUR_PROVIDER, courses: iskurRaw.slice(0, 300) });
+    }
     return results;
   },
-  ["course-groups-v8"],
+  ["course-groups-v9-iskur"],
   { revalidate: 21600 },
 );
 

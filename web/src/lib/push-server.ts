@@ -177,16 +177,10 @@ export interface SendResult {
   error?: string;
 }
 
-export async function sendPush(
-  category: EventCategory | null,
-  payload: PushPayload,
-): Promise<SendResult[]> {
-  if (!configureVapid()) return [];
-
-  const targets = await getSubscribers(category ?? undefined);
+// Verilen aboneliklere paralel gönder (410/404 → temizle). sendPush + sendPushToUserIds ortak.
+async function deliver(targets: StoredSubscription[], payload: PushPayload): Promise<SendResult[]> {
   const body = JSON.stringify(payload);
-
-  const results = await Promise.all(
+  return Promise.all(
     targets.map(async (t): Promise<SendResult> => {
       try {
         const res = await webpush.sendNotification(t.subscription, body);
@@ -206,6 +200,30 @@ export async function sendPush(
       }
     }),
   );
+}
 
-  return results;
+export async function sendPush(
+  category: EventCategory | null,
+  payload: PushPayload,
+): Promise<SendResult[]> {
+  if (!configureVapid()) return [];
+  const targets = await getSubscribers(category ?? undefined);
+  return deliver(targets, payload);
+}
+
+/** Belirli kullanıcı(lar)ın tüm tarayıcı aboneliklerine hedefli push (@mention için). */
+export async function sendPushToUserIds(
+  userIds: string[],
+  payload: PushPayload,
+): Promise<SendResult[]> {
+  if (!configureVapid() || userIds.length === 0) return [];
+  const ids = new Set(userIds);
+  const targets = await withDb(
+    async () => {
+      const rows = await db.pushSubscription.findMany({ where: { userId: { in: userIds } } });
+      return rows.map(rowToStored);
+    },
+    () => Array.from(SUBSCRIPTIONS.values()).filter((s) => ids.has(s.userId)),
+  );
+  return deliver(targets, payload);
 }

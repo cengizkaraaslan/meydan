@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
   sysCard: { borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: 14, gap: 6, ...glow("#000", 10, 0.15) },
   sysHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   sysIcon: { fontSize: 18 },
-  sysBadge: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 8, paddingVertical: 3 },
+  sysBadge: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 10, paddingVertical: 5 },
   sysBody: { flexDirection: "row", gap: 12, alignItems: "flex-start", marginTop: 2 },
   sysThumb: { width: 72, height: 72, borderRadius: Radius.md },
 });

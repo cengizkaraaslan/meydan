@@ -4,8 +4,14 @@ import {
   sendMessage,
   editMessage,
   deleteMessage,
+  recipientDevicesForMatch,
+  deviceDisplayName,
   type MutationReason,
 } from "@/lib/mobile-chat-store";
+import { extractMentionEmails, notifyDevices, notifyEmails, preview } from "@/lib/mention-notify";
+
+// Backend foto mesajı öneki (chat.ts ile aynı) — bildirimde "📷 Fotoğraf" göster.
+const IMG_PREFIX = "[img]";
 
 export const dynamic = "force-dynamic";
 

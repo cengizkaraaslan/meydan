@@ -280,6 +280,29 @@ export async function sendMessage(input: {
   );
 }
 
+/** Bir konuşmadaki (matchKey) gönderici DIŞINDAKİ gerçek cihaz alıcıları (DM bildirimi için).
+ *  Mock eşleşmede tek satır vardır (alıcı = mock partner, gerçek cihaz değil) → boş döner. */
+export async function recipientDevicesForMatch(matchKey: string, senderDeviceId: string): Promise<string[]> {
+  return withDb(
+    async () => {
+      const rows = await db.mobileMatch.findMany({ where: { matchKey }, select: { deviceId: true } });
+      return [...new Set(rows.map((r) => r.deviceId).filter((d) => d && d !== senderDeviceId))];
+    },
+    () =>
+      [...new Set(mem.matches.filter((m) => m.matchKey === matchKey).map((m) => m.deviceId))].filter(
+        (d) => d && d !== senderDeviceId,
+      ),
+  );
+}
+
+/** Gönderenin görünen adı (DM bildirim başlığı için). Yoksa null. */
+export async function deviceDisplayName(deviceId: string): Promise<string | null> {
+  return withDb(
+    async () => (await db.mobileProfile.findUnique({ where: { deviceId }, select: { name: true } }))?.name ?? null,
+    () => mem.matches.find((m) => m.partnerId === deviceId)?.partnerName ?? null,
+  );
+}
+
 // ── Düzenle / Sil (sadece sahibi, gönderimden sonraki 10 dk içinde) ──────────────
 
 /** Mesaj düzenleme/silme için izin verilen pencere. */

@@ -63,8 +63,9 @@ export default function CoursesScreen() {
         key: `${g.provider.key}-${ci}-${c.name}`,
         course: c,
         providerName,
-        city: g.provider.city,
-        url,
+        // Ulusal kaynakta (İŞKUR) kursun KENDİ ili + kursa özel başvuru url'i.
+        city: c.city ?? g.provider.city,
+        url: c.url ?? url,
         gradIdx: gi + ci,
       });
     });

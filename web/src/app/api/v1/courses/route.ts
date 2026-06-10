@@ -33,7 +33,15 @@ export async function GET(request: NextRequest) {
     const groups = (await getCourseGroups()) as CourseGroup[];
     const city = sp.get("city");
     const data: CourseGroup[] = city
-      ? groups.filter((g: CourseGroup) => fold(g.provider.city) === fold(city))
+      ? groups.flatMap((g: CourseGroup) => {
+          // Ulusal kaynak (İŞKUR): grubu KURS-bazlı süz (her kurs kendi ilini taşır).
+          if (g.provider.national) {
+            const courses = g.courses.filter((c) => c.city && fold(c.city) === fold(city));
+            return courses.length ? [{ ...g, courses }] : [];
+          }
+          // Belediye kaynakları: sağlayıcının şehri eşleşiyorsa tüm grubu döndür.
+          return fold(g.provider.city) === fold(city) ? [g] : [];
+        })
       : groups;
     return NextResponse.json({ ok: true, data });
   } catch {

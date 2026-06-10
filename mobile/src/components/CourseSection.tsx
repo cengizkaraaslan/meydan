@@ -63,6 +63,7 @@ export function CourseRow({
         provider: providerName,
         city: city ?? "",
         url: url ?? "",
+        note: course.note ?? "",
       },
     });
   };
@@ -153,14 +154,15 @@ export function CourseSection() {
   const rows: Row[] = [];
   groups.forEach((g, gi) => {
     const providerName = g.provider.name.split("—")[0]?.trim() || g.provider.name;
-    const url = g.provider.registerUrl ?? g.provider.listUrl;
+    const provUrl = g.provider.registerUrl ?? g.provider.listUrl;
     g.courses.forEach((c, ci) => {
       rows.push({
         key: `${g.provider.key}-${ci}-${c.name}`,
         course: c,
         providerName,
-        city: g.provider.city,
-        url,
+        // Ulusal kaynakta (İŞKUR) kursun KENDİ ili; başvuru için kursa özel url varsa o.
+        city: c.city ?? g.provider.city,
+        url: c.url ?? provUrl,
         gradIdx: gi + ci,
       });
     });

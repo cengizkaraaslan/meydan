@@ -10,6 +10,8 @@ interface ProviderLite {
   name: string;
   city: string;
   registerUrl: string;
+  /** Ulusal kaynak (İŞKUR): kurslar kendi şehrini taşır. */
+  national?: boolean;
 }
 interface CourseLite {
   name: string;
@@ -21,6 +23,10 @@ interface CourseLite {
   image?: string;
   full?: boolean;
   open?: boolean;
+  city?: string;
+  district?: string;
+  note?: string;
+  url?: string;
 }
 export interface CourseGroupLite {
   provider: ProviderLite;
@@ -59,9 +65,9 @@ function AccordionItem({ group, query, defaultOpen }: { group: CourseGroupLite; 
             )}
           </div>
           <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-[var(--muted)]">
-            <MapPin className="size-3.5" /> {provider.city} ·{" "}
+            <MapPin className="size-3.5" /> {provider.national ? "Türkiye geneli" : provider.city} ·{" "}
             {has ? (
-              <span className="text-[var(--primary)] font-medium">{courses.length} branş</span>
+              <span className="text-[var(--primary)] font-medium">{courses.length} {provider.national ? "kurs" : "branş"}</span>
             ) : (
               <span>{query ? "eşleşme yok" : "liste şu an alınamıyor"}</span>
             )}
@@ -121,10 +127,13 @@ function AccordionItem({ group, query, defaultOpen }: { group: CourseGroupLite; 
                               <Clock className="size-3.5 shrink-0" /> <span className="truncate">{c.schedule}</span>
                             </div>
                           )}
-                          {(c.start || c.end) && (
+                          {(c.start || c.end) && !c.schedule && (
                             <div className="mt-0.5 flex items-center gap-1 text-xs text-[var(--muted)]">
                               <CalendarDays className="size-3.5 shrink-0" /> {c.start} – {c.end}
                             </div>
+                          )}
+                          {c.note && (
+                            <div className="mt-1 text-[11px] text-[var(--muted)] line-clamp-2">{c.note}</div>
                           )}
                         </div>
                       </Link>
@@ -176,19 +185,32 @@ export function CoursesExplorer({ groups, defaultCity = "" }: { groups: CourseGr
   const [query, setQuery] = useState("");
   const [city, setCity] = useState(defaultCity);
 
-  const cities = useMemo(
-    () => Array.from(new Set(groups.map((g) => g.provider.city))).sort((a, b) => a.localeCompare(b, "tr")),
-    [groups],
-  );
+  const cities = useMemo(() => {
+    const set = new Set<string>();
+    for (const g of groups) {
+      if (g.provider.national) {
+        for (const c of g.courses) if (c.city) set.add(c.city);
+      } else if (g.provider.city) {
+        set.add(g.provider.city);
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "tr"));
+  }, [groups]);
 
   const filtered = useMemo(() => {
     const q = fold(query);
+    const cityF = fold(city);
     return groups
-      .filter((g) => !city || g.provider.city === city)
-      .map((g) => ({
-        provider: g.provider,
-        courses: q ? g.courses.filter((c) => fold(c.name).includes(q)) : g.courses,
-      }));
+      // Belediye grupları şehre göre tümden süzülür; ulusal (İŞKUR) grupları kurs-bazlı.
+      .filter((g) => !city || g.provider.national || g.provider.city === city)
+      .map((g) => {
+        let courses = g.courses;
+        if (city && g.provider.national) courses = courses.filter((c) => c.city && fold(c.city) === cityF);
+        if (q) courses = courses.filter((c) => fold(c.name).includes(q));
+        return { provider: g.provider, courses };
+      })
+      // Ulusal grup seçili şehirde boşsa gizle.
+      .filter((g) => !(g.provider.national && city && g.courses.length === 0));
   }, [groups, query, city]);
 
   const totalMatches = filtered.reduce((s, g) => s + g.courses.length, 0);
