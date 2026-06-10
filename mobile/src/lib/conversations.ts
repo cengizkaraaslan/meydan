@@ -12,6 +12,15 @@ export interface Conversation {
   unread: number;
 }
 
+/** Son mesaj önizlemesi: foto mesajı ("[img]<url>") ve sesli mesaj ham URL/işaret yerine
+ *  güvenli/okunur metin gösterilir (içeride dolaşan URL'leri kullanıcıya sızdırma). */
+function previewText(text: string | null): string | null {
+  if (!text) return text;
+  if (text.startsWith("[img]")) return "📷 Fotoğraf";
+  if (text.startsWith("[voice]") || text.startsWith("[audio]")) return "🎤 Sesli mesaj";
+  return text;
+}
+
 /** Backend'ten eşleşme özetlerini çekip sohbet listesine dönüştürür (yeni→eski). */
 export async function listConversations(): Promise<Conversation[]> {
   const deviceId = await getOrCreateDeviceId();
@@ -23,7 +32,7 @@ export async function listConversations(): Promise<Conversation[]> {
       name: p?.name ?? m.partnerName,
       avatar: p?.avatar ?? m.partnerAvatar,
       online: p?.online ?? false,
-      lastText: m.lastMessage,
+      lastText: previewText(m.lastMessage),
       unread: m.unread,
     };
   });
