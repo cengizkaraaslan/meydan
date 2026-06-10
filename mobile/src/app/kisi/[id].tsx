@@ -12,7 +12,7 @@ import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
 import { useCanSeeAges } from "@/lib/dprofile";
 import { tapH, impactH } from "@/lib/haptics";
-import { fetchFollowing, followUser, unfollowUser, followIdForPerson, fetchStoriesFor, type MobileStoryView } from "@/lib/social";
+import { fetchFollowing, followUser, unfollowUser, followIdForPerson, fetchStoriesFor, fetchUserStats, fetchProfileById, type MobileStoryView, type UserStats, type PublicProfile } from "@/lib/social";
 import { getOrCreateDeviceId } from "@/lib/device";
 import { personStats as getPersonStats } from "@/lib/personStats";
 import { EventStoryViewer, type StoryGroup } from "@/components/EventStoryViewer";
@@ -37,6 +37,18 @@ function personStats(id: string): { storyCount: number; eventCount: number } {
   };
 }
 
+/** YYYY-MM-DD doğum tarihinden yaş (geçersizse 0). */
+function ageFromBirth(b?: string | null): number {
+  if (!b) return 0;
+  const d = new Date(b);
+  if (isNaN(d.getTime())) return 0;
+  const now = new Date();
+  let a = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a -= 1;
+  return a > 0 && a < 120 ? a : 0;
+}
+
 export default function PersonScreen() {
   const { id, name: paramName, avatar: paramAvatar } = useLocalSearchParams<{ id: string; name?: string; avatar?: string }>();
   const insets = useSafeAreaInsets();
@@ -45,25 +57,43 @@ export default function PersonScreen() {
   const canSeeAges = useCanSeeAges();
   // Mock listede yoksa (gerçek Meydan kullanıcısı) gönderiden gelen ad/avatarla minimal
   // bir profil üret — "kişi bulunamadı" yerine isim+avatarla açılsın.
+  const mockPerson = getPerson(String(id));
+  const isReal = !mockPerson;
+  // Gerçek kullanıcı: GERÇEK profil + istatistikleri sunucudan çek (mock değil).
+  const [realProfile, setRealProfile] = React.useState<PublicProfile | null>(null);
+  const [realStats, setRealStats] = React.useState<UserStats | null>(null);
+  React.useEffect(() => {
+    if (!isReal) return;
+    let alive = true;
+    fetchProfileById(String(id)).then((p) => { if (alive) setRealProfile(p); }).catch(() => {});
+    fetchUserStats(String(id)).then((s) => { if (alive) setRealStats(s); }).catch(() => {});
+    return () => { alive = false; };
+  }, [id, isReal]);
+
   const person: Person | undefined = React.useMemo(() => {
-    const p = getPerson(String(id));
-    if (p) return p;
-    if (!paramName && !paramAvatar) return undefined;
+    if (mockPerson) return mockPerson;
+    if (!realProfile && !paramName && !paramAvatar) return undefined;
+    const gender: "male" | "female" = realProfile?.gender === "female" ? "female" : "male";
+    const name = (realProfile?.name || paramName || "Meydanlı").trim();
     return {
       id: String(id),
-      name: (paramName || "Meydanlı").trim(),
-      age: 0,
-      city: "",
+      name,
+      age: ageFromBirth(realProfile?.birthDate),
+      city: realProfile?.city || "",
       distanceKm: 0,
       online: false,
-      avatar: resolveAvatar(paramAvatar || null, paramName || null, "male"),
-      bio: "",
-      interests: [],
-      gender: "male",
+      avatar: resolveAvatar(realProfile?.avatar || paramAvatar || null, name, gender),
+      bio: realProfile?.bio || "",
+      interests: (realProfile?.interests || "").split(",").map((s) => s.trim()).filter(Boolean),
+      gender,
     };
-  }, [id, paramName, paramAvatar]);
+  }, [id, mockPerson, realProfile, paramName, paramAvatar]);
 
-  const stats = React.useMemo(() => personStats(String(id)), [id]);
+  // Üst sayaç (story/etkinlik): gerçek kullanıcıda GERÇEK; mock kişide deterministik.
+  const stats = React.useMemo(
+    () => (isReal && realStats ? { storyCount: realStats.stories, eventCount: realStats.attended } : personStats(String(id))),
+    [id, isReal, realStats],
+  );
   const followId = React.useMemo(() => followIdForPerson(String(id)), [id]);
   // Kendi profilim mi? (kendimi takip edemem). Takip kimliği = cihaz id'si.
   const [myId, setMyId] = React.useState("");
@@ -98,7 +128,13 @@ export default function PersonScreen() {
     [id, person?.name, person?.avatar, personStories],
   );
 
-  const detailedStats = React.useMemo(() => getPersonStats(String(id)), [id]);
+  const detailedStats = React.useMemo(
+    () =>
+      isReal && realStats
+        ? { attended: realStats.attended, reactions: realStats.reactions, comments: realStats.comments }
+        : getPersonStats(String(id)),
+    [id, isReal, realStats],
+  );
 
   React.useEffect(() => {
     let alive = true;

@@ -44,6 +44,52 @@ export function followIdForPerson(personId: string): string {
   return /^u\d+$/.test(personId) ? `fake_${personId}` : personId;
 }
 
+// ── Gerçek kullanıcı verisi (profil ekranı için — mock değil) ────────────────
+export interface UserStats {
+  attended: number;
+  comments: number;
+  photos: number;
+  stories: number;
+  following: number;
+  followers: number;
+  reactions: number;
+}
+
+/** Bir kullanıcının GERÇEK toplam sayıları (katılım/yorum/foto/story/takip/tepki). */
+export async function fetchUserStats(deviceId: string): Promise<UserStats> {
+  const empty: UserStats = { attended: 0, comments: 0, photos: 0, stories: 0, following: 0, followers: 0, reactions: 0 };
+  const r = await getJson<{ stats?: UserStats }>(
+    `/api/v1/social/user-stats?deviceId=${encodeURIComponent(deviceId)}`,
+    {},
+  );
+  return r.stats ?? empty;
+}
+
+export interface PublicProfile {
+  name?: string | null;
+  avatar?: string | null;
+  bio?: string | null;
+  city?: string | null;
+  district?: string | null;
+  birthDate?: string | null;
+  interests?: string | null;
+  gender?: string | null;
+}
+
+/** Bir deviceId'nin GERÇEK profilini çek (ad/avatar/bio/şehir/yaş/ilgi). */
+export async function fetchProfileById(deviceId: string): Promise<PublicProfile | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/profile?deviceId=${encodeURIComponent(deviceId)}`, {
+      headers: { "x-api-key": "meydanfest-app", Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { profile?: PublicProfile | null };
+    return json.profile ?? null;
+  } catch {
+    return null;
+  }
+}
+
 const JSON_HEADERS = { "Content-Type": "application/json", Accept: "application/json" };
 
 async function getJson<T>(path: string, fallback: T): Promise<T> {
