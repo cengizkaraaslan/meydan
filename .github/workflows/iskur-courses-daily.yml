@@ -41,14 +41,18 @@ jobs:
         working-directory: web
         run: node scripts/scrape-iskur-courses.mjs
 
+      - name: Belediye kurslarını çek — GASMEK/KAYMEK/ESMEK/BURSA (boş dönen korunur)
+        working-directory: web
+        run: node scripts/scrape-courses-pw.mjs || echo "::warning::belediye kurs scrape kısmen başarısız (mevcut snapshot korunur)"
+
       - name: Snapshot değiştiyse commit + push
         id: commit
         run: |
-          if [ -n "$(git status --porcelain web/src/data/iskur-snapshot.json)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add web/src/data/iskur-snapshot.json
-            git commit -m "chore(iskur): günlük kurs snapshot tazeleme [skip ci]"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/data/iskur-snapshot.json web/src/data/courses-snapshot.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(kurslar): günlük kurs snapshot tazeleme (İŞKUR + belediye) [skip ci]"
             git push
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else

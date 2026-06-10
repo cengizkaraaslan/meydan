@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-05-31T19:37:06.679Z",
+  "scrapedAt": "2026-06-10T14:06:24.288Z",
   "data": {
     "GASMEK": [
       {
@@ -206,7 +206,7 @@
         "center": "Alpu Eğitim Merkezi",
         "start": "15.09.2025",
         "end": "31.07.2026",
-        "schedule": "Pzt: 10:00 - 17:00 Sal: 10:00 - 17:00 Çar: 10:00 - 17:00 Per: 10:00 - 17:00 Cum: 10:00 - 17:00",
+        "schedule": "Pzt: 10:00 - 12:00 Sal: 10:00 - 12:00 Çar: 10:00 - 12:00 Per: 10:00 - 12:00 Cum: 10:00 - 12:00",
         "full": false,
         "open": true
       },
@@ -220,19 +220,10 @@
         "open": false
       },
       {
-        "name": "Çocuk Zumba",
-        "center": "Emek Eğitim Merkezi",
-        "start": "04.02.2026",
-        "end": "27.05.2026",
-        "schedule": "Çar: 15:00 - 15:50",
-        "full": true,
-        "open": true
-      },
-      {
         "name": "Step-Aerobik",
         "center": "Emek Eğitim Merkezi",
         "start": "02.02.2026",
-        "end": "27.05.2026",
+        "end": "24.06.2026",
         "schedule": "Pzt: 10:00 - 11:00 Çar: 10:00 - 11:00",
         "full": true,
         "open": true
@@ -253,13 +244,6 @@
         "end": "18.05.2026",
         "schedule": "Pzt: 15:45 - 17:30",
         "full": true,
-        "open": true
-      },
-      {
-        "name": "Ödev Etüdü",
-        "center": "Mihalgazi Eğitim Merkezi",
-        "schedule": "Çar: 16:00 - 17:00",
-        "full": false,
         "open": true
       },
       {
@@ -391,19 +375,19 @@
       {
         "name": "Pilates",
         "center": "Sarıcakaya Eğitim Merkezi",
-        "start": "02.02.2026",
-        "end": "19.05.2026",
-        "schedule": "Pzt: 9:00 - 10:50 Sal: 9:00 - 10:50",
-        "full": false,
+        "start": "04.02.2026",
+        "end": "20.05.2026",
+        "schedule": "Çar: 20:00 - 21:50",
+        "full": true,
         "open": true
       },
       {
         "name": "Pilates",
         "center": "Sarıcakaya Eğitim Merkezi",
-        "start": "04.02.2026",
-        "end": "20.05.2026",
-        "schedule": "Çar: 20:00 - 21:50",
-        "full": true,
+        "start": "02.02.2026",
+        "end": "19.05.2026",
+        "schedule": "Pzt: 9:00 - 10:50 Sal: 9:00 - 10:50",
+        "full": false,
         "open": true
       },
       {
@@ -427,15 +411,6 @@
       {
         "name": "Zumba",
         "center": "Sarıcakaya Eğitim Merkezi",
-        "start": "05.02.2026",
-        "end": "21.05.2026",
-        "schedule": "Per: 9:00 - 10:50",
-        "full": false,
-        "open": true
-      },
-      {
-        "name": "Zumba",
-        "center": "Sarıcakaya Eğitim Merkezi",
         "start": "03.02.2026",
         "end": "21.05.2026",
         "schedule": "Sal: 20:00 - 21:50 Per: 20:00 - 21:50",
@@ -443,12 +418,11 @@
         "open": true
       },
       {
-        "name": "Miyuki Takı Tasarımı",
-        "center": "Turistik El Sanatları Merkezi",
-        "start": "25.01.2026",
-        "end": "15.06.2026",
-        "schedule": "Pzr: 10:00 - 16:00",
-        "note": "Turistik El Sanatları Merkezinde kayıtlar kurs merkezinde yüz yüze yapılmaktadır.",
+        "name": "Zumba",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "05.02.2026",
+        "end": "21.05.2026",
+        "schedule": "Per: 9:00 - 10:50",
         "full": false,
         "open": true
       },
@@ -461,6 +435,32 @@
         "full": true,
         "open": true
       }
+    ],
+    "BURSA": [
+      "A’dan Z’ye Bisiklet Eğitimi",
+      "Aerobik ve Step (Kadın)",
+      "Afiş Tasarım Teknikleri",
+      "Ahşap Yakma Tekniği (Pirogravür)",
+      "Ahşap Yakma Teknikleri",
+      "Aile Bütçesi Yönetimi",
+      "Akıl ve Zekâ Oyunları Atölyesi-Çocuk",
+      "Akrilik Boya Resim",
+      "Akrilik Boya Serbest Çalışma Teknikleri",
+      "Aksesuar Yapımı",
+      "Almanca A1 Seviyesi",
+      "Almanca A2 Seviyesi",
+      "Almanca Konuşma Kulübü",
+      "Artistik Çizim",
+      "Aşçı Çırağı",
+      "Atık Kağıttan Biblo Yapımı",
+      "Bağımlılıkla Mücadele (Mustafakemalpaşa Bursa İş Ofisi)",
+      "Bağımlılıklarla Mücadele Eğitimleri (GADEM)",
+      "Bağlama (Bozuk Düzen)",
+      "İlçe",
+      "Eğitim Sağlayıcı",
+      "Kategoriler",
+      "Eğitim Türü",
+      "Eğitim Durumu"
     ]
   }
 }

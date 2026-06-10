@@ -2,7 +2,15 @@
 // Lokal/bakım zamanı çalışır; çıktı src/data/courses-snapshot.json'a yazılır.
 // Çalıştır: node scripts/scrape-courses-pw.mjs
 import { chromium } from "playwright";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
+
+// Mevcut snapshot — bir hedef bu çalıştırmada BOŞ dönerse (site down/blok) eski veriyi koru.
+let prevData = {};
+try {
+  prevData = JSON.parse(readFileSync("src/data/courses-snapshot.json", "utf8")).data ?? {};
+} catch {
+  /* ilk kez ya da okunamadı */
+}
 
 // ASCII-katlanmış metne karşı test edilir (JS /i Türkçe büyük harfi foldlamaz).
 const NOISE = /^menu|iletisim|anasayfa|giris|kayit|hakk|duyuru|haber|tum haklar|copyright|cerez|cookie|^ara$|devam|detay|^kurslar$|^branslar$|galeri|birim|yayin|referans|^tumu$|^ana sayfa$|bilgi ve|^sayfa$|kurumsal|medya|^logo$|facebook|instagram|twitter|youtube|akilli arama|bizi takip|uye ol|uye giris|egitmen|merkez|sanat galeri|^kaymek|^genc kaymek|katilmak|aram|takip|^egitimler?$/;
@@ -61,6 +69,12 @@ const TARGETS = [
     url: "https://esmek.eskisehir.bel.tr/onkayit.php",
     iframe: /eski_/, // kayıt tablosu /eski_/onkayit.php iframe'inde
     rowMode: true, // tablo satırlarından kurs adı çıkar (merkez/tarih/durum ele)
+  },
+  {
+    key: "BURSA",
+    url: "https://akademi.bursa.com.tr/egitimler",
+    waitFor: "h2.font-semibold",
+    selectors: ["h2.line-clamp-2", "h2.font-semibold"], // kurs adı kartları (JS-render)
   },
 ];
 
@@ -165,6 +179,17 @@ for (const t of TARGETS) {
 }
 
 await browser.close();
+
+// KORUMA: bu turda boş dönen (site down/blok) hedefler için eski veriyi koru;
+// ayrıca yeniden scrape edilmeyen eski anahtarları da sakla.
+for (const [k, v] of Object.entries(prevData)) {
+  if (!Array.isArray(result[k]) || result[k].length === 0) {
+    if (Array.isArray(v) && v.length > 0) {
+      result[k] = v;
+      console.log(`${k}: bu turda boş → eski snapshot korundu (${v.length})`);
+    }
+  }
+}
 
 mkdirSync("src/data", { recursive: true });
 writeFileSync("src/data/courses-snapshot.json", JSON.stringify({ scrapedAt: new Date().toISOString(), data: result }, null, 2) + "\n");

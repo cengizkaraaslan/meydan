@@ -101,6 +101,26 @@ export const COURSE_PROVIDERS: CourseProvider[] = [
     registerUrl: "https://kaymek.com.tr",
     selector: "h4 a, h4, .kurs h3",
   },
+  {
+    key: "BELMEK",
+    name: "BELMEK — Ankara Büyükşehir",
+    city: "Ankara",
+    // /tumbranslar düz HTML — branş adları .course-title + /brans/ linklerinde.
+    // (WebFetch'e 403 verir ama fetchProvider gerçek Chrome UA gönderir → 200.)
+    listUrl: "https://belmek.ankara.bel.tr/tumbranslar",
+    registerUrl: "https://belmek.ankara.bel.tr/",
+    selector: ".course-title, a[href*='/brans/']",
+  },
+  {
+    key: "BURSA",
+    name: "Bursa Akademi — Bursa Büyükşehir",
+    city: "Bursa",
+    // JS-render (akademi.bursa.com.tr) → canlı cheerio boş döner; veri Playwright
+    // snapshot'ından gelir (scripts/scrape-courses-pw.mjs, key "BURSA").
+    listUrl: "https://akademi.bursa.com.tr/egitimler",
+    registerUrl: "https://akademi.bursa.com.tr/egitimler",
+    selector: "h2",
+  },
 ];
 
 /**
