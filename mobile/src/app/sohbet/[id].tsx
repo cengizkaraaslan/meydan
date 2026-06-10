@@ -28,8 +28,6 @@ import { useCanSeeAges } from "@/lib/dprofile";
 import { SignInPrompt } from "@/components/SignInPrompt";
 import { tapH } from "@/lib/haptics";
 import { sndSend } from "@/lib/sound";
-import { useMentionField } from "@/lib/mentions";
-import { MentionSuggestions } from "@/components/MentionSuggestions";
 
 const READ_BLUE = "#34B7F1";
 const CHAT_TIP_KEY = "meydanfest:chatTipSeen";
@@ -55,8 +53,6 @@ export default function ChatScreen() {
   const person = getPerson(String(id));
   const { messages, typing, send, sendImage, sendVoice, editMessage, deleteMessage, ready } = useChat(String(id));
   const [text, setText] = useState("");
-  // @mention autocomplete (sohbette de @email ile bahsetme).
-  const mention = useMentionField(text, setText);
   const [editing, setEditing] = useState<Msg | null>(null);
   const [tipVisible, setTipVisible] = useState(false);
   // Mesaja uzun basınca açılan action-sheet için seçili mesaj (null = kapalı).
@@ -186,7 +182,6 @@ export default function ChatScreen() {
       const target = editing;
       setEditing(null);
       setText("");
-      mention.clear();
       void (async () => {
         const r = await editMessage(target.id, trimmed);
         if (!r.ok) {
@@ -202,7 +197,6 @@ export default function ChatScreen() {
     }
     void send(trimmed);
     setText("");
-    mention.clear();
     void maybeShowTip();
   };
 
@@ -338,19 +332,13 @@ export default function ChatScreen() {
             </Pressable>
           </View>
         ) : (
-          <>
-          {mention.results.length > 0 ? (
-            <View style={{ paddingHorizontal: 10 }}>
-              <MentionSuggestions users={mention.results} onPick={mention.pick} />
-            </View>
-          ) : null}
           <View style={[styles.inputBar, { paddingBottom: insets.bottom ? insets.bottom : 12, borderTopColor: T.hairline, opacity: ready ? 1 : 0.55 }]}>
             <Pressable onPress={onPickImage} disabled={!ready} hitSlop={8} style={[styles.attach, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
               <Text style={{ fontSize: 20 }}>📷</Text>
             </Pressable>
             <TextInput
               value={text}
-              onChangeText={mention.onChangeText}
+              onChangeText={setText}
               editable={ready}
               placeholder={t("message_hint", { name: person.name })}
               placeholderTextColor={T.textFaint}
@@ -374,7 +362,6 @@ export default function ChatScreen() {
               </Pressable>
             )}
           </View>
-          </>
         )}
       </KeyboardAvoidingView>
 

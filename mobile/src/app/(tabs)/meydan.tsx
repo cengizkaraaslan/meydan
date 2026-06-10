@@ -27,6 +27,8 @@ import { EventStoryViewer, type StoryGroup } from "@/components/EventStoryViewer
 import { ImageEditor } from "@/components/ImageEditor";
 import { personToGroup } from "@/components/EventStoryStrip";
 import { StoryAvatar } from "@/components/StoryAvatar";
+import { useMentionField } from "@/lib/mentions";
+import { MentionSuggestions } from "@/components/MentionSuggestions";
 import { Loader, SectionHeader, EmptyState } from "@/ui/atoms";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
@@ -92,6 +94,8 @@ export default function MeydanScreen() {
   const loadingMoreRef = useRef(false);
 
   const [compose, setCompose] = useState("");
+  // @mention autocomplete: gönderi metninde "@ad" yazınca kullanıcı önerisi.
+  const mentionCompose = useMentionField(compose, setCompose);
   const [composerOpen, setComposerOpen] = useState(false);
   const [posting, setPosting] = useState(false);
   const [photoPosting, setPhotoPosting] = useState(false);
@@ -356,6 +360,7 @@ export default function MeydanScreen() {
       if (ok) {
         successH();
         setCompose("");
+        mentionCompose.clear();
         setComposerOpen(false);
         setHasMore(true);
         offsetRef.current = 0;
@@ -664,13 +669,15 @@ export default function MeydanScreen() {
           </View>
           <TextInput
             value={compose}
-            onChangeText={setCompose}
+            onChangeText={mentionCompose.onChangeText}
             placeholder="Meydan'da ne paylaşmak istersin? 🎉"
             placeholderTextColor={T.textFaint}
             style={[styles.composeInput, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
             multiline
             autoFocus
           />
+          {/* @mention önerileri (metin kutusunun altında) */}
+          <MentionSuggestions users={mentionCompose.results} onPick={mentionCompose.pick} />
           <View style={styles.composerActions}>
             {/* 📷 Foto gönderi (kamera/galeri → R2 → createPost). Composer metni varsa altyazı olur. */}
             <Pressable

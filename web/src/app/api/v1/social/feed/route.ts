@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { listFeed, createPost, editPost, deletePost, type PostMutReason } from "@/lib/social-store";
+import { extractMentionEmails, notifyEmails, preview } from "@/lib/mention-notify";
 
 export const dynamic = "force-dynamic";
 
@@ -62,5 +63,18 @@ export async function POST(request: NextRequest) {
     eventSlug: (body.eventSlug as string) ?? null,
     eventTitle: (body.eventTitle as string) ?? null,
   });
+
+  // @mention → gönderi metninde geçen email'lere bildirim (Meydan duvarına yönlendir).
+  const text = typeof body.text === "string" ? body.text : "";
+  const emails = extractMentionEmails(text);
+  if (emails.length) {
+    const who = (typeof body.authorName === "string" && body.authorName.trim()) || "Biri";
+    void notifyEmails(emails, {
+      title: `${who} bir gönderide senden bahsetti`,
+      body: preview(text),
+      data: { type: "feed_post", url: "/" },
+    }).catch(() => {});
+  }
+
   return NextResponse.json({ ok: true, post });
 }

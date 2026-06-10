@@ -17,6 +17,8 @@ import { useTheme } from "@/lib/theme";
 import { tapH } from "@/lib/haptics";
 import { StoryAvatar } from "@/components/StoryAvatar";
 import { addComment, fetchComments, type PostComment } from "@/lib/social";
+import { useMentionField } from "@/lib/mentions";
+import { MentionSuggestions } from "@/components/MentionSuggestions";
 
 function relTime(iso: string): string {
   const ts = new Date(iso).getTime();
@@ -45,6 +47,8 @@ export function CommentsModal({ postId, authorName, onClose, onAdded }: Props) {
   const [loading, setLoading] = useState(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  // @mention autocomplete: yorumda "@ad" yazınca kullanıcı önerisi.
+  const mention = useMentionField(text, setText);
 
   const load = useCallback(async (id: string) => {
     setLoading(true);
@@ -71,6 +75,7 @@ export function CommentsModal({ postId, authorName, onClose, onAdded }: Props) {
       if (c) {
         setComments((prev) => [...prev, c]);
         setText("");
+        mention.clear();
         onAdded?.(postId);
       }
     } finally {
@@ -126,10 +131,14 @@ export function CommentsModal({ postId, authorName, onClose, onAdded }: Props) {
           )}
 
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            {/* @mention önerileri (input'un üstünde) */}
+            <View style={{ paddingHorizontal: 12 }}>
+              <MentionSuggestions users={mention.results} onPick={mention.pick} />
+            </View>
             <View style={[styles.inputRow, { borderColor: T.hairline }]}>
               <TextInput
                 value={text}
-                onChangeText={setText}
+                onChangeText={mention.onChangeText}
                 placeholder="Yorum yaz… 😊"
                 placeholderTextColor={T.textFaint}
                 style={[styles.input, { color: T.text, backgroundColor: T.surface, borderColor: T.hairline }]}
