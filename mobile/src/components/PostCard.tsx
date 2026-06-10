@@ -195,9 +195,12 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
         </Pressable>
         {!isMine ? (
           following ? (
-            <View style={[styles.followPill, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}>
-              <Text style={[Type.label, { color: T.textDim }]}>Takip ediliyor</Text>
-            </View>
+            <Pressable
+              onPress={() => { tapHaptic(); onToggleFollow(); }}
+              style={[styles.followPill, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}
+            >
+              <Text style={[Type.label, { color: T.textDim }]}>✓ Takip ediliyor</Text>
+            </Pressable>
           ) : (
             <Pressable
               onPress={() => { tapHaptic(); onToggleFollow(); }}

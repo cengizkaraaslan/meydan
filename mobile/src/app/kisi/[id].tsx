@@ -344,7 +344,7 @@ export default function PersonScreen() {
           {/* Mesaj Gönder */}
           <Animated.View entering={FadeInDown.delay(340).duration(460)}>
             <Pressable
-              onPress={() => { impactH(); router.push(`/sohbet/${person.id}`); }}
+              onPress={() => { impactH(); router.push({ pathname: "/sohbet/[id]", params: { id: person.id, name: person.name, avatar: person.avatar } }); }}
               style={{ borderRadius: Radius.pill, overflow: "hidden" }}
             >
               <LinearGradient

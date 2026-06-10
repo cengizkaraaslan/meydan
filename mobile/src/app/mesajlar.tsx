@@ -102,9 +102,10 @@ export default function MesajlarScreen() {
     return convos.filter((c) => c.name.toLocaleLowerCase("tr").includes(needle));
   }, [convos, q]);
 
-  const openChat = useCallback((id: string) => {
+  const openChat = useCallback((c: Conversation) => {
     tapH();
-    router.push(`/sohbet/${id}`);
+    // Ad/avatarı da geçir → gerçek kullanıcıda sohbet "kişi bulunamadı" demesin.
+    router.push({ pathname: "/sohbet/[id]", params: { id: c.id, name: c.name, avatar: c.avatar } });
   }, []);
 
   return (
@@ -209,7 +210,7 @@ export default function MesajlarScreen() {
               </Text>
             </View>
           }
-          renderItem={({ item, index }) => <ConvoRow T={T} c={item} index={index} onPress={() => openChat(item.id)} />}
+          renderItem={({ item, index }) => <ConvoRow T={T} c={item} index={index} onPress={() => openChat(item)} />}
         />
       )}
     </View>

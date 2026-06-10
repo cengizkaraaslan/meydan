@@ -42,6 +42,7 @@ import {
   fetchFeed,
   fetchFollowing,
   followUser,
+  unfollowUser,
   followIdForPerson,
   createPost,
   reactPost,
@@ -333,10 +334,17 @@ export default function MeydanScreen() {
 
   const onToggleFollow = useCallback(async (authorId: string) => {
     mediumH();
-    setFollowing((prev) => [...prev, authorId]); // optimistik
-    const r = await followUser(authorId);
-    if (!r.following) setFollowing((prev) => prev.filter((id) => id !== authorId));
-  }, []);
+    const isFollowing = following.includes(authorId);
+    if (isFollowing) {
+      // Takipten çık (tekrar basınca "Takip et" moduna döner).
+      setFollowing((prev) => prev.filter((id) => id !== authorId)); // optimistik
+      try { await unfollowUser(authorId); } catch { setFollowing((prev) => [...prev, authorId]); }
+    } else {
+      setFollowing((prev) => [...prev, authorId]); // optimistik
+      const r = await followUser(authorId);
+      if (!r.following) setFollowing((prev) => prev.filter((id) => id !== authorId));
+    }
+  }, [following]);
 
   // İlk paylaşımdan sonra (1 kez) düzenle/sil ipucu göster.
   const maybeShowTip = useCallback(async () => {
