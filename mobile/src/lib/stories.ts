@@ -27,10 +27,22 @@ function notify() {
   listeners.forEach((l) => l());
 }
 
+/** Görseli gösterilebilir mi? Yalnız http(s) (R2 bulut) URL'ler kalıcıdır; yerel
+ *  file://, content:// vb. yeniden kurulumda/yükleme hatasında ölür → "Görsel yüklenemedi". */
+function isLiveStoryUri(uri: unknown): boolean {
+  return typeof uri === "string" && /^https?:\/\//i.test(uri);
+}
+
 export async function getStories(): Promise<Story[]> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Story[]) : [];
+    const all = raw ? (JSON.parse(raw) as Story[]) : [];
+    // Ölü yerel görselli (file://) eski/bozuk story'leri ele; değiştiyse kalıcı temizle.
+    const live = all.filter((s) => isLiveStoryUri(s.uri));
+    if (live.length !== all.length) {
+      await AsyncStorage.setItem(KEY, JSON.stringify(live));
+    }
+    return live;
   } catch {
     return [];
   }

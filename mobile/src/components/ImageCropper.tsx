@@ -38,8 +38,9 @@ async function cropTo(uri: string, rect: Rect, outW: number): Promise<string> {
 interface Props {
   /** Kırpılacak görsel uri'si. null → modal kapalı. */
   uri: string | null;
-  /** Çerçeve oranı (genişlik/yükseklik). 1 = kare (avatar). */
-  aspect?: number;
+  /** Çerçeve oranı (genişlik/yükseklik). 1 = kare (avatar). "auto" = fotoğrafın
+   *  KENDİ oranı → çerçeve fotoğrafa birebir oturur, dokunmazsan hiç kesilmez. */
+  aspect?: number | "auto";
   /** Çıktı genişliği (px). */
   outWidth?: number;
   title?: string;
@@ -65,13 +66,17 @@ export function ImageCropper({ uri, aspect = 1, outWidth = 1080, title, embedded
   const [base, setBase] = useState<{ w: number; h: number } | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Efektif oran: "auto" ise fotoğrafın KENDİ oranı (size yüklendikten sonra).
+  // Hep aynı kaynaktan (getSize → size) türetilir; ImagePicker d/getSize uyuşmazlığı olmaz.
+  const effAspect = aspect === "auto" ? (size ? size.w / size.h : 9 / 16) : aspect;
+
   // Çerçeve boyutu — ekrana sığacak şekilde, oran korunarak.
   let FW = SW - 16;
-  let FH = FW / aspect;
+  let FH = FW / effAspect;
   const MAXH = SH * 0.72;
   if (FH > MAXH) {
     FH = MAXH;
-    FW = FH * aspect;
+    FW = FH * effAspect;
   }
 
   const baseW = useSharedValue(0);
@@ -83,8 +88,13 @@ export function ImageCropper({ uri, aspect = 1, outWidth = 1080, title, embedded
   const savedTx = useSharedValue(0);
   const savedTy = useSharedValue(0);
 
+  // uri değişince: transformları sıfırla + görseli ölç (yalnız bir kez, uri başına).
   useEffect(() => {
-    if (!uri) return;
+    if (!uri) {
+      setSize(null);
+      setBase(null);
+      return;
+    }
     setSize(null);
     setBase(null);
     scale.value = 1;
@@ -93,16 +103,22 @@ export function ImageCropper({ uri, aspect = 1, outWidth = 1080, title, embedded
     ty.value = 0;
     savedTx.value = 0;
     savedTy.value = 0;
-    const apply = (w: number, h: number) => {
-      setSize({ w, h });
-      const b = coverFit(w, h, FW, FH);
-      setBase(b);
-      baseW.value = b.w;
-      baseH.value = b.h;
-    };
-    RNImage.getSize(uri, apply, () => apply(FW, FH));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uri, FW, FH]);
+    RNImage.getSize(
+      uri,
+      (w, h) => setSize({ w, h }),
+      () => setSize({ w: 1000, h: 1000 }), // ölçülemezse nötr varsayım
+    );
+  }, [uri, scale, savedScale, tx, ty, savedTx, savedTy]);
+
+  // Boyut veya çerçeve hazır/değişince: görseli çerçeveyi kaplayacak şekilde ölçekle.
+  // "auto" oranda çerçeve fotoğrafa birebir oturduğundan base == çerçeve → kayıpsız.
+  useEffect(() => {
+    if (!size) return;
+    const b = coverFit(size.w, size.h, FW, FH);
+    setBase(b);
+    baseW.value = b.w;
+    baseH.value = b.h;
+  }, [size, FW, FH, baseW, baseH]);
 
   const clamp = () => {
     "worklet";

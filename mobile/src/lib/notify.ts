@@ -138,8 +138,10 @@ export async function scheduleProximityPing(name: string): Promise<void> {
 export function useNearbyNotificationNav(): void {
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
-      const pid = resp.notification.request.content.data?.personId;
-      if (pid) router.push(`/kisi/${pid}`);
+      const data = resp.notification.request.content.data ?? {};
+      // Etkinlik hatırlatıcısı → etkinlik detayına; yakındaki kişi → profil.
+      if (data.eventId) router.push(`/etkinlik/${data.eventId}`);
+      else if (data.personId) router.push(`/kisi/${data.personId}`);
     });
     return () => sub.remove();
   }, []);

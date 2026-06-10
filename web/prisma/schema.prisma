@@ -709,3 +709,14 @@ model MobileStory {
   @@index([deviceId, createdAt])
   @@index([createdAt])
 }
+
+/// Mobil story görüntülenmeleri (Instagram "seen by"): kim hangi story'i gördü.
+model MobileStoryView {
+  id       String   @id @default(cuid())
+  storyId  String
+  viewerId String
+  viewedAt DateTime @default(now())
+
+  @@unique([storyId, viewerId])
+  @@index([storyId])
+}

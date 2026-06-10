@@ -11,12 +11,13 @@ import { useActiveCity } from "@/lib/location";
 import { tapH } from "@/lib/haptics";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { fmtDay } from "@/lib/format";
-import { imageFor, type ApiEvent } from "@/lib/api";
+import { cacheEvent, imageFor, type ApiEvent } from "@/lib/api";
 import { fetchPastEvents, type PastEvent } from "@/lib/pastEvents";
 
 function open(e: ApiEvent) {
   tapH();
-  router.push({ pathname: "/etkinlik/[id]", params: { id: e.id, data: JSON.stringify(e) } });
+  const key = cacheEvent(e) || "event";
+  router.push({ pathname: "/etkinlik/[id]", params: { id: key } });
 }
 
 /** Tam genişlik "anı" kartı — biten etkinlik + paylaşılan içerik önizlemesi. */

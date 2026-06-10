@@ -228,6 +228,34 @@ export async function fetchStoriesFor(deviceIds: string[]): Promise<MobileStoryV
   return r.data ?? [];
 }
 
+export interface StoryViewer {
+  id: string;
+  name: string | null;
+  avatar: string | null;
+  viewedAt: string;
+}
+
+/** Bir story'i gördüğümü kaydet (Instagram "seen by"). viewerId = kendi deviceId. */
+export async function markStoryViewed(storyId: string): Promise<void> {
+  if (!storyId) return;
+  try {
+    const viewerId = await getOrCreateDeviceId();
+    await send("POST", "/api/v1/social/stories/views", { storyId, viewerId }, {});
+  } catch {
+    /* sessiz */
+  }
+}
+
+/** Bir story'i kimler gördü + sayı (yalnız story sahibine gösterilir). */
+export async function fetchStoryViewers(storyId: string): Promise<{ count: number; viewers: StoryViewer[] }> {
+  if (!storyId) return { count: 0, viewers: [] };
+  const r = await getJson<{ count?: number; viewers?: StoryViewer[] }>(
+    `/api/v1/social/stories/views?storyId=${encodeURIComponent(storyId)}`,
+    {},
+  );
+  return { count: r.count ?? 0, viewers: r.viewers ?? [] };
+}
+
 export async function deleteStoryRemote(id: string): Promise<boolean> {
   const deviceId = await getOrCreateDeviceId();
   const r = await send<{ ok?: boolean }>("DELETE", "/api/v1/social/stories", { id, deviceId }, {});

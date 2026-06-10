@@ -10,7 +10,8 @@ import { useAuth } from "@/lib/auth";
 import { useT } from "../lib/i18n";
 import { catMeta } from "../lib/categories";
 import { fmtDay, priceLabel, isUniversitySource, relativeDayLabel } from "../lib/format";
-import { imageFor, type ApiEvent } from "../lib/api";
+import { cacheEvent, imageFor, type ApiEvent } from "../lib/api";
+import { useUserCoords, approxDistanceLabel } from "../lib/geo";
 import { toggleFavorite, useFavorites } from "../lib/favorites";
 import { Badge } from "../ui/atoms";
 import { showAuthPrompt } from "../lib/authPrompt";
@@ -42,8 +43,10 @@ function Heart({ event }: { event: ApiEvent }) {
 
 function open(e: ApiEvent) {
   Haptics.selectionAsync();
-  // Etkinliği parametre olarak geçir → detay refetch'e bağlı kalmaz ("bulunamadı" sorunu çözülür).
-  router.push({ pathname: "/etkinlik/[id]", params: { id: e.id, data: JSON.stringify(e) } });
+  // Etkinliği belleğe al, yalnız id/slug ile yönlendir (ağır JSON parametresi yok →
+  // uzun açıklamalı/boş-id'li etkinlikler de açılır).
+  const key = cacheEvent(e) || "event";
+  router.push({ pathname: "/etkinlik/[id]", params: { id: key } });
 }
 
 /** Büyük öne çıkan kart (carousel). */
@@ -51,6 +54,8 @@ export function HeroCard({ event, width }: { event: ApiEvent; width: number }) {
   const { t: T } = useTheme();
   const c = catMeta(event.category);
   const d = fmtDay(event.starts_at);
+  const coords = useUserCoords();
+  const dist = approxDistanceLabel(event, coords);
   // #8/#15: Görsel yüklenemezse kategori fallback'ine düş.
   const [imgErr, setImgErr] = useState(false);
   const categoryFallback = imageFor({ ...event, image_url: null });
@@ -88,6 +93,12 @@ export function HeroCard({ event, width }: { event: ApiEvent; width: number }) {
             })()}
             <View style={[styles.dot, { backgroundColor: T.textFaint }]} />
             <Text style={[Type.body, { color: isUniversitySource(event.source) ? T.cyan : event.is_free ? T.success : T.gold }]}>{priceLabel(event)}</Text>
+            {dist ? (
+              <>
+                <View style={[styles.dot, { backgroundColor: T.textFaint }]} />
+                <Text style={[Type.body, { color: T.textDim }]}>📍 {dist}</Text>
+              </>
+            ) : null}
           </View>
         </View>
       </View>
@@ -100,6 +111,8 @@ export function EventRow({ event }: { event: ApiEvent }) {
   const { t: T } = useTheme();
   const c = catMeta(event.category);
   const d = fmtDay(event.starts_at);
+  const coords = useUserCoords();
+  const dist = approxDistanceLabel(event, coords);
   // #8/#15: Görsel yüklenemezse kategori fallback'ine düş.
   const [imgErr, setImgErr] = useState(false);
   const categoryFallback = imageFor({ ...event, image_url: null });
@@ -123,7 +136,7 @@ export function EventRow({ event }: { event: ApiEvent }) {
           {event.title}
         </Text>
         <Text style={[Type.label, { color: T.textFaint }]} numberOfLines={1}>
-          📍 {event.venue || event.city || "Türkiye"}
+          📍 {event.venue || event.city || "Türkiye"}{dist ? `  ·  ${dist}` : ""}
         </Text>
         <View style={styles.metaRow}>
           <Text style={[Type.label, { color: c.gradient[0] }]}>{c.emoji} {c.label}</Text>

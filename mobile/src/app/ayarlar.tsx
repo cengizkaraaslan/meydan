@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Switch, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as WebBrowser from "expo-web-browser";
@@ -29,6 +29,7 @@ import { useT, LANGS } from "@/lib/i18n";
 import { syncProfile } from "@/lib/profileSync";
 import { tapH, impactH } from "@/lib/haptics";
 import { getNotifPrefs, setNotifPrefs, type NotifPrefs } from "@/lib/notify";
+import { inlineGreeting, inlineDeviceInfo } from "@/lib/inlineNative";
 
 const MODE_ICON: Record<Mode, string> = { dark: "🌙", light: "☀️", system: "⚙️" };
 
@@ -110,6 +111,8 @@ function Section({
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  // Native inline modül cihaz bilgisi (Hakkında'da gösterilir; modül yoksa null).
+  const nativeInfo = useMemo(() => inlineDeviceInfo(), []);
   const { user, signOut } = useAuth();
   const { t: T, name, setTheme, mode, setMode, gender, setGender } = useTheme();
   const { t, lang, setLang } = useT();
@@ -322,6 +325,19 @@ export default function SettingsScreen() {
             <Text style={[Type.body, { color: T.textDim }]}>{t("about_text")}</Text>
             <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
             <Text style={[Type.label, { color: T.textFaint }]}>{t("version")}</Text>
+
+            {/* Expo SDK 56 inline (native Kotlin) modül demosu — native kod çalışıyorsa görünür. */}
+            {inlineGreeting ? (
+              <>
+                <View style={[styles.hairline, { backgroundColor: T.hairline, marginVertical: Space.md }]} />
+                <Text style={[Type.label, { color: T.text }]}>🧩 {inlineGreeting}</Text>
+                {nativeInfo ? (
+                  <Text style={[Type.label, { color: T.textFaint, marginTop: 4 }]}>
+                    {nativeInfo.manufacturer} {nativeInfo.model} · Android {nativeInfo.release} (SDK {nativeInfo.androidSdk})
+                  </Text>
+                ) : null}
+              </>
+            ) : null}
           </View>
         </Section>
 

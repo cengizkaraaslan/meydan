@@ -17,6 +17,7 @@ import { loadEventsCache, saveEventsCache } from "@/lib/eventCache";
 import { dayRange, isPastDay } from "@/lib/format";
 import { useActiveCity, ALL_CITIES } from "@/lib/location";
 import { COUNTRIES, DEFAULT_COUNTRY, countryByCode, type Country } from "@/lib/countries";
+import { setUserCoords, useUserCoords, eventDistanceKm } from "@/lib/geo";
 import * as Location from "expo-location";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
@@ -32,11 +33,26 @@ const { width } = Dimensions.get("window");
 const HERO_W = width - 32;
 const FEATURED_COUNT = 8;
 
-/** Hero slider için: geçmişi ele, görselli olanları öne al, FEATURED_COUNT'a kadar doldur. */
-function pickFeatured(events: ApiEvent[]): ApiEvent[] {
+/**
+ * Hero slider için: geçmişi ele, görselli olanları öne al, FEATURED_COUNT'a kadar doldur.
+ * Konum biliniyorsa (coords) her grubu YAKLAŞIK mesafeye göre yakından uzağa sıralar.
+ */
+function pickFeatured(events: ApiEvent[], coords?: import("@/lib/geo").Coords | null): ApiEvent[] {
   const up = events.filter((e) => !isPastDay(e.starts_at));
+  const byDist = (a: ApiEvent, b: ApiEvent) => {
+    const da = eventDistanceKm(a, coords ?? null);
+    const db = eventDistanceKm(b, coords ?? null);
+    if (da == null && db == null) return 0;
+    if (da == null) return 1;
+    if (db == null) return -1;
+    return da - db;
+  };
   const withImg = up.filter((e) => e.image_url);
   const without = up.filter((e) => !e.image_url);
+  if (coords) {
+    withImg.sort(byDist);
+    without.sort(byDist);
+  }
   return [...withImg, ...without].slice(0, FEATURED_COUNT);
 }
 
@@ -46,6 +62,7 @@ export default function DiscoverScreen() {
   const { t: T } = useTheme();
   const { t } = useT();
   const { city, status, setCity } = useActiveCity();
+  const userCoords = useUserCoords();
   const { user } = useAuth();
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
   const [gender, setGender] = useState<string | null>(null);
@@ -119,6 +136,8 @@ export default function DiscoverScreen() {
       let pos = await Location.getLastKnownPositionAsync();
       if (!pos) pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       if (!pos) return;
+      // Mesafe rozeti/sıralaması için GPS koordinatını sakla.
+      void setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       const geo = await Location.reverseGeocodeAsync({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
       const iso = geo[0]?.isoCountryCode;
       const detected = countryByCode(iso ?? undefined);
@@ -151,7 +170,7 @@ export default function DiscoverScreen() {
     const cached = await loadEventsCache(key);
     const hadCache = !!(cached && cached.length > 0);
     if (hadCache) {
-      setFeatured(pickFeatured(cached!));
+      setFeatured(pickFeatured(cached!, userCoords));
       setLoading(false);
     }
 
@@ -174,7 +193,7 @@ export default function DiscoverScreen() {
           feedRes = await fetchEvents({ category: category ?? undefined, from: fromDate, to: range.to, pageSize: 40 });
         }
       }
-      const list = pickFeatured(feedRes.data);
+      const list = pickFeatured(feedRes.data, userCoords);
       // Boş TAZE sonuç, gösterilmiş hero'yu (cache/önceki) ASLA boşaltmasın — "Ankara
       // geldi sonra slider kalktı" buydu: cache dolu gösterilip taze fetch boş dönünce
       // ilk yüklemede setFeatured([]) hero'yu siliyordu. Yalnız hiç veri yokken boş set.
@@ -187,7 +206,7 @@ export default function DiscoverScreen() {
       setRefreshing(false);
       loadedOnce.current = true;
     }
-  }, [cacheKey]);
+  }, [cacheKey, userCoords]);
 
   useEffect(() => {
     let alive = true;

@@ -10,14 +10,15 @@ import { useActiveCity } from "@/lib/location";
 import { tapH } from "@/lib/haptics";
 import { SectionHeader } from "@/ui/atoms";
 import { fmtDay } from "@/lib/format";
-import { imageFor, type ApiEvent } from "@/lib/api";
+import { cacheEvent, imageFor, type ApiEvent } from "@/lib/api";
 import { fetchPastEvents, type PastEvent } from "@/lib/pastEvents";
 
 const CARD_W = 220;
 
 function open(e: ApiEvent) {
   tapH();
-  router.push({ pathname: "/etkinlik/[id]", params: { id: e.id, data: JSON.stringify(e) } });
+  const key = cacheEvent(e) || "event";
+  router.push({ pathname: "/etkinlik/[id]", params: { id: key } });
 }
 
 /**

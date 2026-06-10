@@ -211,7 +211,8 @@ function ImageAdjust({
 
 interface Props {
   uri: string | null;
-  aspect?: number;
+  /** Kırpma oranı. Sayı = sabit (1 = kare). "auto" = fotoğrafın kendi oranı (kesmez). */
+  aspect?: number | "auto";
   outWidth?: number;
   title?: string;
   /** true → kırpma adımını ATLA; görselin kendi oranı korunur (story zoom sorununu çözer). */

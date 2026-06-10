@@ -71,6 +71,21 @@ export async function fetchEvents(q: EventQuery = {}): Promise<EventsResponse> {
   return (await res.json()) as EventsResponse;
 }
 
+/**
+ * Tıklanan etkinliği bellekte tutar → detay ekranına ağır JSON parametresi geçmeden,
+ * yalnız id/slug ile yönlendiririz. Android navigasyon parametre limiti (uzun açıklamalı
+ * üniversite etkinlikleri) ve boş-id (yalnız slug'lı kaynaklar) sorunlarını birlikte çözer.
+ */
+const _eventCache = new Map<string, ApiEvent>();
+export function cacheEvent(e: ApiEvent): string {
+  const key = e.id || e.slug || "";
+  if (key) _eventCache.set(key, e);
+  return key;
+}
+export function getCachedEvent(key: string): ApiEvent | null {
+  return _eventCache.get(key) ?? null;
+}
+
 export async function fetchEventById(id: string): Promise<ApiEvent | null> {
   // Listeden ara; bulunamazsa null. Parametre id VEYA slug olabilir — sistem/duyuru
   // gönderileri (akış) yalnızca slug taşıdığı için ikisini de eşleştiriyoruz.

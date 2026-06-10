@@ -65,6 +65,7 @@ export default function PersonScreen() {
       name: person?.name ?? "",
       avatar: person?.avatar ?? "",
       segments: personStories.map((s) => ({
+        id: s.id,
         uri: s.imageUrl,
         caption: s.caption ?? undefined,
         eventTitle: s.eventTitle ?? undefined,

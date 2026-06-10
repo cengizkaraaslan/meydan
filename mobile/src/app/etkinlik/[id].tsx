@@ -12,10 +12,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { catMeta } from "@/lib/categories";
 import { fmtLong, priceLabel, isUniversitySource } from "@/lib/format";
-import { API_BASE, fetchEventById, imageFor, type ApiEvent } from "@/lib/api";
+import { API_BASE, fetchEventById, getCachedEvent, imageFor, type ApiEvent } from "@/lib/api";
 import { getDeviceId } from "@/lib/profileSync";
 import { toggleFavorite, useFavorites } from "@/lib/favorites";
 import { setAttending, mockAttendeesFor } from "@/lib/attending";
+import { scheduleEventReminders, cancelEventReminders } from "@/lib/reminders";
+import { addEventToCalendar } from "@/lib/calendar";
+import { useUserCoords, approxDistanceLabel } from "@/lib/geo";
 import { fetchEventSocial } from "@/lib/pastEvents";
 import { addStory, useStories } from "@/lib/stories";
 import { uploadImage } from "@/lib/social";
@@ -79,21 +82,6 @@ interface Photo {
 
 type Rsvp = "going" | "maybe" | "interested";
 
-/**
- * Etkinlik koordinatı yok → id'den DETERMİNİSTİK yaklaşık mesafe üret (Math.random YOK).
- * Aynı etkinlik her açılışta aynı mesafeyi gösterir. ~0.3–12 km arası.
- */
-function approxDistance(id: string): string {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) {
-    h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  }
-  // 300 m – 12000 m arası deterministik mesafe
-  const meters = 300 + (h % 11700);
-  if (meters < 1000) return `${meters} m yakınında`;
-  return `${(meters / 1000).toFixed(1)} km yakınında`;
-}
-
 interface Story {
   uri: string;
   caption: string;
@@ -148,6 +136,7 @@ export default function EventDetail() {
   const [rsvp, setRsvp] = useState<Rsvp | null>(null);
   // Gerçek (sunucu) başvuru sayısı — "+N" rozetinde gösterilir.
   const [serverCount, setServerCount] = useState(0);
+  const coords = useUserCoords();
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -244,7 +233,14 @@ export default function EventDetail() {
   const photosKey = `meydanfest:photos:${eid}`;
 
   useEffect(() => {
-    // Önce parametreyle gelen etkinlik verisini kullan (anında, "bulunamadı" sorununu çözer).
+    // 1) Bellek cache (tıklanan etkinlik aynen aktarılır — ağır JSON parametresi yok).
+    const cached = getCachedEvent(eid);
+    if (cached) {
+      setEvent(cached);
+      setLoading(false);
+      return;
+    }
+    // 2) Geriye dönük: parametreyle gelen veri varsa kullan.
     if (data) {
       try {
         setEvent(JSON.parse(data) as ApiEvent);
@@ -254,6 +250,7 @@ export default function EventDetail() {
         /* parse başarısızsa fetch'e düş */
       }
     }
+    // 3) id VEYA slug ile sunucudan çek.
     fetchEventById(eid).then((e) => {
       setEvent(e);
       setLoading(false);
@@ -341,6 +338,12 @@ export default function EventDetail() {
     else AsyncStorage.removeItem(rsvpKey);
     // Profil "Katılacağım / Katıldığım" listeleri için tam etkinlik objesini sakla.
     if (event) setAttending(event, next);
+    // Hatırlatıcı: katılım/belki seçilince etkinlikten 1 gün + 1 saat önce yerel bildirim
+    // planla; vazgeçilince iptal et. (Cihazda planlanır, sunucu/push gerekmez.)
+    if (event) {
+      if (next) void scheduleEventReminders(event);
+      else void cancelEventReminders(event.id);
+    }
     // Sunucuya gönder: join/leave. Giriş yapıldıysa kimlik=email (uninstall→reinstall
     // sonrası aynı hesapla giriş yapınca katılım korunur); değilse cihaz kimliği.
     if (event) {
@@ -580,6 +583,8 @@ export default function EventDetail() {
 
   const c = catMeta(event.category);
   const fav = ids.has(event.id);
+  // Gerçek (yaklaşık) mesafe — konum biliniyorsa şehir merkezine göre; yoksa null.
+  const distLabel = approxDistanceLabel(event, coords);
   // kırık görsel → kategori fallback (kategori emojili düz blok). imgFailed true ise emoji bloğu göster.
   const heroUri = imageFor(event);
   // katılacaklar — "katılacağım" diyen kullanıcı listenin BAŞINDA görünür (yerel).
@@ -726,6 +731,7 @@ export default function EventDetail() {
           <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
             <Pressable onPress={() => { tapH(); tryLeave(); }} style={[styles.circleBtn, { borderColor: T.hairline }]}><Text style={styles.circleTxt}>←</Text></Pressable>
             <View style={{ flexDirection: "row", gap: 10 }}>
+              <Pressable onPress={() => { tapH(); addEventToCalendar(event); }} style={[styles.circleBtn, { borderColor: T.hairline }]}><Text style={{ fontSize: 15 }}>📅</Text></Pressable>
               <Pressable onPress={share} style={[styles.circleBtn, { borderColor: T.hairline }]}><Text style={styles.circleTxt}>↗</Text></Pressable>
               <Pressable
                 onPress={async () => {
@@ -760,8 +766,12 @@ export default function EventDetail() {
             />
             <View style={[styles.sep, { backgroundColor: T.hairline }]} />
             <InfoRow T={T} icon="📍" label={t("venue")} value={event.venue || event.city || t("not_specified")} onPress={openMap} actionLabel={t("see_on_map")} />
-            <View style={[styles.sep, { backgroundColor: T.hairline }]} />
-            <InfoRow T={T} icon="📏" label="Uzaklık" value={approxDistance(eid)} />
+            {distLabel ? (
+              <>
+                <View style={[styles.sep, { backgroundColor: T.hairline }]} />
+                <InfoRow T={T} icon="📏" label="Uzaklık" value={distLabel} />
+              </>
+            ) : null}
             <View style={[styles.sep, { backgroundColor: T.hairline }]} />
             <InfoRow
               T={T}

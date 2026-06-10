@@ -1,6 +1,7 @@
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
+import { setUserCoords } from "./geo";
 
 const KEY = "meydanfest:detectedCity";
 const KEY_MANUAL = "meydanfest:city"; // kullanıcının profilden seçtiği şehir (override)
@@ -105,6 +106,8 @@ export async function detectCity(): Promise<string | null> {
     ]).catch(() => null);
     if (!pos) pos = await Location.getLastKnownPositionAsync();
     if (!pos) return null;
+    // Mesafe rozeti/sıralaması için GPS koordinatını sakla (geo.ts).
+    void setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
     const geo = await Location.reverseGeocodeAsync({
       latitude: pos.coords.latitude,
       longitude: pos.coords.longitude,

@@ -305,6 +305,49 @@ export async function createMobileStory(input: {
   return toStoryView(s);
 }
 
+export interface MobileStoryViewer {
+  id: string; // viewerId (deviceId / acct anahtarı)
+  name: string | null;
+  avatar: string | null;
+  viewedAt: string;
+}
+
+/** Story görüntülenmesini kaydet (Instagram "seen by"). Sahip kendi story'sini izlemez. */
+export async function markMobileStoryViewed(storyId: string, viewerId: string): Promise<{ ok: boolean }> {
+  if (!isDbConfigured || !storyId || !viewerId) return { ok: false };
+  const s = await db.mobileStory.findUnique({ where: { id: storyId }, select: { deviceId: true } });
+  if (!s) return { ok: false };
+  if (s.deviceId === viewerId) return { ok: true }; // kendi story'm — sayma
+  await db.mobileStoryView.upsert({
+    where: { storyId_viewerId: { storyId, viewerId } },
+    create: { storyId, viewerId },
+    update: {},
+  });
+  return { ok: true };
+}
+
+/** Bir story'i kimler gördü + toplam (yeni→eski). Ad/avatar MobileProfile'dan (gerçek data). */
+export async function listMobileStoryViewers(
+  storyId: string,
+): Promise<{ count: number; viewers: MobileStoryViewer[] }> {
+  if (!isDbConfigured || !storyId) return { count: 0, viewers: [] };
+  const views = await db.mobileStoryView.findMany({
+    where: { storyId },
+    orderBy: { viewedAt: "desc" },
+    take: 500,
+  });
+  const ids = [...new Set(views.map((v) => v.viewerId))];
+  const profs = ids.length
+    ? await db.mobileProfile.findMany({ where: { deviceId: { in: ids } }, select: { deviceId: true, name: true, avatar: true } })
+    : [];
+  const pmap = new Map(profs.map((p) => [p.deviceId, p]));
+  const viewers: MobileStoryViewer[] = views.map((v) => {
+    const p = pmap.get(v.viewerId);
+    return { id: v.viewerId, name: p?.name ?? null, avatar: p?.avatar ?? null, viewedAt: v.viewedAt.toISOString() };
+  });
+  return { count: viewers.length, viewers };
+}
+
 /** Kendi story'ni sil (deviceId sahiplik kontrolü). */
 export async function deleteMobileStory(input: { id: string; deviceId: string }): Promise<{ ok: boolean }> {
   const s = await db.mobileStory.findUnique({ where: { id: input.id } });

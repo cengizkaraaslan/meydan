@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,6 +13,7 @@ import {
   View,
 } from "react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "expo-router";
@@ -22,6 +24,7 @@ import { PostCard } from "@/components/PostCard";
 import { CommentsModal } from "@/components/CommentsModal";
 import { PostActionsModal } from "@/components/PostActionsModal";
 import { EventStoryViewer, type StoryGroup } from "@/components/EventStoryViewer";
+import { ImageEditor } from "@/components/ImageEditor";
 import { personToGroup } from "@/components/EventStoryStrip";
 import { StoryAvatar } from "@/components/StoryAvatar";
 import { Loader, SectionHeader, EmptyState } from "@/ui/atoms";
@@ -66,6 +69,12 @@ export default function MeydanScreen() {
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
   // Kendi story'lerimi gerçek görselle gösteren izleyici (açıkken grup dolu).
   const [myStoryOpen, setMyStoryOpen] = useState(false);
+  // Story kaynağı seçim modalı (Kamera/Galeri) — Alert yerine güzel modal.
+  const [storyPickerOpen, setStoryPickerOpen] = useState(false);
+  // Story sunucuya yüklenirken avatar etrafında dönen loading halkası.
+  const [uploadingStory, setUploadingStory] = useState(false);
+  // Seçilen ham görsel → resim düzenleme sihirbazına (kırp + filtre) gider.
+  const [storyEditUri, setStoryEditUri] = useState<string | null>(null);
 
   const [filter, setFilter] = useState<WallFilter>("all");
   const [filterReady, setFilterReady] = useState(false);
@@ -210,12 +219,23 @@ export default function MeydanScreen() {
   // Seçilen görseli kendi story'me ekle + şeridi yenile + onay.
   const addStoryFromUri = useCallback(
     async (uri: string) => {
-      await addStory({ uri, caption: "", eventSlug: "", ts: Date.now() });
-      reloadStories();
-      successH();
+      setUploadingStory(true);
+      try {
+        await addStory({ uri, caption: "", eventSlug: "", ts: Date.now() });
+        reloadStories();
+        successH();
+      } finally {
+        setUploadingStory(false);
+      }
     },
     [reloadStories],
   );
+
+  // Seçilen görseli düzenleme sihirbazına gönder. Çerçeve oranı sihirbazda "auto" —
+  // fotoğrafın kendi oranına oturur, dokunmazsan hiç kesilmez (içeride tek getSize'tan türetilir).
+  const openStoryEditor = useCallback((uri: string) => {
+    setStoryEditUri(uri);
+  }, []);
 
   // Kamera ile story çek.
   const shareFromCamera = useCallback(async () => {
@@ -224,10 +244,10 @@ export default function MeydanScreen() {
       Alert.alert("Kamera izni gerekli", "Story çekmek için kamera iznine ihtiyaç var.");
       return;
     }
-    const res = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+    const res = await ImagePicker.launchCameraAsync({ quality: 1 });
     if (res.canceled || !res.assets?.length) return;
-    await addStoryFromUri(res.assets[0].uri);
-  }, [addStoryFromUri]);
+    openStoryEditor(res.assets[0].uri); // önce düzenleme sihirbazı (kırp + filtre)
+  }, [openStoryEditor]);
 
   // Galeriden story seç.
   const shareFromLibrary = useCallback(async () => {
@@ -236,20 +256,16 @@ export default function MeydanScreen() {
       Alert.alert("Galeri izni gerekli", "Story seçmek için galeri iznine ihtiyaç var.");
       return;
     }
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7 });
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1 });
     if (res.canceled || !res.assets?.length) return;
-    await addStoryFromUri(res.assets[0].uri);
-  }, [addStoryFromUri]);
+    openStoryEditor(res.assets[0].uri); // önce düzenleme sihirbazı (kırp + filtre)
+  }, [openStoryEditor]);
 
-  // Kamera rozeti / (story yokken) avatar → kaynak seç.
+  // Kamera rozeti / (story yokken) avatar → kaynak seç (güzel modal).
   const onShareStory = useCallback(() => {
     impactH();
-    Alert.alert("Story paylaş", "Fotoğraf kaynağını seç", [
-      { text: "📷 Kamera", onPress: () => { void shareFromCamera(); } },
-      { text: "🖼️ Galeri", onPress: () => { void shareFromLibrary(); } },
-      { text: "İptal", style: "cancel" },
-    ]);
-  }, [shareFromCamera, shareFromLibrary]);
+    setStoryPickerOpen(true);
+  }, []);
 
   // Story varsa avatara dokun → kendi story'lerini gerçek görselle göster.
   const onOpenMyStory = useCallback(() => {
@@ -291,7 +307,7 @@ export default function MeydanScreen() {
       name: "Senin story'n",
       avatar: myAvatar ?? "",
       isMe: true,
-      segments: stories.map((s) => ({ uri: s.uri, caption: s.caption })),
+      segments: stories.map((s) => ({ id: s.id, uri: s.uri, caption: s.caption })),
     }),
     [myAvatar, stories],
   );
@@ -589,25 +605,36 @@ export default function MeydanScreen() {
           >
             <View>
               <StoryAvatar uri={myAvatar} name={myName} size={58} hasStory={!!myStoryUri} />
-              {/* Kamera rozeti: dokununca story paylaş (kamera/galeri). */}
-              <Pressable
-                onPress={onShareStory}
-                hitSlop={8}
-                style={[styles.camBadge, { backgroundColor: T.primary, borderColor: T.bg }]}
-              >
-                <Text style={{ fontSize: 11 }}>📷</Text>
-              </Pressable>
+              {/* Yükleniyorsa avatar etrafında dönen loading halkası (profildeki gibi) */}
+              {uploadingStory ? (
+                <View style={styles.storyUploading} pointerEvents="none">
+                  <ActivityIndicator color="#fff" size="small" />
+                </View>
+              ) : (
+                /* Kamera rozeti: dokununca story paylaş (kamera/galeri). */
+                <Pressable
+                  onPress={onShareStory}
+                  hitSlop={8}
+                  style={[styles.camBadge, { backgroundColor: T.primary, borderColor: T.bg }]}
+                >
+                  <Text style={{ fontSize: 11 }}>📷</Text>
+                </Pressable>
+              )}
             </View>
             <Text style={[Type.micro, { color: T.textDim, maxWidth: 64 }]} numberOfLines={1}>
               Senin story'n
             </Text>
           </Pressable>
         ) : (
-          <Pressable style={styles.storyItem} onPress={onShareStory}>
+          <Pressable style={styles.storyItem} onPress={onShareStory} disabled={uploadingStory}>
             <View
               style={[styles.addStoryCircle, { backgroundColor: T.primary, borderColor: T.bg }, glow(T.primary, 12, 0.4)]}
             >
-              <Text style={styles.addStoryPlus}>+</Text>
+              {uploadingStory ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.addStoryPlus}>+</Text>
+              )}
             </View>
             <Text style={[Type.micro, { color: T.textDim, maxWidth: 64, textAlign: "center" }]} numberOfLines={2}>
               Senin story'n{"\n"}Ekle
@@ -757,6 +784,56 @@ export default function MeydanScreen() {
         onClose={() => { tapH(); setTipVisible(false); setTipMsg(null); }}
         T={T}
       />
+
+      {/* Story resim düzenleme sihirbazı — KIRP → filtre. aspect="auto": çerçeve
+          fotoğrafın oranına oturur → dokunmazsan tüm fotoğraf korunur, istersen kırparsın. */}
+      <ImageEditor
+        uri={storyEditUri}
+        aspect="auto"
+        outWidth={1080}
+        title="Story"
+        onDone={(uri) => { setStoryEditUri(null); void addStoryFromUri(uri); }}
+        onCancel={() => setStoryEditUri(null)}
+      />
+
+      {/* Story kaynağı seçim modalı — Alert yerine güzel bottom-sheet. */}
+      <Modal visible={storyPickerOpen} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setStoryPickerOpen(false)}>
+        <Pressable style={styles.pickerScrim} onPress={() => setStoryPickerOpen(false)}>
+          <Pressable
+            style={[styles.pickerCard, { backgroundColor: T.bgElevated, borderColor: T.hairline, paddingBottom: insets.bottom + 14 }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.pickerHandle} />
+            <Text style={[Type.title, { color: T.text, textAlign: "center", marginBottom: 4 }]}>Story paylaş</Text>
+            <Text style={[Type.label, { color: T.textDim, textAlign: "center", marginBottom: 16 }]}>
+              Fotoğrafını nereden eklemek istersin?
+            </Text>
+            <View style={styles.pickerRow}>
+              <Pressable
+                style={[styles.pickerOpt, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+                onPress={() => { tapH(); setStoryPickerOpen(false); void shareFromCamera(); }}
+              >
+                <View style={[styles.pickerIcon, { backgroundColor: T.primary }]}>
+                  <Ionicons name="camera" size={26} color="#fff" />
+                </View>
+                <Text style={[Type.body, { color: T.text, fontWeight: "700" }]}>Kamera</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.pickerOpt, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
+                onPress={() => { tapH(); setStoryPickerOpen(false); void shareFromLibrary(); }}
+              >
+                <View style={[styles.pickerIcon, { backgroundColor: T.primary }]}>
+                  <Ionicons name="images" size={24} color="#fff" />
+                </View>
+                <Text style={[Type.body, { color: T.text, fontWeight: "700" }]}>Galeri</Text>
+              </Pressable>
+            </View>
+            <Pressable style={styles.pickerCancel} onPress={() => { tapH(); setStoryPickerOpen(false); }}>
+              <Text style={[Type.body, { color: T.textDim }]}>İptal</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -806,6 +883,14 @@ const styles = StyleSheet.create({
   storyBar: { paddingHorizontal: 16, gap: 14, alignItems: "flex-start" },
   storyItem: { alignItems: "center", gap: 6, width: 72 },
   camBadge: { position: "absolute", right: 0, bottom: 0, width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", borderWidth: 2 },
+  storyUploading: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 29, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
+  pickerScrim: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" },
+  pickerCard: { borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 20, paddingTop: 12 },
+  pickerHandle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "rgba(128,128,128,0.5)", marginBottom: 14 },
+  pickerRow: { flexDirection: "row", gap: 12 },
+  pickerOpt: { flex: 1, alignItems: "center", gap: 10, paddingVertical: 18, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2 },
+  pickerIcon: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center" },
+  pickerCancel: { alignItems: "center", paddingVertical: 14, marginTop: 6 },
   addStoryCircle: { width: 58, height: 58, borderRadius: 29, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   addStoryPlus: { color: "#fff", fontSize: 34, fontWeight: "700", lineHeight: 38, marginTop: -2 },
   composer: { marginHorizontal: 16, marginBottom: 18, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 12, gap: 10 },

@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { sendStoryReply } from "@/lib/chat";
+import { markStoryViewed, fetchStoryViewers, type StoryViewer } from "@/lib/social";
 import { tapH } from "@/lib/haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
@@ -30,6 +31,8 @@ export interface StorySegment {
   eventTitle?: string;
   /** Etkinliğin şehri/konumu (opsiyonel, geri uyumlu). */
   city?: string;
+  /** Backend story id'si — görüntülenme kaydı + sahibe "kimler gördü" için. */
+  id?: string;
 }
 
 export interface StoryGroup {
@@ -65,6 +68,9 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
   const [zooming, setZooming] = useState(false);
   // Görsel yüklenemezse (bozuk/ölü URL — ör. eski local story) siyah ekran yerine uyarı.
   const [imgError, setImgError] = useState(false);
+  // Görüntülenme ("seen by"): kendi story'mde kimlerin gördüğü; açıkken timer durur.
+  const [viewers, setViewers] = useState<StoryViewer[]>([]);
+  const [viewersOpen, setViewersOpen] = useState(false);
   // Story'e yanıt (gerçek kişide DM): yazarken otomatik ilerleme durur.
   const [reply, setReply] = useState("");
   const [replying, setReplying] = useState(false);
@@ -111,13 +117,13 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
   // Aktif segment için zamanlayıcıyı başlat (reanimated withTiming + runOnJS).
   // Menü açıkken durdur; menü kapanınca segment baştan ilerler.
   useEffect(() => {
-    if (!segment || menuOpen || zooming || replying) return;
+    if (!segment || menuOpen || zooming || replying || viewersOpen) return;
     progress.value = 0;
     progress.value = withTiming(1, { duration: SEGMENT_MS }, (finished) => {
       if (finished) runOnJS(advance)();
     });
     return () => { cancelAnimation(progress); };
-  }, [gi, si, segment, advance, progress, menuOpen, zooming, replying]);
+  }, [gi, si, segment, advance, progress, menuOpen, zooming, replying, viewersOpen]);
 
   // Segment değişince zoom'u sıfırla (yeni görsel yakınlaştırılmış başlamasın).
   useEffect(() => {
@@ -126,6 +132,26 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
     ty.value = 0;
     setImgError(false); // yeni segmentte hata bayrağını sıfırla
   }, [gi, si, scale, tx, ty]);
+
+  // Görüntülenme: başkasının story'sini gördüğümü sunucuya kaydet; KENDİ story'mde
+  // "kimler gördü" listesini çek (Instagram seen-by). id yoksa (eski local story) atla.
+  // Kendi story'mde sayı CANLI artsın diye 5 sn'de bir yeniden çek.
+  useEffect(() => {
+    setViewersOpen(false);
+    const sid = segment?.id;
+    if (!sid) { setViewers([]); return; }
+    if (group?.isMe) {
+      let alive = true;
+      const refresh = () => {
+        fetchStoryViewers(sid).then((r) => { if (alive) setViewers(r.viewers); }).catch(() => {});
+      };
+      refresh();
+      const iv = setInterval(refresh, 5000); // güncel/artan sayım
+      return () => { alive = false; clearInterval(iv); };
+    }
+    void markStoryViewed(sid);
+    setViewers([]);
+  }, [segment?.id, group?.isMe]);
 
   const prev = useCallback(() => {
     if (si > 0) {
@@ -357,6 +383,56 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
             </View>
           </KeyboardAvoidingView>
         ) : null}
+
+        {/* Kendi story'm: "👁 N kişi gördü" → dokununca izleyen listesi (Instagram seen-by).
+            ⋯ menüsü/izleyen sheet'i açıkken gizle (alt alta gelip üst üste binmesin). */}
+        {group.isMe && segment.id && !menuOpen && !viewersOpen ? (
+          <Pressable
+            onPress={() => { cancelAnimation(progress); setViewersOpen(true); }}
+            style={[styles.seenBtn, { bottom: insets.bottom + 16 }]}
+            hitSlop={10}
+          >
+            <Ionicons name="eye-outline" size={20} color="#fff" />
+            <Text style={styles.seenTxt}>
+              {viewers.length > 0 ? `${viewers.length} kişi gördü` : "Henüz kimse görmedi"}
+            </Text>
+          </Pressable>
+        ) : null}
+
+        {/* İzleyenler sheet'i (kimler gördü) */}
+        {viewersOpen ? (
+          <View style={styles.menuScrim}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setViewersOpen(false)} />
+            <View
+              style={[
+                styles.viewersCard,
+                { backgroundColor: T.bgElevated, borderColor: T.hairline, paddingBottom: insets.bottom + 12 },
+              ]}
+            >
+              <View style={styles.viewersHandle} />
+              <View style={styles.viewersHead}>
+                <Ionicons name="eye-outline" size={18} color={T.text} />
+                <Text style={[Type.title, { color: T.text }]}>
+                  {viewers.length > 0 ? `${viewers.length} görüntülenme` : "Görüntülenme"}
+                </Text>
+              </View>
+              {viewers.length === 0 ? (
+                <Text style={[Type.body, { color: T.textDim, textAlign: "center", paddingVertical: 24 }]}>
+                  Bu story'i henüz kimse görmedi.
+                </Text>
+              ) : (
+                viewers.map((v) => (
+                  <View key={v.id} style={styles.viewerRow}>
+                    <StoryAvatar uri={v.avatar ?? ""} name={v.name ?? "?"} size={40} />
+                    <Text style={[Type.body, { color: T.text, flex: 1 }]} numberOfLines={1}>
+                      {v.name ?? "Bir kullanıcı"}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
+          </View>
+        ) : null}
       </View>
       </GestureHandlerRootView>
     </Modal>
@@ -416,4 +492,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginBottom: 10,
   },
   sentFlashTxt: { color: "#fff", fontWeight: "700" },
+  seenBtn: {
+    position: "absolute", alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 7,
+    backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22,
+  },
+  seenTxt: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  viewersCard: {
+    position: "absolute", left: 0, right: 0, bottom: 0,
+    borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 18, paddingTop: 10, maxHeight: "70%",
+  },
+  viewersHandle: {
+    alignSelf: "center", width: 40, height: 4, borderRadius: 2,
+    backgroundColor: "rgba(128,128,128,0.5)", marginBottom: 14,
+  },
+  viewersHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  viewerRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 9 },
 });
