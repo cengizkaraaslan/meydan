@@ -19,7 +19,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { AuroraBackground } from "@/components/AuroraBackground";
-import { getPerson } from "@/lib/people";
+import { getPerson, type Person } from "@/lib/people";
 import { useChat, canEditMsg, type Msg } from "@/lib/chat";
 import { useAuth } from "@/lib/auth";
 import { useTheme, type Palette } from "@/lib/theme";
@@ -44,14 +44,34 @@ function mmss(ms: number): string {
 }
 
 export default function ChatScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, name: pName, avatar: pAvatar } = useLocalSearchParams<{ id: string; name?: string; avatar?: string }>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { t: T } = useTheme();
   const { t } = useT();
   const canSeeAges = useCanSeeAges();
-  const person = getPerson(String(id));
-  const { messages, typing, send, sendImage, sendVoice, editMessage, deleteMessage, ready } = useChat(String(id));
+  // PEOPLE'da olan mock kişi; yoksa (gerçek kullanıcı) parametreden ad/avatar ile kur.
+  const realPerson = getPerson(String(id));
+  const person: Person | null =
+    realPerson ??
+    (pName || pAvatar
+      ? {
+          id: String(id),
+          name: pName || "Kullanıcı",
+          age: 0,
+          city: "",
+          distanceKm: 0,
+          online: false,
+          avatar: pAvatar || "",
+          bio: "",
+          interests: [],
+          gender: "male",
+        }
+      : null);
+  const { messages, typing, send, sendImage, sendVoice, editMessage, deleteMessage, ready } = useChat(String(id), {
+    name: pName,
+    avatar: pAvatar,
+  });
   const [text, setText] = useState("");
   const [editing, setEditing] = useState<Msg | null>(null);
   const [tipVisible, setTipVisible] = useState(false);
@@ -267,9 +287,9 @@ export default function ChatScreen() {
           <Image source={{ uri: person.avatar }} style={styles.hAvatar} contentFit="cover" />
         </Pressable>
         <Pressable style={{ flex: 1 }} onPress={() => { tapH(); router.push(`/kisi/${person.id}`); }}>
-          <Text style={[Type.title, { color: T.text }]}>{canSeeAges ? `${person.name}, ${person.age}` : person.name}</Text>
+          <Text style={[Type.title, { color: T.text }]}>{canSeeAges && person.age ? `${person.name}, ${person.age}` : person.name}</Text>
           <Text style={[Type.label, { color: typing ? T.primary : person.online ? T.success : T.textFaint }]}>
-            {typing ? `${t("typing")}` : person.online ? t("online") : `${person.distanceKm} km ${t("away")}`}
+            {typing ? `${t("typing")}` : person.online ? t("online") : person.distanceKm ? `${person.distanceKm} km ${t("away")}` : ""}
           </Text>
         </Pressable>
       </View>

@@ -80,7 +80,7 @@ const IMG_PREFIX = "[img]";
  *   böylece kalıcı olur ve okunmamış sayacına yansır.
  * - Fotoğraflar yerelde tutulur (AsyncStorage) ve listeye karıştırılır.
  */
-export function useChat(personId: string) {
+export function useChat(personId: string, override?: { name?: string | null; avatar?: string | null }) {
   const [deviceId, setDeviceId] = useState<string>("");
   const [matchKey, setMatchKey] = useState<string | null>(null);
   const [serverMsgs, setServerMsgs] = useState<ChatMessage[]>([]);
@@ -109,8 +109,9 @@ export function useChat(personId: string) {
       const mk = await apiEnsureMatch({
         deviceId: did,
         partnerId: personId,
-        partnerName: person?.name ?? personId,
-        partnerAvatar: person?.avatar ?? "",
+        // Gerçek kullanıcıda (PEOPLE'da yok) ad/avatar parametreden gelir → deviceId yerine isim.
+        partnerName: override?.name || person?.name || personId,
+        partnerAvatar: override?.avatar || person?.avatar || "",
       });
       if (!alive || !mk) return;
       setMatchKey(mk);

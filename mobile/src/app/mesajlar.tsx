@@ -22,6 +22,8 @@ import { useAuth } from "@/lib/auth";
 import { showAuthPrompt } from "@/lib/authPrompt";
 import { tapH } from "@/lib/haptics";
 import { listConversations, type Conversation } from "@/lib/conversations";
+import { useIsAdmin } from "@/lib/admin";
+import { searchMentionUsers, type MentionUser } from "@/lib/mentions";
 
 /**
  * Instagram-Direct tarzı tam ekran mesaj kutusu.
@@ -39,6 +41,29 @@ export default function MesajlarScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [q, setQ] = useState("");
   const hasLoaded = useRef(false);
+
+  // Admin-only: tüm kullanıcılarda @ad/e-posta ile arama → sohbet aç.
+  const { admin } = useIsAdmin();
+  const [findQ, setFindQ] = useState("");
+  const [findResults, setFindResults] = useState<MentionUser[]>([]);
+  const findTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const onFindChange = useCallback((txt: string) => {
+    setFindQ(txt);
+    const query = txt.replace(/^@/, "").trim();
+    if (findTimer.current) clearTimeout(findTimer.current);
+    if (!query) { setFindResults([]); return; }
+    findTimer.current = setTimeout(async () => {
+      setFindResults(await searchMentionUsers(query));
+    }, 180);
+  }, []);
+
+  const openWithUser = useCallback((u: MentionUser) => {
+    tapH();
+    setFindQ("");
+    setFindResults([]);
+    router.push({ pathname: "/sohbet/[id]", params: { id: u.id || u.email, name: u.name ?? "", avatar: u.avatar ?? "" } });
+  }, []);
 
   const load = useCallback(async (background: boolean) => {
     if (!user) { setLoading(false); return; }
@@ -99,7 +124,50 @@ export default function MesajlarScreen() {
         </View>
       </View>
 
-      {/* Arama kutusu */}
+      {/* Admin: tüm kullanıcılarda kişi bul → sohbet aç (yalnız admin görür) */}
+      {admin ? (
+        <View style={{ marginHorizontal: 14, marginTop: 12 }}>
+          <View style={[styles.searchWrap, { backgroundColor: T.surfaceStrong, borderColor: T.primary, marginHorizontal: 0, marginVertical: 0 }]}>
+            <Ionicons name="person-add-outline" size={17} color={T.primary} />
+            <TextInput
+              value={findQ}
+              onChangeText={onFindChange}
+              placeholder="Kişi bul ve sohbet aç (@ad / e-posta)"
+              placeholderTextColor={T.textFaint}
+              style={[Type.body, { color: T.text, flex: 1, padding: 0 }]}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {findQ.length > 0 && (
+              <Pressable onPress={() => { setFindQ(""); setFindResults([]); }} hitSlop={8}>
+                <Ionicons name="close-circle" size={17} color={T.textFaint} />
+              </Pressable>
+            )}
+          </View>
+          {findResults.length > 0 ? (
+            <View style={[styles.findResults, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+              {findResults.map((u) => (
+                <Pressable key={u.email} onPress={() => openWithUser(u)} style={styles.findRow}>
+                  {u.avatar ? (
+                    <Image source={{ uri: u.avatar }} style={styles.findAvatar} contentFit="cover" />
+                  ) : (
+                    <View style={[styles.findAvatar, { backgroundColor: T.surface, alignItems: "center", justifyContent: "center" }]}>
+                      <Text style={{ fontSize: 14 }}>🙂</Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={[Type.label, { color: T.text }]} numberOfLines={1}>{u.name || u.email}</Text>
+                    <Text style={[Type.micro, { color: T.textFaint }]} numberOfLines={1}>{u.email}</Text>
+                  </View>
+                  <Ionicons name="chatbubble-ellipses-outline" size={18} color={T.primary} />
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {/* Arama kutusu (mevcut konuşmalarda) */}
       <View style={[styles.searchWrap, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
         <Ionicons name="search" size={17} color={T.textFaint} />
         <TextInput
@@ -244,6 +312,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
+  findResults: {
+    marginTop: 6,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    overflow: "hidden",
+  },
+  findRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  findAvatar: { width: 34, height: 34, borderRadius: 17 },
   avatar: { width: AV, height: AV, borderRadius: AV / 2 },
   onlineDot: {
     position: "absolute",
