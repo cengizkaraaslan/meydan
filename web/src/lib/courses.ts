@@ -238,7 +238,7 @@ export const getCourseGroups = unstable_cache(
     }
     return results;
   },
-  ["course-groups-v9-iskur"],
+  ["course-groups-v10"],
   { revalidate: 21600 },
 );
 
