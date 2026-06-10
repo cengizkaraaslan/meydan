@@ -17,10 +17,18 @@ import { getStories, type Story } from "./stories";
 
 const API_KEY = "meydanfest-app";
 
+export interface RsvpCounts {
+  going: number;
+  maybe: number;
+  interested: number;
+}
 export interface EventSocial {
   attendeeCount: number;
   commentCount: number;
+  rsvp: RsvpCounts;
 }
+
+const EMPTY_RSVP: RsvpCounts = { going: 0, maybe: 0, interested: 0 };
 
 /** Bir etkinliğin gerçek sosyal sayıları (DB). Hata olursa sıfırlı döner. */
 export async function fetchEventSocial(eventSlug: string): Promise<EventSocial> {
@@ -29,16 +37,22 @@ export async function fetchEventSocial(eventSlug: string): Promise<EventSocial> 
       `${API_BASE}/api/v1/event-social?eventSlug=${encodeURIComponent(eventSlug)}`,
       { headers: { "x-api-key": API_KEY, Accept: "application/json" } },
     );
-    if (!res.ok) return { attendeeCount: 0, commentCount: 0 };
+    if (!res.ok) return { attendeeCount: 0, commentCount: 0, rsvp: { ...EMPTY_RSVP } };
     const json = (await res.json()) as {
-      data?: { attendeeCount?: number; comments?: unknown[] };
+      data?: { attendeeCount?: number; comments?: unknown[]; rsvp?: Partial<RsvpCounts> };
     };
+    const r = json.data?.rsvp;
     return {
       attendeeCount: json.data?.attendeeCount ?? 0,
       commentCount: json.data?.comments?.length ?? 0,
+      rsvp: {
+        going: r?.going ?? 0,
+        maybe: r?.maybe ?? 0,
+        interested: r?.interested ?? 0,
+      },
     };
   } catch {
-    return { attendeeCount: 0, commentCount: 0 };
+    return { attendeeCount: 0, commentCount: 0, rsvp: { ...EMPTY_RSVP } };
   }
 }
 

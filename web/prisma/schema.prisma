@@ -418,6 +418,8 @@ model EventAttendance {
   id        String   @id @default(cuid())
   deviceId  String
   eventSlug String
+  /// RSVP durumu: "going" | "maybe" | "interested". Eski satırlar varsayılan "going".
+  status    String   @default("going")
   createdAt DateTime @default(now())
 
   @@unique([deviceId, eventSlug])

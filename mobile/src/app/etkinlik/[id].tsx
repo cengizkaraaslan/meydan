@@ -170,7 +170,8 @@ export default function EventDetail() {
   // #14 — katılım / yorum / fotoğraf durumu
   const [rsvp, setRsvp] = useState<Rsvp | null>(null);
   // Gerçek (sunucu) başvuru sayısı — "+N" rozetinde gösterilir.
-  const [serverCount, setServerCount] = useState(0);
+  // Kategori bazlı GERÇEK sayılar (sunucu): katılacak / belki / ilgili.
+  const [serverCounts, setServerCounts] = useState({ going: 0, maybe: 0, interested: 0 });
   const coords = useUserCoords();
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState("");
@@ -363,7 +364,7 @@ export default function EventDetail() {
     if (!event?.slug) return;
     let alive = true;
     fetchEventSocial(event.slug)
-      .then((s) => { if (alive) setServerCount(s.attendeeCount); })
+      .then((s) => { if (alive) setServerCounts(s.rsvp); })
       .catch(() => {});
     return () => { alive = false; };
   }, [event?.slug]);
@@ -375,8 +376,16 @@ export default function EventDetail() {
       return;
     }
     impactH();
+    const prev = rsvp;
     const next = rsvp === choice ? null : choice;
     setRsvp(next);
+    // Sayaçları anında (iyimser) güncelle: eski kategoriden çıkar, yeniye ekle.
+    setServerCounts((c) => {
+      const d = { ...c };
+      if (prev) d[prev] = Math.max(0, d[prev] - 1);
+      if (next) d[next] = d[next] + 1;
+      return d;
+    });
     if (next) AsyncStorage.setItem(rsvpKey, next);
     else AsyncStorage.removeItem(rsvpKey);
     // Profil "Katılacağım / Katıldığım" listeleri için tam etkinlik objesini sakla.
@@ -396,11 +405,11 @@ export default function EventDetail() {
           await fetch(`${API_BASE}/api/v1/event-social`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-api-key": "meydanfest-app" },
-            body: JSON.stringify({ action: next ? "join" : "leave", deviceId: identity, eventSlug: event.slug }),
+            body: JSON.stringify({ action: next ?? "leave", deviceId: identity, eventSlug: event.slug }),
           });
-          // Sayacı tazele ("+N" gerçek başvuru sayısını göstersin).
+          // Sayaçları sunucudan tazele (gerçek/otoriter).
           const s = await fetchEventSocial(event.slug);
-          setServerCount(s.attendeeCount);
+          setServerCounts(s.rsvp);
         } catch {
           /* yok say */
         }
@@ -695,13 +704,17 @@ export default function EventDetail() {
     maybe: maybePeople,
     interested: interestedPeople,
   };
-  // Kategori sayımı: o kategoriye KATILDIYSAM kendimi de say (avatarım listeye eklenir).
-  // "Katılacak" sayısı gerçek sunucu başvurularını da içerir (+N gerçek başvuru sayısı).
-  const catCount = (cat: Rsvp) =>
-    catPeople[cat].length + (rsvp === cat && user ? 1 : 0) + (cat === "going" ? serverCount : 0);
-  // Önizleme listesi: o kategoriye katıldıysam avatarımı başa ekle.
-  const peopleForCat = (cat: Rsvp): Person[] =>
-    rsvp === cat && user ? [buildMePerson(), ...catPeople[cat]] : catPeople[cat];
+  // Kategori sayımı: GERÇEK sunucu sayısı (going/maybe/interested). Kendi RSVP'm sunucuda
+  // tutulduğu için bu sayıya zaten dahil.
+  const catCount = (cat: Rsvp) => serverCounts[cat];
+  // Önizleme avatarları: kendi avatarım (RSVP'liysem) + temsili dolgu; GERÇEK sayıyı AŞMAZ.
+  const peopleForCat = (cat: Rsvp): Person[] => {
+    const base = rsvp === cat && user ? [buildMePerson(), ...catPeople[cat]] : catPeople[cat];
+    return base.slice(0, Math.max(0, catCount(cat)));
+  };
+  // Modal "ben"i meLabel ile ayrı gösterir → liste = diğerleri, gerçek sayıdan kendimi düşerek sınırla.
+  const othersForCat = (cat: Rsvp): Person[] =>
+    catPeople[cat].slice(0, Math.max(0, catCount(cat) - (rsvp === cat && user ? 1 : 0)));
 
   // ── Story şeridi grupları ──
   // Benim bu etkinliğe ait story'lerim → tek grup (avatar: profil override ?? user.photo).
@@ -1163,7 +1176,7 @@ export default function EventDetail() {
       <AttendeeListModal
         visible={catOpen === "going"}
         title="👥 Katılacaklar"
-        people={goingPeople}
+        people={othersForCat("going")}
         gradient={c.gradient}
         bottomInset={insets.bottom}
         meLabel={rsvp === "going" ? `✓ ${t("rsvp_going")}` : null}
@@ -1174,7 +1187,7 @@ export default function EventDetail() {
       <AttendeeListModal
         visible={catOpen === "maybe"}
         title="🤔 Belki"
-        people={maybePeople}
+        people={othersForCat("maybe")}
         gradient={c.gradient}
         bottomInset={insets.bottom}
         meLabel={rsvp === "maybe" ? `🤔 ${t("rsvp_maybe")}` : null}
@@ -1185,7 +1198,7 @@ export default function EventDetail() {
       <AttendeeListModal
         visible={catOpen === "interested"}
         title="✨ İlgileniyorum"
-        people={interestedPeople}
+        people={othersForCat("interested")}
         gradient={c.gradient}
         bottomInset={insets.bottom}
         meLabel={rsvp === "interested" ? `✨ ${t("rsvp_interested")}` : null}

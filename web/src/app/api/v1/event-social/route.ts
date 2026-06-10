@@ -25,20 +25,28 @@ export async function GET(request: NextRequest) {
   }
 
   if (!isDbConfigured) {
-    return NextResponse.json({ data: { attendeeCount: 0, comments: [] } });
+    return NextResponse.json({ data: { attendeeCount: 0, rsvp: { going: 0, maybe: 0, interested: 0 }, comments: [] } });
   }
 
-  const [attendeeCount, comments] = await Promise.all([
-    db.eventAttendance.count({ where: { eventSlug } }),
+  const [grouped, comments] = await Promise.all([
+    db.eventAttendance.groupBy({ by: ["status"], where: { eventSlug }, _count: { _all: true } }),
     db.eventCommentMobile.findMany({
       where: { eventSlug },
       orderBy: { createdAt: "desc" },
     }),
   ]);
 
+  // Kategori bazlı GERÇEK sayılar. Bilinmeyen/eski status → "going".
+  const rsvp = { going: 0, maybe: 0, interested: 0 };
+  for (const g of grouped) {
+    const key = g.status === "maybe" || g.status === "interested" ? g.status : "going";
+    rsvp[key] += g._count._all;
+  }
+
   return NextResponse.json({
     data: {
-      attendeeCount,
+      attendeeCount: rsvp.going, // geriye dönük: "katılacak" sayısı
+      rsvp,
       comments: comments.map((c) => ({
         id: c.id,
         device_id: c.deviceId,
@@ -51,7 +59,7 @@ export async function GET(request: NextRequest) {
 }
 
 interface SocialBody {
-  action?: "join" | "leave" | "comment";
+  action?: "join" | "leave" | "comment" | "going" | "maybe" | "interested";
   deviceId?: string;
   eventSlug?: string;
   authorName?: string;
@@ -82,11 +90,15 @@ export async function POST(request: NextRequest) {
   }
 
   switch (action) {
-    case "join": {
+    case "join": // eski sürüm uyumluluğu → "going"
+    case "going":
+    case "maybe":
+    case "interested": {
+      const status = action === "join" ? "going" : action;
       await db.eventAttendance.upsert({
         where: { deviceId_eventSlug: { deviceId, eventSlug } },
-        create: { deviceId, eventSlug },
-        update: {},
+        create: { deviceId, eventSlug, status },
+        update: { status },
       });
       break;
     }
@@ -107,7 +119,7 @@ export async function POST(request: NextRequest) {
     }
     default:
       return NextResponse.json(
-        { error: "action 'join' | 'leave' | 'comment' olmalı" },
+        { error: "action 'going'|'maybe'|'interested'|'leave'|'comment' olmalı" },
         { status: 400 },
       );
   }
