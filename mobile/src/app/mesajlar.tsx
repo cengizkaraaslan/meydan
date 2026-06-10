@@ -39,11 +39,11 @@ export default function MesajlarScreen() {
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [q, setQ] = useState("");
   const hasLoaded = useRef(false);
 
-  // Admin-only: tüm kullanıcılarda @ad/e-posta ile arama → sohbet aç.
+  // Admin-only: tüm kullanıcılarda @ad/e-posta ile arama → sohbet aç. Büyüteçle açılır/kapanır.
   const { admin } = useIsAdmin();
+  const [showFind, setShowFind] = useState(false);
   const [findQ, setFindQ] = useState("");
   const [findResults, setFindResults] = useState<MentionUser[]>([]);
   const findTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,11 +96,14 @@ export default function MesajlarScreen() {
     setRefreshing(false);
   }, [load]);
 
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLocaleLowerCase("tr");
-    if (!needle) return convos;
-    return convos.filter((c) => c.name.toLocaleLowerCase("tr").includes(needle));
-  }, [convos, q]);
+  // Büyüteç toggle: kapanınca aramayı temizle.
+  const toggleFind = useCallback(() => {
+    tapH();
+    setShowFind((v) => {
+      if (v) { setFindQ(""); setFindResults([]); }
+      return !v;
+    });
+  }, []);
 
   const openChat = useCallback((c: Conversation) => {
     tapH();
@@ -120,13 +123,19 @@ export default function MesajlarScreen() {
         <Text style={[Type.h2, { color: T.text, flex: 1 }]} numberOfLines={1}>
           {t("chats_title")}
         </Text>
-        <View style={[styles.iconBtn, { backgroundColor: T.surfaceStrong }]}>
-          <Ionicons name="create-outline" size={20} color={T.text} />
-        </View>
+        {admin ? (
+          <Pressable onPress={toggleFind} hitSlop={10} style={[styles.iconBtn, { backgroundColor: showFind ? T.primary : T.surfaceStrong }]}>
+            <Ionicons name="search" size={20} color={showFind ? "#fff" : T.text} />
+          </Pressable>
+        ) : (
+          <View style={[styles.iconBtn, { backgroundColor: T.surfaceStrong }]}>
+            <Ionicons name="create-outline" size={20} color={T.text} />
+          </View>
+        )}
       </View>
 
-      {/* Admin: tüm kullanıcılarda kişi bul → sohbet aç (yalnız admin görür) */}
-      {admin ? (
+      {/* Admin: büyüteçle açılan "kişi bul → sohbet aç" kutusu (yalnız admin) */}
+      {admin && showFind ? (
         <View style={{ marginHorizontal: 14, marginTop: 12 }}>
           <View style={[styles.searchWrap, { backgroundColor: T.surfaceStrong, borderColor: T.primary, marginHorizontal: 0, marginVertical: 0 }]}>
             <Ionicons name="person-add-outline" size={17} color={T.primary} />
@@ -138,6 +147,7 @@ export default function MesajlarScreen() {
               style={[Type.body, { color: T.text, flex: 1, padding: 0 }]}
               autoCapitalize="none"
               autoCorrect={false}
+              autoFocus
             />
             {findQ.length > 0 && (
               <Pressable onPress={() => { setFindQ(""); setFindResults([]); }} hitSlop={8}>
@@ -168,24 +178,6 @@ export default function MesajlarScreen() {
         </View>
       ) : null}
 
-      {/* Arama kutusu (mevcut konuşmalarda) */}
-      <View style={[styles.searchWrap, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-        <Ionicons name="search" size={17} color={T.textFaint} />
-        <TextInput
-          value={q}
-          onChangeText={setQ}
-          placeholder={t("search") ?? "Ara"}
-          placeholderTextColor={T.textFaint}
-          style={[Type.body, { color: T.text, flex: 1, padding: 0 }]}
-          returnKeyType="search"
-        />
-        {q.length > 0 && (
-          <Pressable onPress={() => setQ("")} hitSlop={8}>
-            <Ionicons name="close-circle" size={17} color={T.textFaint} />
-          </Pressable>
-        )}
-      </View>
-
       {/* Gövde: yüklenirken skeleton, boşsa boş durum, doluysa liste */}
       {loading && convos.length === 0 ? (
         <View style={{ paddingTop: 6 }}>
@@ -195,7 +187,7 @@ export default function MesajlarScreen() {
         </View>
       ) : (
         <FlatList
-          data={filtered}
+          data={convos}
           keyExtractor={(c) => c.id}
           contentContainerStyle={{ paddingBottom: insets.bottom + 24, paddingTop: 4 }}
           showsVerticalScrollIndicator={false}
@@ -206,7 +198,7 @@ export default function MesajlarScreen() {
             <View style={styles.empty}>
               <Text style={{ fontSize: 44, marginBottom: 10 }}>💬</Text>
               <Text style={[Type.body, { color: T.textDim, textAlign: "center", lineHeight: 21 }]}>
-                {!user ? t("lock_chat_title") : q ? "Sonuç yok" : t("no_chats")}
+                {!user ? t("lock_chat_title") : t("no_chats")}
               </Text>
             </View>
           }

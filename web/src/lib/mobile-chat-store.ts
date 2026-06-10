@@ -179,6 +179,14 @@ export async function listMatches(deviceId: string): Promise<MatchView[]> {
   return withDb(
     async () => {
       const rows = await db.mobileMatch.findMany({ where: { deviceId }, orderBy: { createdAt: "desc" } });
+      // Gerçek partner'ların ad/avatarını canlı çöz (eski kayıtlarda name=id, avatar boş olabilir).
+      const ids = [...new Set(rows.map((r) => r.partnerId))];
+      const [profs, users] = await Promise.all([
+        ids.length ? db.mobileProfile.findMany({ where: { deviceId: { in: ids } }, select: { deviceId: true, name: true, avatar: true } }) : [],
+        ids.length ? db.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, image: true } }) : [],
+      ]);
+      const profMap = new Map(profs.map((p) => [p.deviceId, p]));
+      const userMap = new Map(users.map((u) => [u.id, u]));
       const out: MatchView[] = [];
       for (const r of rows) {
         const last = await db.mobileMessage.findFirst({
@@ -188,11 +196,18 @@ export async function listMatches(deviceId: string): Promise<MatchView[]> {
         const unread = await db.mobileMessage.count({
           where: { matchKey: r.matchKey, senderDeviceId: { not: deviceId }, readAt: null },
         });
+        const prof = profMap.get(r.partnerId);
+        const usr = userMap.get(r.partnerId);
+        // Gerçek ad/avatar varsa onu kullan; yoksa kayıtlı değer (mock kişiler için).
+        const realName = prof?.name || usr?.name || null;
+        const realAvatar = prof?.avatar || usr?.image || null;
+        // Kayıtlı isim partnerId'nin kendisiyse (eski hata) onu gösterme.
+        const storedName = r.partnerName && r.partnerName !== r.partnerId ? r.partnerName : null;
         out.push({
           matchKey: r.matchKey,
           partnerId: r.partnerId,
-          partnerName: r.partnerName,
-          partnerAvatar: r.partnerAvatar,
+          partnerName: realName || storedName || "Kullanıcı",
+          partnerAvatar: realAvatar || r.partnerAvatar,
           lastMessage: last?.text ?? null,
           lastAt: last ? last.createdAt.toISOString() : null,
           unread,
