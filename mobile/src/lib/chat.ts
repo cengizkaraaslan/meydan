@@ -89,6 +89,10 @@ export function useChat(personId: string, override?: { name?: string | null; ava
   const [typing, setTyping] = useState(false);
   const counter = useRef(0);
 
+  // Mock (PEOPLE) kişi mi? Yalnız mock kişiler bot cevabı + otomatik açılış mesajı alır.
+  // Gerçek kullanıcıda (deviceId, PEOPLE'da yok) sahte cevap YOK — gerçek konuşma.
+  const isMock = !!getPerson(personId);
+
   const refetch = useCallback(
     async (mk: string, did: string) => {
       const msgs = await apiFetchMessages(mk, did);
@@ -126,7 +130,8 @@ export function useChat(personId: string, override?: { name?: string | null; ava
       }
 
       const msgs = await refetch(mk, did);
-      if (alive && msgs.length === 0) {
+      // Otomatik açılış mesajı yalnız mock kişide (gerçek kullanıcıda sahte mesaj yok).
+      if (alive && msgs.length === 0 && isMock) {
         await apiSendMessage({ matchKey: mk, senderDeviceId: botId(personId), text: OPENER });
         if (alive) await refetch(mk, did);
       }
@@ -134,7 +139,7 @@ export function useChat(personId: string, override?: { name?: string | null; ava
     return () => {
       alive = false;
     };
-  }, [personId, refetch]);
+  }, [personId, refetch, isMock]);
 
   // 3sn polling.
   useEffect(() => {
@@ -148,7 +153,8 @@ export function useChat(personId: string, override?: { name?: string | null; ava
   // Bot cevabı: "yazıyor…" göster, sonra cevabı backend'e bot olarak yaz.
   const botReply = useCallback(
     (userText: string) => {
-      if (!matchKey || !deviceId) return;
+      // Gerçek kullanıcıda sahte cevap YOK; sadece mock (demo) kişiler cevap verir.
+      if (!isMock || !matchKey || !deviceId) return;
       counter.current += 1;
       const reply = REPLIES[(counter.current + userText.length) % REPLIES.length];
       setTyping(true);
@@ -158,7 +164,7 @@ export function useChat(personId: string, override?: { name?: string | null; ava
         await refetch(matchKey, deviceId);
       }, 1400 + Math.min(userText.length * 30, 1200));
     },
-    [matchKey, deviceId, personId, refetch],
+    [matchKey, deviceId, personId, refetch, isMock],
   );
 
   const send = useCallback(

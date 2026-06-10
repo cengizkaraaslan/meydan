@@ -2,7 +2,7 @@
   "expo": {
     "name": "MeydanFest",
     "slug": "meydanfest",
-    "version": "1.3.35",
+    "version": "1.3.36",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "meydanfest",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "app.meydanfest",
-      "versionCode": 37,
+      "versionCode": 38,
       "adaptiveIcon": {
         "backgroundColor": "#08070D",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
