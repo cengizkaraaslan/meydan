@@ -62,7 +62,9 @@ export default function MesajlarScreen() {
     tapH();
     setFindQ("");
     setFindResults([]);
-    router.push({ pathname: "/sohbet/[id]", params: { id: u.id || u.email, name: u.name ?? "", avatar: u.avatar ?? "" } });
+    // Partner kimliği = hesap (acct:email) → karşı taraf kendi oturumunda aynı kimlikle eşleşir.
+    const pid = u.email ? `acct:${u.email.toLowerCase()}` : u.id || u.email;
+    router.push({ pathname: "/sohbet/[id]", params: { id: pid, name: u.name ?? "", avatar: u.avatar ?? "" } });
   }, []);
 
   const load = useCallback(async (background: boolean) => {

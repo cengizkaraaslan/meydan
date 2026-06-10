@@ -149,15 +149,26 @@ export async function ensureMatch(input: {
   const { deviceId, partnerId } = input;
   const partnerName = input.partnerName ?? null;
   const partnerAvatar = input.partnerAvatar ?? null;
-  const key = mockMatchKey(deviceId, partnerId);
+  // Gerçek kullanıcı (hesap kimliği "acct:..." / email) → ÇİFT YÖNLÜ simetrik eşleşme:
+  // her iki taraf da konuşmayı listesinde görür. Mock kişide tek yönlü (eski davranış).
+  const isReal = partnerId.startsWith("acct:") || partnerId.includes("@") || deviceId.startsWith("acct:");
+  const key = isReal ? realMatchKey(deviceId, partnerId) : mockMatchKey(deviceId, partnerId);
 
   return withDb(
     async () => {
       await db.mobileMatch.upsert({
         where: { deviceId_partnerId: { deviceId, partnerId } },
         create: { deviceId, partnerId, partnerName, partnerAvatar, matchKey: key },
-        update: { partnerName, partnerAvatar },
+        update: { partnerName, partnerAvatar, matchKey: key },
       });
+      if (isReal) {
+        // Karşı taraf için de satır (benim ad/avatarım listMatches'te email'den çözülür).
+        await db.mobileMatch.upsert({
+          where: { deviceId_partnerId: { deviceId: partnerId, partnerId: deviceId } },
+          create: { deviceId: partnerId, partnerId: deviceId, matchKey: key },
+          update: { matchKey: key },
+        });
+      }
       return { matchKey: key, partner: { id: partnerId, name: partnerName, avatar: partnerAvatar } };
     },
     () => {
@@ -179,14 +190,29 @@ export async function listMatches(deviceId: string): Promise<MatchView[]> {
   return withDb(
     async () => {
       const rows = await db.mobileMatch.findMany({ where: { deviceId }, orderBy: { createdAt: "desc" } });
-      // Gerçek partner'ların ad/avatarını canlı çöz (eski kayıtlarda name=id, avatar boş olabilir).
+      // Gerçek partner'ların ad/avatarını canlı çöz (deviceId / User.id / "acct:email" / email).
       const ids = [...new Set(rows.map((r) => r.partnerId))];
+      const emailOf = (id: string): string | null =>
+        id.startsWith("acct:") ? id.slice(5).toLowerCase() : id.includes("@") ? id.toLowerCase() : null;
+      const emails = [...new Set(ids.map(emailOf).filter((e): e is string => !!e))];
       const [profs, users] = await Promise.all([
-        ids.length ? db.mobileProfile.findMany({ where: { deviceId: { in: ids } }, select: { deviceId: true, name: true, avatar: true } }) : [],
-        ids.length ? db.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, image: true } }) : [],
+        ids.length
+          ? db.mobileProfile.findMany({
+              where: { OR: [{ deviceId: { in: ids } }, ...(emails.length ? [{ email: { in: emails } }] : [])] },
+              select: { deviceId: true, email: true, name: true, avatar: true },
+            })
+          : [],
+        ids.length
+          ? db.user.findMany({
+              where: { OR: [{ id: { in: ids } }, ...(emails.length ? [{ email: { in: emails } }] : [])] },
+              select: { id: true, email: true, name: true, image: true },
+            })
+          : [],
       ]);
       const profMap = new Map(profs.map((p) => [p.deviceId, p]));
+      const profEmailMap = new Map(profs.filter((p) => p.email).map((p) => [p.email!.toLowerCase(), p]));
       const userMap = new Map(users.map((u) => [u.id, u]));
+      const userEmailMap = new Map(users.map((u) => [u.email.toLowerCase(), u]));
       const out: MatchView[] = [];
       for (const r of rows) {
         const last = await db.mobileMessage.findFirst({
@@ -196,8 +222,9 @@ export async function listMatches(deviceId: string): Promise<MatchView[]> {
         const unread = await db.mobileMessage.count({
           where: { matchKey: r.matchKey, senderDeviceId: { not: deviceId }, readAt: null },
         });
-        const prof = profMap.get(r.partnerId);
-        const usr = userMap.get(r.partnerId);
+        const pEmail = emailOf(r.partnerId);
+        const prof = profMap.get(r.partnerId) || (pEmail ? profEmailMap.get(pEmail) : undefined);
+        const usr = userMap.get(r.partnerId) || (pEmail ? userEmailMap.get(pEmail) : undefined);
         // Gerçek ad/avatar varsa onu kullan; yoksa kayıtlı değer (mock kişiler için).
         // Avatar yalnız http(s) ise geçerli — "file://" yerel yolları başka cihazda yüklenmez, ele.
         const httpAvatar = (u: string | null | undefined) => (u && /^https?:\/\//.test(u) ? u : null);

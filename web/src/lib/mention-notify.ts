@@ -117,8 +117,13 @@ export async function notifyDevices(deviceIds: string[], payload: NotifyPayload)
   const list = [...new Set(deviceIds)].filter(Boolean);
   if (list.length === 0 || !isDbConfigured) return;
   try {
+    // "acct:email" kimlikleri için email'den de token çöz (push gerçek cihaza gitsin).
+    const emails = list.filter((d) => d.startsWith("acct:")).map((d) => d.slice(5).toLowerCase());
     const profiles = await db.mobileProfile.findMany({
-      where: { deviceId: { in: list }, pushToken: { not: null } },
+      where: {
+        pushToken: { not: null },
+        OR: [{ deviceId: { in: list } }, ...(emails.length ? [{ email: { in: emails } }] : [])],
+      },
       select: { deviceId: true, pushToken: true },
     });
     await pushToDevices(profiles, payload);
