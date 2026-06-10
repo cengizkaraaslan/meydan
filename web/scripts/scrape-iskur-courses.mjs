@@ -66,6 +66,13 @@ async function run() {
     await browser.close();
   }
 
+  // KORUMA: 0 sonuç (geo-blok / ağ hatası / gerçekten boş) mevcut iyi snapshot'ı EZMESİN.
+  // Cron'da yabancı CI IP'si gov.tr'yi bloklarsa boş yazıp veriyi silmeyelim.
+  if (items.length === 0) {
+    console.log("İŞKUR: 0 kurs döndü → mevcut snapshot KORUNUYOR (üzerine yazılmadı).");
+    return;
+  }
+
   mkdirSync("src/data", { recursive: true });
   const out = { generatedAt: new Date().toISOString(), count: items.length, data: { ISKUR: items } };
   writeFileSync("src/data/iskur-snapshot.json", JSON.stringify(out, null, 2));

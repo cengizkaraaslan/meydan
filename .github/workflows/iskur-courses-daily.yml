@@ -1,0 +1,70 @@
+name: İŞKUR kurs scrape (günlük)
+
+# Her gün İŞKUR "yayındaki kurslar"ı (KursOnAir, ASP.NET/AjaxPro) Playwright ile çeker,
+# web/src/data/iskur-snapshot.json'u tazeler, değiştiyse commit eder ve Vercel'e prod
+# deploy alır. Playwright gerçek tarayıcı gerektirdiği için Vercel cron yerine GitHub
+# Actions kullanılır (CI'da tarayıcı vardır).
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # her gün 04:00 UTC ≈ 07:00 TR
+  workflow_dispatch: {} # gerektiğinde elle tetikle
+
+permissions:
+  contents: write
+
+concurrency:
+  group: iskur-scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    env:
+      # Proje kimlikleri gizli değil; yalnız VERCEL_TOKEN secret olarak gerekir.
+      VERCEL_ORG_ID: team_zw5hs43ZL3Oc695oVnDU2tjs
+      VERCEL_PROJECT_ID: prj_CItrWroB0U4ng1LER8EDq87OMii9
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Playwright + Chromium kur
+        working-directory: web
+        run: |
+          npm i --no-save playwright@1.49.1
+          npx playwright install --with-deps chromium
+
+      - name: İŞKUR kurslarını çek (0 dönerse mevcut snapshot korunur)
+        working-directory: web
+        run: node scripts/scrape-iskur-courses.mjs
+
+      - name: Snapshot değiştiyse commit + push
+        id: commit
+        run: |
+          if [ -n "$(git status --porcelain web/src/data/iskur-snapshot.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add web/src/data/iskur-snapshot.json
+            git commit -m "chore(iskur): günlük kurs snapshot tazeleme [skip ci]"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Snapshot değişmedi — deploy gerekmiyor."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Vercel prod deploy (snapshot değiştiyse)
+        if: steps.commit.outputs.changed == 'true'
+        working-directory: web
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::warning::VERCEL_TOKEN secret tanımlı değil — snapshot commit'lendi ama Vercel'e deploy edilemedi. (Repo → Settings → Secrets → VERCEL_TOKEN ekle.)"
+            exit 0
+          fi
+          npx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
