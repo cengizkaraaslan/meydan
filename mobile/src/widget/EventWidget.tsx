@@ -75,7 +75,10 @@ export function EventWidget({ event }: { event: WidgetEvent | null }) {
       <FlexWidget style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "match_parent" }}>
         <FlexWidget style={{ flexDirection: "row", alignItems: "center" }}>
           <TextWidget text="MEYDAN" style={{ fontSize: 12, fontWeight: "700", color: "#A78BFA" }} />
-          <TextWidget text="  ·  yakınındaki etkinlik" style={{ fontSize: 11, color: "#8B83A3" }} />
+          <TextWidget
+            text={event?.mine ? "  ·  senin etkinliğin" : "  ·  yakınındaki etkinlik"}
+            style={{ fontSize: 11, color: "#8B83A3" }}
+          />
         </FlexWidget>
         {event ? (
           <TextWidget
@@ -115,14 +118,23 @@ export function EventWidget({ event }: { event: WidgetEvent | null }) {
         <TextWidget text="Dokun ve yakınındaki etkinlikleri keşfet" style={{ fontSize: 14, color: "#C9C3D9" }} />
       )}
 
-      {/* Etkileşim sayaçları: katılacak · belki · ilgili · yorum */}
+      {/* Etkileşim sayaçları. Kendi etkinliğinde: katılacak · yorum · story (GERÇEK).
+          Yakındaki etkinlikte: katılacak · belki · ilgili · yorum. */}
       {event ? (
-        <FlexWidget style={{ flexDirection: "row", alignItems: "center" }}>
-          <Stat emoji="✅" value={event.going} color="#34D399" />
-          <Stat emoji="🤔" value={event.maybe} color="#FBBF24" />
-          <Stat emoji="⭐" value={event.interested} color="#60A5FA" />
-          <Stat emoji="💬" value={event.comments} color="#C9C3D9" />
-        </FlexWidget>
+        event.mine ? (
+          <FlexWidget style={{ flexDirection: "row", alignItems: "center" }}>
+            <Stat emoji="✅" value={event.going} color="#34D399" />
+            <Stat emoji="💬" value={event.comments} color="#C9C3D9" />
+            <Stat emoji="📸" value={event.stories} color="#F472B6" />
+          </FlexWidget>
+        ) : (
+          <FlexWidget style={{ flexDirection: "row", alignItems: "center" }}>
+            <Stat emoji="✅" value={event.going} color="#34D399" />
+            <Stat emoji="🤔" value={event.maybe} color="#FBBF24" />
+            <Stat emoji="⭐" value={event.interested} color="#60A5FA" />
+            <Stat emoji="💬" value={event.comments} color="#C9C3D9" />
+          </FlexWidget>
+        )
       ) : (
         <FlexWidget style={{ flexDirection: "row" }} />
       )}

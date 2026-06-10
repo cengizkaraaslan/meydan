@@ -19,6 +19,8 @@ export interface MyEvent {
   createdAt: number;
   creatorName?: string;
   creatorHidden?: boolean;
+  /** Sunucu slug'ı (create-event yanıtından). Widget gerçek etkileşim sayılarını bununla çeker. */
+  slug?: string;
 }
 
 const KEY = "meydanfest:myevents";
@@ -67,7 +69,8 @@ export async function upsertMyEvent(
   if (input.id) {
     const idx = list.findIndex((e) => e.id === input.id);
     if (idx >= 0) {
-      const updated: MyEvent = { ...list[idx], ...input, id: input.id };
+      // slug verilmediyse mevcut slug korunur (düzenlemede silinmesin).
+      const updated: MyEvent = { ...list[idx], ...input, id: input.id, slug: input.slug ?? list[idx].slug };
       list[idx] = updated;
       await writeAll(list);
       return updated;

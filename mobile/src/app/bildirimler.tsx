@@ -100,11 +100,21 @@ export default function BildirimlerScreen() {
       const { name, avatar } = actorView(item);
       const isFollowing = following.has(item.actorId);
       const isPending = pending.has(item.actorId);
-      const showFollowBtn = item.actorId !== "system";
+      const isFollow = item.type === "follow";
+      const showFollowBtn = isFollow && item.actorId !== "system";
+      const ACTION: Record<string, string> = {
+        follow: "seni takip etmeye başladı",
+        mention: "seni bir paylaşımda etiketledi",
+        comment: "bir yorumda senden bahsetti",
+        feed_comment: "bir yorumda senden bahsetti",
+        dm: "sana mesaj attı",
+      };
+      const action = ACTION[item.type] ?? "seninle etkileşime geçti";
 
       return (
         <Animated.View entering={FadeInDown.duration(380).delay(Math.min(index, 10) * 45)}>
-          <View
+          <Pressable
+            onPress={() => { if (item.target) { tapH(); router.push(item.target as never); } }}
             style={[
               styles.row,
               { backgroundColor: T.bgElevated, borderColor: T.hairline },
@@ -122,8 +132,13 @@ export default function BildirimlerScreen() {
 
             <View style={{ flex: 1 }}>
               <Text style={[Type.body, { color: T.text }]} numberOfLines={2}>
-                <Text style={{ fontWeight: "800" }}>{name}</Text> seni takip etmeye başladı
+                <Text style={{ fontWeight: "800" }}>{name}</Text> {action}
               </Text>
+              {item.body ? (
+                <Text style={[Type.label, { color: T.textDim, marginTop: 2 }]} numberOfLines={2}>
+                  {item.body}
+                </Text>
+              ) : null}
               <Text style={[Type.label, { color: T.textFaint, marginTop: 3 }]}>
                 {relativeTime(item.createdAt)}
               </Text>
@@ -148,7 +163,7 @@ export default function BildirimlerScreen() {
                 </Pressable>
               )
             ) : null}
-          </View>
+          </Pressable>
         </Animated.View>
       );
     },

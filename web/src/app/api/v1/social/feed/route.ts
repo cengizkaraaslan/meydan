@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
       title: `${who} bir gönderide senden bahsetti`,
       body: preview(text),
       data: { type: "feed_post", url: "/" },
+      inApp: { type: "mention", actorId: authorId, actorName: who },
     }).catch(() => {});
   }
 

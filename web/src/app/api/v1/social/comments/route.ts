@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       title: `${who} bir yorumda senden bahsetti`,
       body: preview(text),
       data: { type: "feed_comment", postId, url: "/" },
+      inApp: { type: "feed_comment", actorId: deviceId, actorName: who },
     }).catch(() => {});
   }
 

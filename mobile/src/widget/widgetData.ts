@@ -23,6 +23,10 @@ export interface WidgetEvent {
   maybe: number;
   interested: number;
   comments: number;
+  /** Bu etkinliğe paylaşılan story sayısı (kullanıcının kendi etkinliğinde GERÇEK). */
+  stories: number;
+  /** Kullanıcının KENDİ oluşturduğu etkinlik mi (gerçek etkileşim + "Senin etkinliğin" rozeti). */
+  mine?: boolean;
 }
 
 /** Etkinlik id'sinden deterministik sayı (attending.ts hashEventId ile AYNI). */
@@ -81,7 +85,76 @@ export async function loadCachedWidgetEvent(): Promise<WidgetEvent | null> {
   }
 }
 
+/** Kullanıcının yerelde sakladığı, sunucu slug'ı olan EN SON oluşturduğu etkinlik. */
+async function readMyLatestEvent(): Promise<{ title: string; venue: string; city: string; startsAt: string; category: string; slug: string } | null> {
+  try {
+    const raw = await AsyncStorage.getItem("meydanfest:myevents");
+    if (!raw) return null;
+    const arr = JSON.parse(raw) as Array<Record<string, unknown>>;
+    if (!Array.isArray(arr)) return null;
+    const withSlug = arr
+      .filter((e) => typeof e?.slug === "string" && (e.slug as string).trim())
+      .sort((a, b) => Number(b?.createdAt ?? 0) - Number(a?.createdAt ?? 0));
+    const e = withSlug[0];
+    if (!e) return null;
+    return {
+      title: String(e.title ?? ""),
+      venue: String(e.venue ?? ""),
+      city: String(e.city ?? ""),
+      startsAt: String(e.startsAt ?? ""),
+      category: String(e.category ?? "DIGER"),
+      slug: String(e.slug),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Kullanıcının KENDİ oluşturduğu etkinlik (varsa) — GERÇEK etkileşim sayılarıyla:
+ * katılacak (attendeeCount), yorum (commentCount), story (storyCount). event-social'dan.
+ */
+export async function loadMyWidgetEvent(): Promise<WidgetEvent | null> {
+  const mine = await readMyLatestEvent();
+  if (!mine) return null;
+  let going = 0, comments = 0, stories = 0;
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/event-social?eventSlug=${encodeURIComponent(mine.slug)}`, {
+      headers: { "x-api-key": API_KEY, Accept: "application/json" },
+    });
+    if (res.ok) {
+      const j = (await res.json()) as { data?: { attendeeCount?: number; commentCount?: number; storyCount?: number; comments?: unknown[] } };
+      const d = j?.data ?? {};
+      going = Number(d.attendeeCount) || 0;
+      comments = Number(d.commentCount ?? (Array.isArray(d.comments) ? d.comments.length : 0)) || 0;
+      stories = Number(d.storyCount) || 0;
+    }
+  } catch {
+    /* ağ hatası → 0'larla göster (yine de kendi etkinliğini gösterir) */
+  }
+  const result: WidgetEvent = {
+    title: mine.title,
+    venue: mine.venue,
+    city: mine.city,
+    startsAt: mine.startsAt,
+    isFree: false,
+    category: mine.category,
+    going,
+    maybe: 0,
+    interested: 0,
+    comments,
+    stories,
+    mine: true,
+  };
+  try { await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(result)); } catch { /* yoksay */ }
+  return result;
+}
+
 export async function loadWidgetEvent(): Promise<WidgetEvent | null> {
+  // 1) ÖNCELİK: kullanıcının kendi oluşturduğu etkinlik (gerçek yorum/story/katılım).
+  const mine = await loadMyWidgetEvent();
+  if (mine) return mine;
+  // 2) Yoksa: yakınındaki yaklaşan etkinlik.
   const city = await readCity();
   const now = new Date().toISOString();
   // 1) Şehir + yaklaşan → 2) yalnız yaklaşan → 3) filtresiz (her halükârda bir şey göster).
@@ -110,6 +183,7 @@ export async function loadWidgetEvent(): Promise<WidgetEvent | null> {
           maybe: catCount(eid, "maybe"),
           interested: catCount(eid, "interested"),
           comments,
+          stories: 0,
         };
         // Sonraki açılış/eklemede anında göstermek için sakla (best-effort).
         try { await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(result)); } catch { /* yoksay */ }

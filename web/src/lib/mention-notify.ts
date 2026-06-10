@@ -2,6 +2,7 @@ import "server-only";
 import { db, isDbConfigured } from "./db";
 import { sendExpoPush, type ExpoPushMessage } from "./expo-push";
 import { sendPushToUserIds } from "./push-server";
+import { addMobileNotif } from "./social-store";
 
 /**
  * @mention çözümleme + çift dağıtım (mobil Expo push + web tarayıcı web-push).
@@ -27,6 +28,13 @@ export interface NotifyPayload {
   body: string;
   /** Tıklayınca açılacak deep-link verisi (mobil) ve url (web). */
   data?: Record<string, unknown>;
+  /** Verilirse uygulama-içi Bildirimler listesine de kayıt düşülür. */
+  inApp?: { type: string; actorId?: string | null; actorName?: string | null };
+}
+
+/** payload.data.url'i string olarak al (in-app target için). */
+function targetUrl(payload: NotifyPayload): string | null {
+  return typeof payload.data?.url === "string" ? (payload.data.url as string) : null;
 }
 
 /** Kısa önizleme metni (Instagram tarzı) — bildirim gövdesi için. */
@@ -82,6 +90,23 @@ export async function notifyEmails(emails: string[], payload: NotifyPayload): Pr
   } catch (e) {
     console.warn("[mention-notify] web push hata:", e instanceof Error ? e.message : e);
   }
+
+  // Uygulama-içi Bildirimler listesine kayıt (acct:<email> anahtarlı → girişte görünür).
+  if (payload.inApp) {
+    const target = targetUrl(payload);
+    await Promise.all(
+      list.map((email) =>
+        addMobileNotif({
+          deviceId: `acct:${email}`,
+          type: payload.inApp!.type,
+          actorId: payload.inApp!.actorId,
+          actorName: payload.inApp!.actorName,
+          body: payload.body,
+          target,
+        }),
+      ),
+    );
+  }
 }
 
 /**
@@ -99,5 +124,22 @@ export async function notifyDevices(deviceIds: string[], payload: NotifyPayload)
     await pushToDevices(profiles, payload);
   } catch (e) {
     console.warn("[mention-notify] cihaz push hata:", e instanceof Error ? e.message : e);
+  }
+
+  // Uygulama-içi Bildirimler listesine kayıt (alıcı kimliğiyle = match deviceId / acct:<email>).
+  if (payload.inApp) {
+    const target = targetUrl(payload);
+    await Promise.all(
+      list.map((deviceId) =>
+        addMobileNotif({
+          deviceId,
+          type: payload.inApp!.type,
+          actorId: payload.inApp!.actorId,
+          actorName: payload.inApp!.actorName,
+          body: payload.body,
+          target,
+        }),
+      ),
+    );
   }
 }

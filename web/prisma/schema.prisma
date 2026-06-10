@@ -720,10 +720,14 @@ model PostComment {
 
 model MobileNotif {
   id        String   @id @default(cuid())
-  deviceId  String   // alıcı
-  type      String   // "follow"
+  deviceId  String   // alıcı (girişliyse "acct:<email>")
+  type      String   // "follow" | "mention" | "comment" | "dm" | "feed_comment"
   actorId   String   // eylemi yapan (takip eden) deviceId/fake_<id>
   actorName String?
+  /// Önizleme metni (yorum/mesaj içeriği).
+  body      String?  @db.Text
+  /// Tıklayınca gidilecek deep-link (örn. "/etkinlik/<slug>", "/mesajlar").
+  target    String?
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 

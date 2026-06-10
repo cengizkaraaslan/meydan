@@ -81,12 +81,12 @@ export async function POST(request: NextRequest) {
       const bodyText = text.startsWith(IMG_PREFIX) ? "📷 Fotoğraf" : preview(text, 140);
       const data = { type: "dm", matchKey, partnerId: senderDeviceId, url: "/mesajlar" };
       if (recipients.length) {
-        await notifyDevices(recipients, { title: name, body: bodyText, data });
+        await notifyDevices(recipients, { title: name, body: bodyText, data, inApp: { type: "dm", actorId: senderDeviceId, actorName: name } });
       }
       // DM içinde @email geçtiyse o kişilere de bildir (alıcıdan bağımsız).
       const emails = extractMentionEmails(text);
       if (emails.length) {
-        await notifyEmails(emails, { title: `${name} senden bahsetti`, body: bodyText, data });
+        await notifyEmails(emails, { title: `${name} senden bahsetti`, body: bodyText, data, inApp: { type: "mention", actorId: senderDeviceId, actorName: name } });
       }
     })().catch(() => {});
   }

@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { API_BASE } from "./api";
 import { getOrCreateDeviceId } from "./device";
+import { getProfileKey } from "./profileSync";
 
 /** Meydan sosyal duvar API istemcisi (deviceId bazlı). */
 
@@ -35,6 +36,8 @@ export interface SocialNotif {
   type: string;
   actorId: string;
   actorName: string | null;
+  body?: string | null;
+  target?: string | null;
   read: boolean;
   createdAt: string;
 }
@@ -182,13 +185,14 @@ export async function addComment(postId: string, text: string, authorName?: stri
 }
 
 export async function fetchNotifs(): Promise<{ data: SocialNotif[]; unread: number }> {
-  const deviceId = await getOrCreateDeviceId();
+  // Hesap-bazlı kimlik (acct:<email>) → mention/yorum/mesaj bildirimleri girişli hesapta görünür.
+  const deviceId = await getProfileKey();
   const r = await getJson<{ data?: SocialNotif[]; unread?: number }>(`/api/v1/social/notifs?deviceId=${encodeURIComponent(deviceId)}`, {});
   return { data: r.data ?? [], unread: r.unread ?? 0 };
 }
 
 export async function markNotifsRead(): Promise<void> {
-  const deviceId = await getOrCreateDeviceId();
+  const deviceId = await getProfileKey();
   await send("POST", "/api/v1/social/notifs", { deviceId }, {});
 }
 

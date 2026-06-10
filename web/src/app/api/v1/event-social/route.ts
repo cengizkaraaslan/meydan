@@ -25,15 +25,16 @@ export async function GET(request: NextRequest) {
   }
 
   if (!isDbConfigured) {
-    return NextResponse.json({ data: { attendeeCount: 0, rsvp: { going: 0, maybe: 0, interested: 0 }, comments: [] } });
+    return NextResponse.json({ data: { attendeeCount: 0, rsvp: { going: 0, maybe: 0, interested: 0 }, commentCount: 0, storyCount: 0, comments: [] } });
   }
 
-  const [grouped, comments] = await Promise.all([
+  const [grouped, comments, storyCount] = await Promise.all([
     db.eventAttendance.groupBy({ by: ["status"], where: { eventSlug }, _count: { _all: true } }),
     db.eventCommentMobile.findMany({
       where: { eventSlug },
       orderBy: { createdAt: "desc" },
     }),
+    db.mobileStory.count({ where: { eventSlug } }),
   ]);
 
   // Kategori bazlı GERÇEK sayılar. Bilinmeyen/eski status → "going".
@@ -47,6 +48,8 @@ export async function GET(request: NextRequest) {
     data: {
       attendeeCount: rsvp.going, // geriye dönük: "katılacak" sayısı
       rsvp,
+      commentCount: comments.length,
+      storyCount,
       comments: comments.map((c) => ({
         id: c.id,
         device_id: c.deviceId,

@@ -222,8 +222,10 @@ export default function CreateEventScreen() {
       if (uploaded) imageToSend = uploaded;
     }
     // Best-effort POST — görsel upload backend'i YOK, yerel uri ya da boş gönderilir.
+    // Yanıttaki slug'ı yakala: widget bu etkinliğin GERÇEK etkileşim sayılarını slug ile çeker.
+    let serverSlug: string | undefined;
     try {
-      await fetch(`${API_BASE}/api/v1/create-event`, {
+      const res = await fetch(`${API_BASE}/api/v1/create-event`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-key": "meydanfest-app" },
         body: JSON.stringify({
@@ -244,6 +246,8 @@ export default function CreateEventScreen() {
           creatorHidden,
         }),
       });
+      const j = await res.json().catch(() => null);
+      if (j?.slug) serverSlug = String(j.slug);
     } catch {
       /* yut — best-effort */
     }
@@ -265,6 +269,7 @@ export default function CreateEventScreen() {
         startsAt: (when ?? new Date()).toISOString(),
         creatorName: user?.name ?? user?.email ?? "",
         creatorHidden,
+        slug: serverSlug,
       });
     } catch {
       /* yut */

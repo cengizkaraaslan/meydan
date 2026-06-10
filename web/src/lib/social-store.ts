@@ -221,9 +221,37 @@ export async function listNotifs(deviceId: string) {
     type: n.type,
     actorId: n.actorId,
     actorName: n.actorName,
+    body: n.body ?? null,
+    target: n.target ?? null,
     read: n.read,
     createdAt: n.createdAt.toISOString(),
   }));
+}
+
+/** Uygulama-içi bildirim ekle (mention/yorum/mesaj vb. → Bildirimler listesine düşer). */
+export async function addMobileNotif(input: {
+  deviceId: string; // alıcı (acct:<email> veya cihaz id)
+  type: string;
+  actorId?: string | null;
+  actorName?: string | null;
+  body?: string | null;
+  target?: string | null;
+}): Promise<void> {
+  if (!isDbConfigured) return;
+  try {
+    await db.mobileNotif.create({
+      data: {
+        deviceId: input.deviceId,
+        type: input.type,
+        actorId: input.actorId ?? "",
+        actorName: input.actorName ?? null,
+        body: input.body ?? null,
+        target: input.target ?? null,
+      },
+    });
+  } catch {
+    /* best-effort */
+  }
 }
 
 export async function markNotifsRead(deviceId: string) {

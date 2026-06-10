@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       title: `${authorName} bir yorumda senden bahsetti`,
       body: preview(text),
       data: { type: "comment", eventId: eventSlug, url: `/etkinlik/${eventSlug}` },
+      inApp: { type: "comment", actorId: deviceId, actorName: authorName },
     }).catch(() => {});
   }
 
