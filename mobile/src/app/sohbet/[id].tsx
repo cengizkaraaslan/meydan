@@ -284,10 +284,10 @@ export default function ChatScreen() {
         <Pressable onPress={() => { tapH(); router.back(); }} hitSlop={10} style={[styles.back, { backgroundColor: T.surfaceStrong }]}>
           <Text style={{ color: "#fff", fontSize: 20 }}>←</Text>
         </Pressable>
-        <Pressable onPress={() => { tapH(); router.push(`/kisi/${person.id}`); }} style={styles.hAvatarWrap} hitSlop={6}>
+        <Pressable onPress={() => { tapH(); router.push({ pathname: "/kisi/[id]", params: { id: person.id, name: person.name, avatar: person.avatar } }); }} style={styles.hAvatarWrap} hitSlop={6}>
           <Image source={{ uri: person.avatar }} style={styles.hAvatar} contentFit="cover" />
         </Pressable>
-        <Pressable style={{ flex: 1 }} onPress={() => { tapH(); router.push(`/kisi/${person.id}`); }}>
+        <Pressable style={{ flex: 1 }} onPress={() => { tapH(); router.push({ pathname: "/kisi/[id]", params: { id: person.id, name: person.name, avatar: person.avatar } }); }}>
           <Text style={[Type.title, { color: T.text }]}>{canSeeAges && person.age ? `${person.name}, ${person.age}` : person.name}</Text>
           <Text style={[Type.label, { color: typing ? T.primary : person.online ? T.success : T.textFaint }]}>
             {typing ? `${t("typing")}` : person.online ? t("online") : person.distanceKm ? `${person.distanceKm} km ${t("away")}` : ""}
