@@ -4,7 +4,7 @@ import { Tabs, router } from "expo-router";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
+import { impactHaptic, mediumHaptic } from "@/lib/haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
@@ -49,7 +49,8 @@ function AuroraTabBar({ state, navigation }: TabBarProps) {
                 key={route.key}
                 style={styles.item}
                 onPress={() => {
-                  Haptics.selectionAsync();
+                  // HapticTab: dokununca belirgin (light impact) titreşim — haptik ayarına saygılı, sessiz.
+                  impactHaptic();
                   const e = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
                   if (!focused && !e.defaultPrevented) navigation.navigate(route.name);
                 }}
@@ -76,7 +77,7 @@ function AuroraTabBar({ state, navigation }: TabBarProps) {
                 key="__create"
                 style={styles.createItem}
                 onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  mediumHaptic();
                   // Oluşturulmuş etkinlik varsa seçim menüsü; yoksa direkt oluştur ekranı.
                   void countMyEvents().then((n) => router.push(n > 0 ? "/olusturmenu" : "/olustur"));
                 }}

@@ -87,8 +87,21 @@ export function getCachedEvent(key: string): ApiEvent | null {
 }
 
 export async function fetchEventById(id: string): Promise<ApiEvent | null> {
-  // Listeden ara; bulunamazsa null. Parametre id VEYA slug olabilir — sistem/duyuru
-  // gönderileri (akış) yalnızca slug taşıdığı için ikisini de eşleştiriyoruz.
+  // 1) Tekil etkinlik endpoint'i — slug ile DOĞRUDAN çek. Meydan'daki sistem/duyuru
+  // gönderileri yalnız slug taşır ve etkinlik liste sayfasının dışında olabilir;
+  // bu yüzden önce slug ile dener (eski "etkinlik bulunamadı" hatasını çözer).
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/events/${encodeURIComponent(id)}`, {
+      headers: { "x-api-key": API_KEY, Accept: "application/json" },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data) return json.data as ApiEvent;
+    }
+  } catch {
+    // ağ hatası → listeye düş
+  }
+  // 2) Yedek: listeden ara (id VEYA slug). Tekil endpoint 404/erişilemezse.
   try {
     const res = await fetchEvents({ pageSize: 100 });
     return res.data.find((e) => e.id === id || e.slug === id) ?? null;

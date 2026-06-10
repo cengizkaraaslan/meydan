@@ -5,7 +5,7 @@ import Animated, { FadeIn } from "react-native-reanimated";
 import { router } from "expo-router";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
-import { tapH, impactH } from "@/lib/haptics";
+import { tapHaptic, impactHaptic } from "@/lib/haptics";
 import { StoryAvatar } from "@/components/StoryAvatar";
 import { ReactionPicker } from "@/components/ReactionPicker";
 import { type FeedPost } from "@/lib/social";
@@ -62,8 +62,8 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
         <Pressable
           disabled={busy}
           hitSlop={8}
-          onPress={() => { tapH(); setPicker((v) => !v); }}
-          onLongPress={() => { impactH(); setPicker(true); }}
+          onPress={() => { tapHaptic(); setPicker((v) => !v); }}
+          onLongPress={() => { impactHaptic(); setPicker(true); }}
           style={[
             styles.likeBtn,
             {
@@ -96,7 +96,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
         </Pressable>
       </View>
 
-      <Pressable onPress={() => { tapH(); onOpenComments(); }} hitSlop={8}>
+      <Pressable onPress={() => { tapHaptic(); onOpenComments(); }} hitSlop={8}>
         <Text style={[Type.label, { color: T.textDim }]}>💬 {post.commentCount} yorum</Text>
       </Pressable>
     </View>
@@ -117,7 +117,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
 
   const openEvent = () => {
     if (isSystem && post.eventSlug) {
-      tapH();
+      tapHaptic();
       // Object-form: param expo-router tarafından düzgün encode edilir (slug Türkçe
       // karakter/boşluk içerse de URL bozulmaz). Ham `/etkinlik/${slug}` URL'yi bozuyordu.
       router.push({ pathname: "/etkinlik/[id]", params: { id: post.eventSlug } });
@@ -169,7 +169,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
 
   return (
     <Pressable
-      onLongPress={canEdit ? () => { impactH(); onOpenActions?.(); } : undefined}
+      onLongPress={canEdit ? () => { impactHaptic(); onOpenActions?.(); } : undefined}
       delayLongPress={300}
       style={[styles.card, { backgroundColor: T.surface, borderColor: T.hairline }]}
     >
@@ -189,7 +189,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
             </View>
           ) : (
             <Pressable
-              onPress={() => { tapH(); onToggleFollow(); }}
+              onPress={() => { tapHaptic(); onToggleFollow(); }}
               style={[styles.followPill, { borderColor: T.primary, backgroundColor: T.surfaceStrong }]}
             >
               <Text style={[Type.label, { color: T.primary }]}>+ Takip et</Text>
@@ -202,7 +202,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
             </View>
             {canEdit ? (
               <Pressable
-                onPress={() => { tapH(); onOpenActions?.(); }}
+                onPress={() => { tapHaptic(); onOpenActions?.(); }}
                 hitSlop={10}
                 style={[styles.moreBtn, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}
               >

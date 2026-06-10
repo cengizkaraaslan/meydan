@@ -20,3 +20,15 @@ export const successH = () => {
   if (isHapticsEnabled()) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   sndSuccess();
 };
+
+// ── SESSİZ haptic'ler: titreşim ver ama SES çalma (pref'e yine saygılı).
+// Meydan gönderi etkileşimleri (ses istenmiyor) ve tab bar için.
+export const tapHaptic = () => {
+  if (isHapticsEnabled()) Haptics.selectionAsync().catch(() => {});
+};
+export const impactHaptic = () => {
+  if (isHapticsEnabled()) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+};
+export const mediumHaptic = () => {
+  if (isHapticsEnabled()) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+};
