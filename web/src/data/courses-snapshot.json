@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-06-10T14:06:24.288Z",
+  "scrapedAt": "2026-06-11T08:27:37.015Z",
   "data": {
     "GASMEK": [
       {
@@ -206,7 +206,7 @@
         "center": "Alpu Eğitim Merkezi",
         "start": "15.09.2025",
         "end": "31.07.2026",
-        "schedule": "Pzt: 10:00 - 12:00 Sal: 10:00 - 12:00 Çar: 10:00 - 12:00 Per: 10:00 - 12:00 Cum: 10:00 - 12:00",
+        "schedule": "Pzt: 10:00 - 17:00 Sal: 10:00 - 17:00 Çar: 10:00 - 17:00 Per: 10:00 - 17:00 Cum: 10:00 - 17:00",
         "full": false,
         "open": true
       },
@@ -218,15 +218,6 @@
         "schedule": "Pzt: 16:00 - 18:00 Sal: 16:00 - 18:00",
         "full": true,
         "open": false
-      },
-      {
-        "name": "Step-Aerobik",
-        "center": "Emek Eğitim Merkezi",
-        "start": "02.02.2026",
-        "end": "24.06.2026",
-        "schedule": "Pzt: 10:00 - 11:00 Çar: 10:00 - 11:00",
-        "full": true,
-        "open": true
       },
       {
         "name": "5. Sınıf Fen Bilimleri",
