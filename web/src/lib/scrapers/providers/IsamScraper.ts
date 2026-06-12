@@ -36,11 +36,23 @@ export class IsamScraper extends BaseScraper {
   public readonly baseUrl = "https://www.isam.org.tr";
 
   protected async fetchListing(opts: ScraperRunOptions): Promise<ScrapedEvent[]> {
-    const raw = await this.httpGet(`${this.baseUrl}/api/events?page=1`, opts.abortSignal, {
-      headers: { Accept: "application/ld+json, application/json" },
-    });
-    const json = JSON.parse(raw) as { "hydra:member"?: IsamMember[] };
-    const members = json["hydra:member"] ?? [];
+    // API sayfa başına 10 kayıt verir (itemsPerPage yok sayılır). Gelecek etkinlikler
+    // farklı sayfalara dağılabildiği için tüm sayfaları (en çok 6) gez.
+    const members: IsamMember[] = [];
+    for (let page = 1; page <= 6; page++) {
+      let raw: string;
+      try {
+        raw = await this.httpGet(`${this.baseUrl}/api/events?page=${page}`, opts.abortSignal, {
+          headers: { Accept: "application/ld+json, application/json" },
+        });
+      } catch {
+        break;
+      }
+      const json = JSON.parse(raw) as { "hydra:member"?: IsamMember[] };
+      const batch = json["hydra:member"] ?? [];
+      members.push(...batch);
+      if (batch.length < 10) break; // son sayfa
+    }
     const now = Date.now();
     const events: ScrapedEvent[] = [];
 
