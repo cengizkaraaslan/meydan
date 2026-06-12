@@ -35,7 +35,9 @@ export async function GET(request: NextRequest) {
       try {
         await fetch(`${url.origin}/api/cron/scrape?shard=${shard + 1}&shards=${shards}`, {
           headers: secret ? { authorization: `Bearer ${secret}` } : {},
-          signal: AbortSignal.timeout(3000),
+          // 8sn: soğuk başlatmada sonraki shard lambda'sı isteği alana dek yeterli süre tanı
+          // (3sn cold start'tan kısaydı → istek iletilmeden iptal olup zincir kopuyordu).
+          signal: AbortSignal.timeout(8000),
         });
       } catch {
         /* abort beklenen — istek iletildi, shard bağımsız çalışır */
