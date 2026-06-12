@@ -1,10 +1,10 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest, after } from "next/server";
 import { revalidatePath } from "next/cache";
 import type { EventSource } from "@/lib/types";
 import { scraperRegistry } from "@/lib/scrapers/ScraperRegistry";
 import { recordRun, persistRun, getLatestRunPerSourceFromDb } from "@/lib/scrapers/RunTracker";
 import { setEventsForSource } from "@/lib/scrapers/EventCache";
-import { runAndPersistAll, type SourceRunSummary } from "@/lib/scrapers/runAndPersist";
+import type { SourceRunSummary } from "@/lib/scrapers/runAndPersist";
 import { isAdminEmail } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
@@ -91,9 +91,24 @@ export async function POST(request: NextRequest) {
       error: r.errorMessage,
     }];
   } else {
-    // Hepsi: cron/admin ile AYNI helper — run()+persist tek bounded havuzdan (fetch & persist
-    // örtüşür), 60sn'ye sığar.
-    summaries = await runAndPersistAll();
+    // Hepsi: 109 scraper tek 60sn'lik lambda'ya sığmaz (Hobby tek vCPU) → cron'un kendi kendine
+    // zincirlenen akışını (/api/cron/scrape, parçalı) arka planda tetikle ve hemen dön.
+    const origin = request.nextUrl.origin;
+    const secret = process.env.CRON_SECRET;
+    after(async () => {
+      try {
+        await fetch(`${origin}/api/cron/scrape`, {
+          headers: secret ? { authorization: `Bearer ${secret}` } : {},
+        });
+      } catch (err) {
+        console.warn("[v1/admin/scrapers] zincir tetikleme hatası:", err instanceof Error ? err.message : err);
+      }
+    });
+    return NextResponse.json({
+      ok: true,
+      started: true,
+      note: "Scrape zinciri başlatıldı (parçalı). Tüm kaynaklar ~2 dk içinde Neon'a yazılır.",
+    });
   }
 
   revalidatePath("/");

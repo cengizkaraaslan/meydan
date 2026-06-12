@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest, after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { runAndPersistAll } from "@/lib/scrapers/runAndPersist";
 
@@ -12,14 +12,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Tek invocation: tüm scraper'lar run()+persist tek bounded havuzdan (fetch & persist örtüşür),
-  // 60sn'ye sığar. Opsiyonel ?shard=i&shards=N ile elle parça çalıştırılabilir (vars. hepsi).
+  // KENDİ KENDİNE ZİNCİRLEME: Hobby lambda'sı tek vCPU → 109 scraper'ın HTML'ini TEK 60sn'lik
+  // çağrıda çekip parse etmek imkânsız (cheerio CPU-bound; tek invocation ~63/109 yetişip 504).
+  // Çözüm: işi N parçaya böl, bu çağrı yalnız bu shard'ı işlesin; bitince after() ile BİR SONRAKİ
+  // shard'ı AYRI bir lambda (kendi 60sn + vCPU'su) olarak tetikle. Vercel cron entry (paramsız)
+  // = shard 0; oradan zincir 1..N-1 ilerler. Ekstra cron entry gerekmez (Hobby 2-cron limiti).
   const url = new URL(request.url);
-  const shards = Number(url.searchParams.get("shards")) || 1;
+  const shards = Number(url.searchParams.get("shards")) || Number(process.env.SCRAPE_SHARDS) || 4;
   const shard = Number(url.searchParams.get("shard")) || 0;
   const usingMock = process.env.USE_MOCK_DATA === "true";
 
   const results = await runAndPersistAll({ shard, shards });
+
+  // Sıradaki shard'ı yanıt gönderildikten SONRA tetikle (bu lambda'yı bloklamaz).
+  if (shard + 1 < shards) {
+    after(async () => {
+      try {
+        await fetch(`${url.origin}/api/cron/scrape?shard=${shard + 1}&shards=${shards}`, {
+          headers: secret ? { authorization: `Bearer ${secret}` } : {},
+        });
+      } catch (err) {
+        console.warn(`[cron/scrape] shard ${shard + 1} zincir tetikleme hatası:`, err instanceof Error ? err.message : err);
+      }
+    });
+  }
 
   // TODO (#25 — bildirim): yeni etkinlik tespit edilince eşleşen cihazlara push gönder.
   //   İskele: setEventsForSource'tan yeni oluşturulan event'leri topla → her event için

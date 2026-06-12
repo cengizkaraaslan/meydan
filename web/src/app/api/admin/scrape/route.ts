@@ -1,50 +1,36 @@
-import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { NextResponse, after } from "next/server";
 import { auth } from "@/auth";
-import { runAndPersistAll } from "@/lib/scrapers/runAndPersist";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
  * Admin panelinden "Tüm verileri çek" butonu bunu tetikler.
- * Cron (/api/cron/scrape) ile AYNI helper'ı kullanır ama CRON_SECRET yerine oturum kontrolü
- * ister (tarayıcıdan tıklanabilsin diye). Tüm scraper'ları çalıştırır, sonuçları
- * Neon'a (db.event) yazar, sayfa cache'lerini tazeler ve kaynak-bazlı özet döner.
+ * 109 scraper tek 60sn'lik lambda'ya sığmadığı için (Hobby tek vCPU) doğrudan çalıştırmaz;
+ * cron'un KENDİ KENDİNE ZİNCİRLENEN scrape akışını (/api/cron/scrape, 4 parça) arka planda
+ * tetikler ve hemen döner. Veriler ~2 dk içinde Neon'a yazılır (sayfa cache'lerini cron tazeler).
  */
-export async function POST() {
+export async function POST(request: Request) {
   const session = await auth().catch(() => null);
   if (!session?.user) {
     return NextResponse.json({ error: "Giriş yapmalısın" }, { status: 401 });
   }
 
-  const usingMock = process.env.USE_MOCK_DATA === "true";
-  const results = await runAndPersistAll();
-
-  revalidatePath("/");
-  revalidatePath("/etkinlikler");
-  revalidatePath("/etkinlik", "layout");
-
-  const totalEvents = results.reduce((sum, r) => sum + r.eventCount, 0);
-  const totalWritten = results.reduce((sum, r) => sum + r.written, 0);
-  const sorted = results
-    .map((r) => ({
-      source: r.source,
-      success: r.success,
-      event_count: r.eventCount,
-      written: r.written,
-      duration_ms: r.durationMs,
-      error: r.error,
-    }))
-    .sort((a, b) => b.event_count - a.event_count);
+  const origin = new URL(request.url).origin;
+  const secret = process.env.CRON_SECRET;
+  after(async () => {
+    try {
+      await fetch(`${origin}/api/cron/scrape`, {
+        headers: secret ? { authorization: `Bearer ${secret}` } : {},
+      });
+    } catch (err) {
+      console.warn("[admin/scrape] zincir tetikleme hatası:", err instanceof Error ? err.message : err);
+    }
+  });
 
   return NextResponse.json({
-    ran_at: new Date().toISOString(),
-    usingMock,
-    scraper_count: results.length,
-    success_count: results.filter((r) => r.success).length,
-    total_events: totalEvents,
-    total_written: totalWritten,
-    results: sorted,
+    ok: true,
+    started: true,
+    note: "Scrape zinciri başlatıldı (parçalı). Tüm kaynaklar ~2 dk içinde Neon'a yazılır.",
   });
 }
