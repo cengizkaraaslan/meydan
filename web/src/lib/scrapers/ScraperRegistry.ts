@@ -29,6 +29,7 @@ import { DiyanetScraper } from "./providers/DiyanetScraper";
 import { YapiKrediKulturScraper } from "./providers/YapiKrediKulturScraper";
 import { YunusEmreScraper } from "./providers/YunusEmreScraper";
 import { GazhaneScraper } from "./providers/GazhaneScraper";
+import { IksvScraper } from "./providers/IksvScraper";
 import { GenericMunicipalityScraper, GenericUniversityScraper } from "./GenericMunicipalityScraper";
 import { ALL_MUNICIPALITY_CONFIGS } from "./configs/municipalities";
 import { UNIVERSITY_CONFIGS } from "./configs/universities";
@@ -102,6 +103,7 @@ scraperRegistry.register(new DiyanetScraper());     // dini/ilmi (DINI)
 scraperRegistry.register(new YapiKrediKulturScraper()); // kültür vakfı (söyleşi/atölye/sergi)
 scraperRegistry.register(new YunusEmreScraper());   // kültür/akademi
 scraperRegistry.register(new GazhaneScraper());     // müze/atölye/konser
+scraperRegistry.register(new IksvScraper());        // İKSV festivalleri/Salon (kültür vakfı)
 
 // Üniversiteler (özel concrete class'lar)
 scraperRegistry.register(new AnadoluScraper());
