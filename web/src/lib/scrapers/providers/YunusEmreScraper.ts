@@ -25,7 +25,11 @@ export class YunusEmreScraper extends BaseScraper {
 
   protected async fetchListing(opts: ScraperRunOptions): Promise<ScrapedEvent[]> {
     const raw = await this.httpGet(`${this.baseUrl}/api/v1/events?page=1&limit=50`, opts.abortSignal, {
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      },
+      insecureTLS: true,
     });
     const json = JSON.parse(raw) as { data?: YeeEvent[] };
     const list = json.data ?? [];
