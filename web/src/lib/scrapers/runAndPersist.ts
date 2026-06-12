@@ -2,7 +2,7 @@ import "server-only";
 import { scraperRegistry } from "./ScraperRegistry";
 import { recordRun, persistRun } from "./RunTracker";
 import { setEventsForSource } from "./EventCache";
-import type { ScraperResult } from "./BaseScraper";
+import type { BaseScraper, ScraperResult } from "./BaseScraper";
 
 /**
  * Cron (`/api/cron/scrape`) ve admin ("Tüm verileri çek") için ORTAK çalıştır+yaz mantığı.
@@ -86,7 +86,12 @@ export interface RunAndPersistOptions {
  */
 export async function runAndPersistAll(opts: RunAndPersistOptions = {}): Promise<SourceRunSummary[]> {
   const concurrency = opts.concurrency
-    ?? (process.env.SCRAPE_CONCURRENCY ? Number(process.env.SCRAPE_CONCURRENCY) : 10);
+    ?? (process.env.SCRAPE_CONCURRENCY ? Number(process.env.SCRAPE_CONCURRENCY) : 16);
+  // Kaynak başına sabit tavan: tek bir yavaş scraper (TICKETMASTER ~20 ülke döngüsü,
+  // FESTIVALL_TR kart-başına detay fetch'i — ikisi de ~60sn takılıp lambda'yı 504 yapıyordu)
+  // tüm bütçeyi yemesin. Tavanı aşan kaynak "başarısız" sayılır; diğerleri etkilenmez.
+  // 45sn → TOBB (~43sn / 243 etkinlik) gibi yavaş ama ÜRETKEN kaynaklar korunur.
+  const capMs = Number(process.env.SCRAPE_SOURCE_TIMEOUT_MS) || 45_000;
 
   let scrapers = scraperRegistry.list();
   const shards = opts.shards && opts.shards > 1 ? Math.floor(opts.shards) : 1;
@@ -96,8 +101,29 @@ export async function runAndPersistAll(opts: RunAndPersistOptions = {}): Promise
   }
 
   // run()+persist tek görev → fetch & persist kaynaklar arası örtüşür. run() asla throw etmez.
+  // Her run() bir kaynak-bazlı tavanla yarışır (lambda 60sn'yi aşmasın).
   return runPool(
-    scrapers.map((s) => async () => persistResult(await s.run())),
+    scrapers.map((s) => async () => persistResult(await runCapped(s, capMs))),
     Math.max(1, concurrency),
   );
+}
+
+/** s.run()'ı capMs tavanıyla yarıştırır; tavan dolarsa başarısız ScraperResult döner. */
+function runCapped(s: BaseScraper, capMs: number): Promise<ScraperResult> {
+  const startedAt = new Date();
+  let timer: ReturnType<typeof setTimeout>;
+  const capped = new Promise<ScraperResult>((resolve) => {
+    timer = setTimeout(
+      () => resolve({
+        source: s.source,
+        startedAt,
+        finishedAt: new Date(),
+        events: [],
+        success: false,
+        errorMessage: `kaynak ${capMs}ms tavanını aştı (cron bütçesi)`,
+      }),
+      capMs,
+    );
+  });
+  return Promise.race([s.run().then((r) => { clearTimeout(timer); return r; }), capped]);
 }
