@@ -24,15 +24,18 @@ export async function GET(request: NextRequest) {
 
   const results = await runAndPersistAll({ shard, shards });
 
-  // Sıradaki shard'ı yanıt gönderildikten SONRA tetikle (bu lambda'yı bloklamaz).
+  // Sıradaki shard'ı tetikle: ateşle-ve-bırak. İsteği başlat, ~3sn sonra abort et — istek
+  // Vercel'e ulaşınca yeni lambda BAĞIMSIZ koşar (client abort sunucu invocation'ını iptal etmez).
+  // Tam yanıtı BEKLEME: aksi halde shard0, shard1→2→3 zincirini await edip 60sn'de ölür ve kopar.
   if (shard + 1 < shards) {
     after(async () => {
       try {
         await fetch(`${url.origin}/api/cron/scrape?shard=${shard + 1}&shards=${shards}`, {
           headers: secret ? { authorization: `Bearer ${secret}` } : {},
+          signal: AbortSignal.timeout(3000),
         });
-      } catch (err) {
-        console.warn(`[cron/scrape] shard ${shard + 1} zincir tetikleme hatası:`, err instanceof Error ? err.message : err);
+      } catch {
+        /* abort beklenen — istek iletildi, shard bağımsız çalışır */
       }
     });
   }
