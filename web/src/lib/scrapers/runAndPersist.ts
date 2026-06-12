@@ -77,11 +77,16 @@ export interface RunAndPersistOptions {
 
 /**
  * Tüm (ya da bir shard'ın) scraper'larını çalıştırır ve sonuçları Neon'a yazar.
- * Fetch'ler paralel; persist sınırlı havuzdan akar. Kaynak-bazlı özet döner.
+ *
+ * Tek bir bounded havuz: her görev = TEK kaynağın run()+persist()'i. Böylece kaynaklar
+ * arası fetch ve persist ÖRTÜŞÜR (A yazılırken B çekilir). Eski "önce tüm fetch (~15sn),
+ * SONRA persist" iki-fazlı akış toplamı şişiriyordu (15sn + persist) ve Hobby 60sn'yi
+ * aşıyordu; örtüşünce toplam ≈ (toplam iş)/eşzamanlılık ≈ ~30sn. Hobby planında HTTP
+ * fan-out işe yaramaz (eşzamanlı fonksiyon limiti leaf'leri kuyruğa sokar) → tek invocation.
  */
 export async function runAndPersistAll(opts: RunAndPersistOptions = {}): Promise<SourceRunSummary[]> {
   const concurrency = opts.concurrency
-    ?? (process.env.SCRAPE_CONCURRENCY ? Number(process.env.SCRAPE_CONCURRENCY) : 6);
+    ?? (process.env.SCRAPE_CONCURRENCY ? Number(process.env.SCRAPE_CONCURRENCY) : 10);
 
   let scrapers = scraperRegistry.list();
   const shards = opts.shards && opts.shards > 1 ? Math.floor(opts.shards) : 1;
@@ -90,55 +95,9 @@ export async function runAndPersistAll(opts: RunAndPersistOptions = {}): Promise
     scrapers = scrapers.filter((_, i) => i % shards === shard);
   }
 
-  // 1) Tüm fetch'leri paralel ateşle (her scraper tek ~≤15sn fetch → toplam ~15sn).
-  //    BaseScraper.run() asla throw etmez (hatayı yutup success:false döner) → reddetmez.
-  const results = await Promise.all(scrapers.map((s) => s.run()));
-
-  // 2) Persist'i sınırlı eşzamanlı havuzdan geçir (Neon pooler'ı boğmadan, ~birkaç sn).
+  // run()+persist tek görev → fetch & persist kaynaklar arası örtüşür. run() asla throw etmez.
   return runPool(
-    results.map((r) => () => persistResult(r)),
+    scrapers.map((s) => async () => persistResult(await s.run())),
     Math.max(1, concurrency),
   );
-}
-
-/**
- * Fan-out: tek lambda'da 74 kaynağı çalıştırmak Vercel `maxDuration=60sn`'yi aşıyor
- * (persist + syncSystemPosts ağır). Çözüm: işi N parçaya böl, her parçayı AYRI bir
- * `/api/cron/scrape?shard=i&shards=N` çağrısına (kendi 60sn bütçeli ayrı lambda) paralel
- * dağıt. Orchestrator yalnız paralel sonuçları bekler → toplam ~tek shard süresi (<60sn).
- *
- * @param origin  İstek origin'i (kendi deployment'ına çağrı → new URL(req.url).origin)
- * @param shards  Parça sayısı (env SCRAPE_SHARDS, vars. 6)
- * @param secret  CRON_SECRET — leaf cron çağrılarını yetkilendirmek için (runtime'da mevcut)
- */
-export async function fanOutScrape(
-  origin: string,
-  shards: number,
-  secret?: string,
-): Promise<SourceRunSummary[]> {
-  const n = Math.max(1, Math.floor(shards));
-  const tasks = Array.from({ length: n }, (_, i) =>
-    fetch(`${origin}/api/cron/scrape?shard=${i}&shards=${n}`, {
-      headers: secret ? { authorization: `Bearer ${secret}` } : {},
-    })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`shard ${i} HTTP ${r.status}`);
-        const j = (await r.json()) as { results?: Array<Record<string, unknown>> };
-        // Leaf cron yanıtını SourceRunSummary'ye normalize et.
-        return (j.results ?? []).map((x) => ({
-          source: String(x.source),
-          success: Boolean(x.success),
-          eventCount: Number(x.event_count ?? 0),
-          written: Number(x.written ?? 0),
-          durationMs: Number(x.duration_ms ?? 0),
-          error: (x.error as string) ?? undefined,
-        })) as SourceRunSummary[];
-      })
-      .catch((err) => {
-        console.warn(`[fanOutScrape] shard ${i} hata:`, err instanceof Error ? err.message : err);
-        return [] as SourceRunSummary[];
-      }),
-  );
-  const perShard = await Promise.all(tasks);
-  return perShard.flat();
 }

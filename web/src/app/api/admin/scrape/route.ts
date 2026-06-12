@@ -1,7 +1,7 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
-import { fanOutScrape } from "@/lib/scrapers/runAndPersist";
+import { runAndPersistAll } from "@/lib/scrapers/runAndPersist";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -12,16 +12,14 @@ export const maxDuration = 60;
  * ister (tarayıcıdan tıklanabilsin diye). Tüm scraper'ları çalıştırır, sonuçları
  * Neon'a (db.event) yazar, sayfa cache'lerini tazeler ve kaynak-bazlı özet döner.
  */
-export async function POST(request: NextRequest) {
+export async function POST() {
   const session = await auth().catch(() => null);
   if (!session?.user) {
     return NextResponse.json({ error: "Giriş yapmalısın" }, { status: 401 });
   }
 
   const usingMock = process.env.USE_MOCK_DATA === "true";
-  // Fan-out: tek lambda'da tüm scraper'lar 60sn'yi aşar → cron leaf'lerine paralel dağıt.
-  const n = Number(process.env.SCRAPE_SHARDS) || 6;
-  const results = await fanOutScrape(new URL(request.url).origin, n, process.env.CRON_SECRET);
+  const results = await runAndPersistAll();
 
   revalidatePath("/");
   revalidatePath("/etkinlikler");

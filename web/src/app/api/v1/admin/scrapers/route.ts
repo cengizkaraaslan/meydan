@@ -4,7 +4,7 @@ import type { EventSource } from "@/lib/types";
 import { scraperRegistry } from "@/lib/scrapers/ScraperRegistry";
 import { recordRun, persistRun, getLatestRunPerSourceFromDb } from "@/lib/scrapers/RunTracker";
 import { setEventsForSource } from "@/lib/scrapers/EventCache";
-import { fanOutScrape, type SourceRunSummary } from "@/lib/scrapers/runAndPersist";
+import { runAndPersistAll, type SourceRunSummary } from "@/lib/scrapers/runAndPersist";
 import { isAdminEmail } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
@@ -91,10 +91,9 @@ export async function POST(request: NextRequest) {
       error: r.errorMessage,
     }];
   } else {
-    // Hepsi: tek lambda'da 74 kaynak 60sn'yi aşar → cron leaf'lerine paralel fan-out
-    // (her shard ayrı lambda, kendi 60sn bütçesi).
-    const n = Number(process.env.SCRAPE_SHARDS) || 6;
-    summaries = await fanOutScrape(request.nextUrl.origin, n, process.env.CRON_SECRET);
+    // Hepsi: cron/admin ile AYNI helper — run()+persist tek bounded havuzdan (fetch & persist
+    // örtüşür), 60sn'ye sığar.
+    summaries = await runAndPersistAll();
   }
 
   revalidatePath("/");
