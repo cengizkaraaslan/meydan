@@ -97,23 +97,26 @@ export interface RunAndPersistOptions {
 export async function runAndPersistAll(opts: RunAndPersistOptions = {}): Promise<SourceRunSummary[]> {
   const concurrency = opts.concurrency
     ?? (process.env.SCRAPE_CONCURRENCY ? Number(process.env.SCRAPE_CONCURRENCY) : 10);
-  // 35sn: yeni kaynak başlatmayı 35sn'de kes. Bütçe anında in-flight olan kaynakların tek
-  // fetch'i (≤15sn) + persist'i (~3sn) ancak ~53sn'de biter → 60sn'den ÖNCE 200 döner ve
-  // revalidatePath çalışır. (44sn'de in-flight 15sn fetch'ler 60sn'yi taşırıp 504 yapıyordu.)
+  // Süre bütçesi ikincil güvenlik. ASIL sınır kaynak SAYISI: Hobby tek vCPU'da ~60+ kaynağın
+  // cheerio parse'ı CPU'yu doyurup event loop'u bloklar → süre timer'ları geç ateşlenir, lambda
+  // 60sn'yi aşar (504). Bu yüzden tur başına maxSources kaynak işlenir → CPU ~50sn'den önce biter,
+  // temiz 200 döner. GÜNLÜK ROTASYON liste'yi maxSources'luk pencerelerle DÖŞER → tüm 109 kaynak
+  // ~ceil(109/maxSources) günde, boşluksuz taranır.
   const budgetMs = opts.budgetMs
-    ?? (process.env.SCRAPE_BUDGET_MS ? Number(process.env.SCRAPE_BUDGET_MS) : 35_000);
+    ?? (process.env.SCRAPE_BUDGET_MS ? Number(process.env.SCRAPE_BUDGET_MS) : 50_000);
+  const maxSources = process.env.SCRAPE_MAX_SOURCES ? Number(process.env.SCRAPE_MAX_SOURCES) : 40;
   const deadlineTs = Date.now() + budgetMs;
 
-  // Günlük rotasyon: listeyi gün-indeksine göre kaydır (her gün farklı kaynaklar öne gelir).
   const scrapers = scraperRegistry.list();
   const day = Math.floor(Date.now() / 86_400_000);
-  const offset = scrapers.length > 0 ? (day * 55) % scrapers.length : 0;
+  const offset = scrapers.length > 0 ? (day * maxSources) % scrapers.length : 0;
   const rotated = [...scrapers.slice(offset), ...scrapers.slice(0, offset)];
+  const batch = rotated.slice(0, Math.max(1, maxSources));
 
   // Her görev = run()+persist; fetch & persist kaynaklar arası örtüşür. run() asla throw etmez.
-  // Her run() KALAN bütçeyle yarışır → hiçbir kaynak mutlak deadline'ı aşamaz (lambda 60sn'de ölmez).
+  // Her run() KALAN bütçeyle yarışır → hiçbir kaynak mutlak deadline'ı aşamaz.
   return runPool(
-    rotated.map((s) => async () => persistResult(await runCapped(s, deadlineTs))),
+    batch.map((s) => async () => persistResult(await runCapped(s, deadlineTs))),
     Math.max(1, concurrency),
     deadlineTs,
   );
