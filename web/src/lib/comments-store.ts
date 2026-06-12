@@ -238,3 +238,46 @@ export async function findComment(slug: string, commentId: string): Promise<Stor
     },
   );
 }
+
+/**
+ * Yorumu (ve altındaki tüm cevap zincirini) siler. Beğeniler CommentLike.onDelete:Cascade
+ * ile otomatik temizlenir. Silinen tüm id'leri döner → istemci optimistic kaldırmayı
+ * sunucuyla aynı kümeye uzlaştırır. Sahiplik kontrolü çağıran action katmanında yapılır.
+ */
+export async function deleteComment(slug: string, commentId: string): Promise<string[]> {
+  return withDb(
+    async () => {
+      const toDelete = [commentId];
+      let frontier = [commentId];
+      // Derinlik küçük (en çok 2); parentId zincirinden alt cevapları topla.
+      while (frontier.length) {
+        const children = await db.eventComment.findMany({
+          where: { parentId: { in: frontier } },
+          select: { id: true },
+        });
+        const ids = children.map((c) => c.id);
+        if (ids.length === 0) break;
+        toDelete.push(...ids);
+        frontier = ids;
+      }
+      await db.eventComment.deleteMany({ where: { id: { in: toDelete } } });
+      return toDelete;
+    },
+    () => {
+      const list = ensureSeed(slug);
+      const toDelete = new Set<string>([commentId]);
+      let added = true;
+      while (added) {
+        added = false;
+        for (const c of list) {
+          if (c.parentId && toDelete.has(c.parentId) && !toDelete.has(c.id)) {
+            toDelete.add(c.id);
+            added = true;
+          }
+        }
+      }
+      store.byEvent.set(slug, list.filter((c) => !toDelete.has(c.id)));
+      return [...toDelete];
+    },
+  );
+}

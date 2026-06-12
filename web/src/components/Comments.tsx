@@ -11,6 +11,7 @@ import { ReportButton } from "./ReportButton";
 import { playSendSound, playClick } from "@/lib/sounds";
 import {
   addCommentAction,
+  deleteCommentAction,
   listCommentsAction,
   toggleLikeAction,
 } from "@/lib/comments-actions";
@@ -55,7 +56,7 @@ function buildTree(items: SerializedComment[]): CommentNode[] {
   return roots.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export function Comments({ slug, isLoggedIn = false, viewerUsername = null, initialItems }: CommentsProps = {}) {
+export function Comments({ slug, isLoggedIn = false, authorName = null, viewerUsername = null, initialItems }: CommentsProps = {}) {
   const t = useTranslations("event");
   const [items, setItems] = useState<SerializedComment[]>(initialItems ?? []);
   const [loading, setLoading] = useState(!initialItems);
@@ -94,17 +95,70 @@ export function Comments({ slug, isLoggedIn = false, viewerUsername = null, init
     if (!isLoggedIn || !slug) return;
     const trimmed = text.trim();
     if (!trimmed) return;
+
+    // Optimistic: yorumu sunucu yanıtını beklemeden anında göster (SQLite gibi
+    // "yerelde anında" his). Geçici id ile ekle; sunucu dönünce gerçek kayıtla
+    // değiştir, hata olursa geri al.
+    const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const replySnapshot = replyTo;
+    const optimistic: SerializedComment = {
+      id: tempId,
+      authorUsername: viewerUsername ?? "anon",
+      authorName: authorName?.trim() || "Sen",
+      authorColor: "#6366f1",
+      text: trimmed,
+      createdAt: new Date().toISOString(),
+      parentId: replySnapshot?.id ?? null,
+      likeCount: 0,
+      likedByMe: false,
+    };
+    setItems((prev) => [...prev, optimistic]);
+    setText("");
+    setReplyTo(null);
+    playSendSound();
+
     startTransition(async () => {
-      const res = await addCommentAction(slug, trimmed, replyTo?.id ?? null);
+      const res = await addCommentAction(slug, trimmed, replySnapshot?.id ?? null);
       if (!res.ok || !res.comment) {
+        // Geri al: geçici yorumu kaldır, metni kullanıcıya geri ver.
+        setItems((prev) => prev.filter((c) => c.id !== tempId));
+        setText((cur) => cur || trimmed);
+        setReplyTo((cur) => cur ?? replySnapshot);
         toast.error(res.error ?? "Yorum gönderilemedi");
         return;
       }
-      setItems((prev) => [...prev, res.comment!]);
-      setText("");
-      setReplyTo(null);
-      playSendSound();
-      toast.success(replyTo ? "Cevabın yayınlandı" : "Yorumun yayınlandı");
+      // Sunucu kaydıyla uzlaştır (gerçek id, createdAt vb.).
+      setItems((prev) => prev.map((c) => (c.id === tempId ? res.comment! : c)));
+      toast.success(replySnapshot ? "Cevabın yayınlandı" : "Yorumun yayınlandı");
+    });
+  }
+
+  function handleDelete(commentId: string) {
+    if (!slug) return;
+    if (!window.confirm("Yorumun silinsin mi?")) return;
+
+    // Optimistic: yorumu (ve altındaki cevap zincirini) anında kaldır; hata olursa
+    // önceki listeyi geri yükle.
+    const toRemove = new Set<string>([commentId]);
+    let added = true;
+    while (added) {
+      added = false;
+      for (const c of items) {
+        if (c.parentId && toRemove.has(c.parentId) && !toRemove.has(c.id)) {
+          toRemove.add(c.id);
+          added = true;
+        }
+      }
+    }
+    const snapshot = items;
+    setItems((prev) => prev.filter((c) => !toRemove.has(c.id)));
+
+    startTransition(async () => {
+      const res = await deleteCommentAction(slug, commentId);
+      if (!res.ok) {
+        setItems(snapshot);
+        toast.error(res.error ?? "Yorum silinemedi");
+      }
     });
   }
 
@@ -233,6 +287,7 @@ export function Comments({ slug, isLoggedIn = false, viewerUsername = null, init
                 depth={0}
                 onLike={handleLike}
                 onReply={startReply}
+                onDelete={handleDelete}
                 slug={slug}
                 isLoggedIn={isLoggedIn}
                 viewerUsername={viewerUsername}
@@ -250,12 +305,13 @@ interface ItemProps {
   depth: number;
   onLike: (id: string) => void;
   onReply: (n: CommentNode) => void;
+  onDelete: (id: string) => void;
   slug?: string;
   isLoggedIn?: boolean;
   viewerUsername?: string | null;
 }
 
-function CommentItem({ node, depth, onLike, onReply, slug, isLoggedIn = false, viewerUsername = null }: ItemProps) {
+function CommentItem({ node, depth, onLike, onReply, onDelete, slug, isLoggedIn = false, viewerUsername = null }: ItemProps) {
   const isOwnComment =
     !!viewerUsername &&
     (viewerUsername === node.authorUsername ||
@@ -318,6 +374,15 @@ function CommentItem({ node, depth, onLike, onReply, slug, isLoggedIn = false, v
                 variant="text"
               />
             )}
+            {isOwnComment && !node.id.startsWith("tmp-") && (
+              <button
+                type="button"
+                onClick={() => onDelete(node.id)}
+                className="text-[var(--muted)] hover:text-red-500 transition-colors"
+              >
+                Sil
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -330,6 +395,7 @@ function CommentItem({ node, depth, onLike, onReply, slug, isLoggedIn = false, v
               depth={depth + 1}
               onLike={onLike}
               onReply={onReply}
+              onDelete={onDelete}
               slug={slug}
               isLoggedIn={isLoggedIn}
               viewerUsername={viewerUsername}

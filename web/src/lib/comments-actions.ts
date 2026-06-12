@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { addComment, findComment, listComments, toggleLike, type SerializedComment } from "./comments-store";
+import { addComment, deleteComment, findComment, listComments, toggleLike, type SerializedComment } from "./comments-store";
 import { moderateMessage } from "./moderation";
 import { pushNotification } from "./notifications-store";
 import { getEventBySlug } from "./events";
@@ -62,6 +62,29 @@ export async function addCommentAction(
 
   revalidatePath(`/etkinlik/${slug}`);
   return { ok: true, comment };
+}
+
+export async function deleteCommentAction(
+  slug: string,
+  commentId: string,
+): Promise<{ ok: boolean; removedIds?: string[]; error?: string }> {
+  const session = await auth().catch(() => null);
+  if (!session?.user) {
+    return { ok: false, error: "Silmek için giriş yapmalısın" };
+  }
+  const viewerId = viewerIdFromSession(session);
+  const target = await findComment(slug, commentId);
+  // Zaten yoksa (örn. çift istek) başarı say — istemci kaldırmış olsun.
+  if (!target) return { ok: true, removedIds: [commentId] };
+  const isOwner =
+    target.authorUsername === viewerId ||
+    target.authorUsername.toLowerCase() === viewerId.toLowerCase();
+  if (!isOwner) {
+    return { ok: false, error: "Sadece kendi yorumunu silebilirsin" };
+  }
+  const removedIds = await deleteComment(slug, commentId);
+  revalidatePath(`/etkinlik/${slug}`);
+  return { ok: true, removedIds };
 }
 
 export async function toggleLikeAction(
