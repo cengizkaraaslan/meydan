@@ -22,6 +22,8 @@ import { EskisehirTrendScraper } from "./providers/EskisehirTrendScraper";
 import { FestTrScraper } from "./providers/FestTrScraper";
 import { FestivallTrScraper } from "./providers/FestivallTrScraper";
 import { TOBBScraper } from "./providers/TOBBScraper";
+import { OdunpazariScraper } from "./providers/OdunpazariScraper";
+import { QuarkAkademiScraper } from "./providers/QuarkAkademiScraper";
 import { GenericMunicipalityScraper, GenericUniversityScraper } from "./GenericMunicipalityScraper";
 import { ALL_MUNICIPALITY_CONFIGS } from "./configs/municipalities";
 import { UNIVERSITY_CONFIGS } from "./configs/universities";
@@ -81,8 +83,10 @@ scraperRegistry.register(new SehirTiyatrolariScraper());
 scraperRegistry.register(new IBBScraper());
 scraperRegistry.register(new VisitEskisehirScraper());
 scraperRegistry.register(new EskisehirTrendScraper());
+scraperRegistry.register(new OdunpazariScraper());
 scraperRegistry.register(new FestTrScraper());
 scraperRegistry.register(new FestivallTrScraper());
+scraperRegistry.register(new QuarkAkademiScraper());
 
 // TOBB resmi Fuar Takvimi (B2B/mesleki fuarlar — category: FUAR, ziyaretçiye ücretsiz)
 scraperRegistry.register(new TOBBScraper());

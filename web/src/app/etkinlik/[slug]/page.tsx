@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { Calendar, MapPin, ExternalLink, BellRing, ArrowLeft, CalendarPlus, Star, Building2 } from "lucide-react";
+import { Calendar, MapPin, ExternalLink, BellRing, ArrowLeft, CalendarPlus, Star, Building2, Globe, Phone, Music2 } from "lucide-react";
+import { InstagramIcon, FacebookIcon } from "@/components/icons/Social";
 import { Badge } from "@/components/ui/Badge";
 import { RsvpButtons } from "@/components/RsvpButtons";
 import { Comments } from "@/components/Comments";
@@ -89,6 +90,12 @@ const SCHEMA_TYPE: Record<EventCategory, string> = {
   FUAR: "ExhibitionEvent",
   DIGER: "Event",
 };
+
+/** Sosyal/web bağlantısı tam URL değilse (örn. kullanıcı adı) başına https:// ekler. */
+function withHttp(u: string): string {
+  const v = u.trim();
+  return /^https?:\/\//i.test(v) ? v : `https://${v.replace(/^@/, "")}`;
+}
 
 /** schema.org/Event JSON-LD — Google rich results + arama görünürlüğü. */
 function buildEventJsonLd(event: EventListItem, reviewSummary: { count: number; average: number }) {
@@ -399,6 +406,64 @@ export default async function EventDetailPage({
                 {t("ticket_cta")}
                 <ExternalLink className="size-4" />
               </a>
+            )}
+
+            {(event.website || event.instagram || event.facebook || event.tiktok || event.phone) && (
+              <div className="space-y-2 border-t border-[var(--border)] pt-4">
+                <div className="text-xs uppercase tracking-wider text-[var(--muted)]">
+                  İletişim & Sosyal
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {event.phone && (
+                    <a
+                      href={`tel:${event.phone.replace(/\s+/g, "")}`}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--muted-bg)] transition-colors"
+                    >
+                      <Phone className="size-3.5" /> {event.phone}
+                    </a>
+                  )}
+                  {event.website && (
+                    <a
+                      href={withHttp(event.website)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--muted-bg)] transition-colors"
+                    >
+                      <Globe className="size-3.5" /> Web sitesi
+                    </a>
+                  )}
+                  {event.instagram && (
+                    <a
+                      href={withHttp(event.instagram)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-tr from-rose-500 via-fuchsia-500 to-amber-400 text-white px-3 py-1.5 text-xs font-medium hover:opacity-90 transition-opacity"
+                    >
+                      <InstagramIcon className="size-3.5" /> Instagram
+                    </a>
+                  )}
+                  {event.facebook && (
+                    <a
+                      href={withHttp(event.facebook)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[#1877F2] text-white px-3 py-1.5 text-xs font-medium hover:opacity-90 transition-opacity"
+                    >
+                      <FacebookIcon className="size-3.5" /> Facebook
+                    </a>
+                  )}
+                  {event.tiktok && (
+                    <a
+                      href={withHttp(event.tiktok)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-black text-white px-3 py-1.5 text-xs font-medium hover:opacity-90 transition-opacity"
+                    >
+                      <Music2 className="size-3.5" /> TikTok
+                    </a>
+                  )}
+                </div>
+              </div>
             )}
 
             <div className="grid grid-cols-3 gap-2 text-xs">

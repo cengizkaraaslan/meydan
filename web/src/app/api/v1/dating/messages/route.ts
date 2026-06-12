@@ -10,8 +10,18 @@ import {
 } from "@/lib/mobile-chat-store";
 import { extractMentionEmails, notifyDevices, notifyEmails, preview } from "@/lib/mention-notify";
 
-// Backend foto mesajı öneki (chat.ts ile aynı) — bildirimde "📷 Fotoğraf" göster.
+// Backend medya mesajı önekleri (chat.ts ile aynı) — bildirimde okunur etiket göster.
 const IMG_PREFIX = "[img]";
+const VOICE_PREFIX = "[voice]";
+// Tepki (reaction) öneki — bunlar mesaj değil, push bildirimi gönderilmez.
+const REACT_PREFIX = "[react]";
+// Yanıt öneki — bildirimde alıntı meta'sını değil yalnız gerçek metni göster.
+const REPLY_PREFIX = "[reply]";
+const REPLY_SEP = String.fromCharCode(1);
+function replyInnerText(t: string): string {
+  const parts = t.slice(REPLY_PREFIX.length).split(REPLY_SEP);
+  return parts.length >= 4 ? parts.slice(3).join(REPLY_SEP) : t;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +63,10 @@ export async function GET(request: NextRequest) {
   if (!matchKey || !deviceId) {
     return NextResponse.json({ error: "matchKey ve deviceId zorunlu" }, { status: 400 });
   }
-  const data = await listMessages({ matchKey, deviceId });
+  // Sayfalama: limit (varsayılan 20) + before (epoch ms; eski sayfa için).
+  const limit = Number(sp.get("limit")) || undefined;
+  const before = Number(sp.get("before")) || undefined;
+  const data = await listMessages({ matchKey, deviceId, limit, before });
   return NextResponse.json({ ok: true, data });
 }
 
@@ -73,13 +86,20 @@ export async function POST(request: NextRequest) {
   }
   const message = await sendMessage({ matchKey, senderDeviceId, text });
 
-  // Alıcıya önizlemeli bildirim (Instagram tarzı) + @mention. Bot/sistem göndericiyi atla.
-  if (!senderDeviceId.startsWith("bot_")) {
+  // Alıcıya önizlemeli bildirim (Instagram tarzı) + @mention. Bot/sistem & tepki mesajını atla.
+  if (!senderDeviceId.startsWith("bot_") && !text.startsWith(REACT_PREFIX)) {
     void (async () => {
       const recipients = await recipientDevicesForMatch(matchKey, senderDeviceId);
       const name = (await deviceDisplayName(senderDeviceId)) || "Yeni mesaj";
-      const bodyText = text.startsWith(IMG_PREFIX) ? "📷 Fotoğraf" : preview(text, 140);
-      const data = { type: "dm", matchKey, partnerId: senderDeviceId, url: "/mesajlar" };
+      const shown = text.startsWith(REPLY_PREFIX) ? replyInnerText(text) : text;
+      const bodyText = shown.startsWith(IMG_PREFIX)
+        ? "📷 Fotoğraf"
+        : shown.startsWith(VOICE_PREFIX)
+          ? "🎤 Sesli mesaj"
+          : preview(shown, 140);
+      // partnerId = gönderen (alıcı için sohbet karşı tarafı). name → bildirimden sohbet başlığı.
+      // url yok → mobil tip-bazlı (dm) yönlendirmeyle doğrudan /sohbet/[id] açılır; web fallback /mesajlar.
+      const data = { type: "dm", matchKey, partnerId: senderDeviceId, name, url: "/mesajlar" };
       if (recipients.length) {
         await notifyDevices(recipients, { title: name, body: bodyText, data, inApp: { type: "dm", actorId: senderDeviceId, actorName: name } });
       }

@@ -9,6 +9,17 @@ export const maxDuration = 30;
 
 const MAX_FILE_BYTES = 6 * 1024 * 1024; // 6 MB
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+// Sesli mesaj (kind="voice") için izinli ses türleri.
+const ALLOWED_AUDIO = new Set([
+  "audio/m4a",
+  "audio/x-m4a",
+  "audio/mp4",
+  "audio/aac",
+  "audio/mpeg",
+  "audio/webm",
+  "audio/ogg",
+  "audio/wav",
+]);
 
 /**
  * Mobil (deviceId bazlı) görsel yükleme — R2'ye koyar, public URL döner.
@@ -34,16 +45,20 @@ export async function POST(request: NextRequest) {
   if (!file || !(file instanceof File)) {
     return NextResponse.json({ ok: false, error: "Dosya bulunamadı" }, { status: 400 });
   }
-  if (!ALLOWED.has(file.type)) {
+  const kindParam = form.get("kind") as string | null;
+  const isAudio = kindParam === "voice";
+  if (isAudio ? !ALLOWED_AUDIO.has(file.type) : !ALLOWED.has(file.type)) {
     return NextResponse.json({ ok: false, error: `Geçersiz tür: ${file.type}` }, { status: 400 });
   }
   if (file.size > MAX_FILE_BYTES) {
     return NextResponse.json({ ok: false, error: "Dosya 6 MB'tan büyük olamaz" }, { status: 400 });
   }
 
-  const kind = (form.get("kind") as string | null) === "post" ? "posts" : "stories";
-  const ext = file.type.split("/")[1] ?? "jpg";
-  const baseName = slugify((file.name || "img").replace(/\.[^.]+$/, "")) || "img";
+  const kind = isAudio ? "voice" : kindParam === "post" ? "posts" : "stories";
+  // audio/x-m4a → "m4a", audio/mpeg → "mp3" gibi makul uzantı.
+  const mimeExt = file.type.split("/")[1]?.replace("x-", "") ?? (isAudio ? "m4a" : "jpg");
+  const ext = mimeExt === "mpeg" ? "mp3" : mimeExt;
+  const baseName = slugify((file.name || (isAudio ? "voice" : "img")).replace(/\.[^.]+$/, "")) || (isAudio ? "voice" : "img");
   const key = `${uploadPrefix()}mobile/${kind}/${Date.now()}-${baseName.slice(0, 40)}.${ext}`;
 
   try {

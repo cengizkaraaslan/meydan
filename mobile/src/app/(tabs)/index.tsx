@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dimensions, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraBackground } from "@/components/AuroraBackground";
@@ -56,6 +56,46 @@ function pickFeatured(events: ApiEvent[], coords?: import("@/lib/geo").Coords | 
   return [...withImg, ...without].slice(0, FEATURED_COUNT);
 }
 
+/**
+ * 3D "takla": her `intervalMs`'de bir rotateX ile ön/arka yüz arasında döner. Android'de
+ * backfaceVisibility güvenilmez olduğundan TEK yüz çizilir; tam kenara (90°, görünmez) gelindiğinde
+ * yüz değiştirilir ve diğer kenardan (-90°) düz olarak yukarı kalkar → ters/aynalı görünmez.
+ * `paused` true iken (örn. konum modalı açıkken) takla durur; false olunca devam eder.
+ * Sağlamlaştırma: interval YALNIZ mount'ta bir kez kurulur (deps []); aynı anda iki flip olmasın
+ * diye yeniden-giriş guard'ı (`busy`) var → "kendi kendine sürekli takla" sorunu engellenir.
+ */
+function FlipCard({ front, back, paused = false, intervalMs = 5000 }: { front: React.ReactNode; back: React.ReactNode; paused?: boolean; intervalMs?: number }) {
+  const rot = useSharedValue(0); // sürekli artan açı; her flip +180
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      if (pausedRef.current) return; // modal açıkken durur
+      rot.value = withTiming(rot.value + 180, { duration: 600, easing: Easing.inOut(Easing.cubic) });
+    }, intervalMs);
+    return () => clearInterval(iv);
+  }, [intervalMs, rot]);
+
+  // İki yüz de çizili; hangisinin GÖRÜNECEĞİ açıdan opacity ile belirlenir (setFace YOK → React
+  // kaynaklı dönme imkânsız). backfaceVisibility Android'de güvenilmez olduğu için opacity kullanıyoruz.
+  const containerStyle = useAnimatedStyle(() => ({ transform: [{ perspective: 800 }, { rotateX: `${rot.value}deg` }] }));
+  const frontStyle = useAnimatedStyle(() => {
+    const m = ((rot.value % 360) + 360) % 360;
+    return { opacity: m < 90 || m > 270 ? 1 : 0 };
+  });
+  const backStyle = useAnimatedStyle(() => {
+    const m = ((rot.value % 360) + 360) % 360;
+    // Arka yüz 180° ters taban → kart 180'deyken düz okunur.
+    return { opacity: m >= 90 && m <= 270 ? 1 : 0, transform: [{ rotateX: "180deg" }] };
+  });
+  return (
+    <Animated.View style={containerStyle}>
+      <Animated.View style={frontStyle}>{front}</Animated.View>
+      <Animated.View style={[styles.flipAbs, backStyle]}>{back}</Animated.View>
+    </Animated.View>
+  );
+}
 
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
@@ -232,19 +272,34 @@ export default function DiscoverScreen() {
       >
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(450)} style={styles.header}>
-          <Pressable onPress={() => { tapH(); setCityModal(true); }} hitSlop={8}>
-            <Text style={[Type.label, { color: T.textFaint }]}>
-              {!isTR ? t("your_location") : city ? t("your_location") : status === "loading" ? t("locating") : t("welcome")}
-            </Text>
-            <Text style={[Type.h1, { color: T.text }]}>
-              {!isTR ? (
-                <>{country.flag} {country.tr} <Text style={{ color: T.primary, fontSize: 16 }}>▾</Text></>
-              ) : city ? (
-                <>📍 {city} <Text style={{ color: T.primary, fontSize: 16 }}>▾</Text></>
-              ) : (
-                <>Meydan<Text style={{ color: T.primary }}>Fest</Text></>
-              )}
-            </Text>
+          <Pressable onPress={() => { tapH(); setCityModal(true); }} hitSlop={8} style={{ flex: 1 }}>
+            {/* Etiket + başlık birlikte takla atar; ÖN = marka, ARKA = konum. Modal açıkken durur. */}
+            <FlipCard
+              paused={cityModal}
+              front={
+                <View>
+                  <Text style={[Type.label, { color: T.textFaint }]}>{t("welcome")}</Text>
+                  <Text style={[Type.h1, { color: T.text }]}>
+                    Meydan<Text style={{ color: T.primary }}>Fest</Text>
+                  </Text>
+                </View>
+              }
+              back={
+                <View>
+                  <Text style={[Type.label, { color: T.textFaint }]}>
+                    {status === "loading" ? t("locating") : t("your_location")}
+                  </Text>
+                  <Text style={[Type.h1, { color: T.text }]} numberOfLines={1}>
+                    {!isTR
+                      ? `${country.flag} ${country.tr}`
+                      : city
+                        ? `📍 ${city}`
+                        : "📍 Konum seç"}{" "}
+                    <Text style={{ color: T.primary, fontSize: 16 }}>▾</Text>
+                  </Text>
+                </View>
+              }
+            />
           </Pressable>
           <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
             {/* Bildirim zili — okunmamış sayacı rozetiyle */}
@@ -452,6 +507,7 @@ export default function DiscoverScreen() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, marginBottom: 20 },
+  flipAbs: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center" },
   searchBtn: {
     width: 38, height: 38, borderRadius: Radius.md, alignItems: "center", justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth * 2,

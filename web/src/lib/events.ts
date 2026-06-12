@@ -31,6 +31,11 @@ interface ManualEventRow {
   featured: boolean;
   creatorEmail: string | null;
   creatorName: string | null;
+  website: string | null;
+  instagram: string | null;
+  facebook: string | null;
+  tiktok: string | null;
+  phone: string | null;
 }
 
 /**
@@ -73,6 +78,11 @@ function manualRowToListItem(r: ManualEventRow): EventListItem {
     imageUrl: r.imageUrl ?? undefined,
     artist: r.artist ?? undefined,
     featured: r.featured,
+    website: r.website ?? undefined,
+    instagram: r.instagram ?? undefined,
+    facebook: r.facebook ?? undefined,
+    tiktok: r.tiktok ?? undefined,
+    phone: r.phone ?? undefined,
   };
 }
 
@@ -98,6 +108,11 @@ const MANUAL_SELECT = {
   featured: true,
   creatorEmail: true,
   creatorName: true,
+  website: true,
+  instagram: true,
+  facebook: true,
+  tiktok: true,
+  phone: true,
 } as const;
 
 /**
@@ -395,6 +410,11 @@ async function dbEventBySlug(slug: string): Promise<EventListItem | null> {
     imageUrl: row.imageUrl ?? undefined,
     artist: row.artist ?? undefined,
     featured: row.featured,
+    website: row.website ?? undefined,
+    instagram: row.instagram ?? undefined,
+    facebook: row.facebook ?? undefined,
+    tiktok: row.tiktok ?? undefined,
+    phone: row.phone ?? undefined,
     attendeeCount: row._count.attendances,
     commentCount: row._count.comments,
   };

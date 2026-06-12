@@ -78,6 +78,28 @@ export async function restoreAvatar(): Promise<void> {
   }
 }
 
+/** Hesaba özel yerel önbellek anahtarları — hesap DEĞİŞİNCE temizlenir ki yeni hesap
+ *  önceki hesabın avatar/profil/cinsiyet/şehir verisini görmesin. (Cihaz ayarları —
+ *  dil, ses, haptics, favoriler — hesaptan bağımsızdır, dokunmuyoruz.) */
+const ACCOUNT_SCOPED_KEYS = [
+  KEY_AVATAR,
+  "meydanfest:dprofile",
+  "meydanfest:gender",
+  "meydanfest:city",
+  "meydanfest:detectedCity",
+  "meydanfest:gps",
+];
+
+/** Başka bir hesaba geçilince (veya çıkışta) önceki hesabın yerel verisini siler. */
+export async function clearAccountScopedCache(): Promise<void> {
+  try {
+    await AsyncStorage.multiRemove(ACCOUNT_SCOPED_KEYS);
+  } catch {
+    /* yoksay */
+  }
+  avatarListeners.forEach((l) => l(""));
+}
+
 export async function syncProfile(data: {
   gender?: Gender;
   city?: string | null;

@@ -5,6 +5,27 @@ import { getProfileKey } from "./profileSync";
 
 /** Meydan sosyal duvar API istemcisi (deviceId bazlı). */
 
+/**
+ * Sosyal gönderi kimliğini (cihaz UUID'si = authorId) girişli hesabın e-postasına bağlar.
+ * Backend bu sayede "gönderiden açılan sohbet"te partner UUID'sini acct:email'e çözüp
+ * mesajı karşı tarafın sohbet listesine (acct:email anahtarlı) ulaştırabilir.
+ * push-token ucu MobileProfile(deviceId).email'i yazar (token=null → mevcut token'a dokunmaz şekilde).
+ */
+export async function linkSocialIdentity(email: string): Promise<void> {
+  const e = email.trim().toLowerCase();
+  if (!e) return;
+  try {
+    const deviceId = await getOrCreateDeviceId();
+    await fetch(`${API_BASE}/api/v1/mobile/push-token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId, email: e }),
+    });
+  } catch {
+    /* sessiz — bağlama best-effort */
+  }
+}
+
 export const REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥"] as const;
 
 export interface FeedPost {
@@ -36,6 +57,7 @@ export interface SocialNotif {
   type: string;
   actorId: string;
   actorName: string | null;
+  actorAvatar?: string | null;
   body?: string | null;
   target?: string | null;
   read: boolean;
@@ -256,6 +278,29 @@ export async function uploadImageResult(
 export async function uploadImage(uri: string, kind: "story" | "post" = "post"): Promise<string | null> {
   const r = await uploadImageResult(uri, kind);
   return "url" in r ? r.url : null;
+}
+
+/** Sesli mesaj kaydını (m4a) R2'ye yükler, public URL döner (başarısızsa null). */
+export async function uploadVoice(uri: string): Promise<string | null> {
+  try {
+    const res = await FileSystem.uploadAsync(`${API_BASE}/api/v1/social/upload`, uri, {
+      httpMethod: "POST",
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      fieldName: "file",
+      mimeType: "audio/m4a",
+      parameters: { kind: "voice" },
+    });
+    let data: { ok?: boolean; url?: string } | null = null;
+    try {
+      data = JSON.parse(res.body) as { ok?: boolean; url?: string };
+    } catch {
+      /* gövde JSON değil */
+    }
+    if (res.status < 200 || res.status >= 300 || !data?.ok || !data?.url) return null;
+    return data.url.startsWith("http") ? data.url : `${API_BASE}${data.url}`;
+  } catch {
+    return null;
+  }
 }
 
 export async function createStory(input: {

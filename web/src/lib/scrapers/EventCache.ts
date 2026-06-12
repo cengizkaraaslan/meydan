@@ -47,6 +47,11 @@ interface CachedRow {
   imageUrl: string | null;
   artist: string | null;
   featured: boolean;
+  website: string | null;
+  instagram: string | null;
+  facebook: string | null;
+  tiktok: string | null;
+  phone: string | null;
 }
 
 function rowToListItem(r: CachedRow): EventListItem {
@@ -72,6 +77,11 @@ function rowToListItem(r: CachedRow): EventListItem {
     imageUrl: r.imageUrl ?? undefined,
     artist: r.artist ?? undefined,
     featured: r.featured,
+    website: r.website ?? undefined,
+    instagram: r.instagram ?? undefined,
+    facebook: r.facebook ?? undefined,
+    tiktok: r.tiktok ?? undefined,
+    phone: r.phone ?? undefined,
   };
 }
 
@@ -80,6 +90,7 @@ const SELECT = {
   category: true, venue: true, city: true, country: true, district: true, organizer: true, startsAt: true, endsAt: true,
   priceMin: true, priceMax: true, isFree: true, ticketUrl: true, imageUrl: true,
   artist: true, featured: true,
+  website: true, instagram: true, facebook: true, tiktok: true, phone: true,
 } as const;
 
 /** Scrape edilmiş (MANUAL olmayan), gizli olmayan, ~geçmiş 1 günden yeni etkinlikler. */
@@ -146,6 +157,11 @@ export async function setEventsForSource(
       ticketUrl: e.ticketUrl ?? null,
       imageUrl: e.imageUrl ?? null,
       artist: e.artist ?? null,
+      website: e.website ?? null,
+      instagram: e.instagram ?? null,
+      facebook: e.facebook ?? null,
+      tiktok: e.tiktok ?? null,
+      phone: e.phone ?? null,
       hidden: false,
       lastScrapedAt: now,
     };

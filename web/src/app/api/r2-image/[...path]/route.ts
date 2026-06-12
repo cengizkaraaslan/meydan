@@ -47,12 +47,28 @@ export async function GET(
 
     // Stream → buffer (AWS SDK ReadableStream)
     const stream = res.Body as ReadableStream<Uint8Array>;
-    const contentType = res.ContentType ?? "image/jpeg";
+    // Ses dosyaları için STANDART MIME'a normalize et: Android ExoPlayer "audio/m4a"yı tanımayıp
+    // çalmayabiliyor; uzantıdan türet (".m4a/.aac/.mp4" → "audio/mp4"). Eski yüklemeler de düzelir.
+    const lower = key.toLowerCase();
+    const audioType =
+      lower.endsWith(".m4a") || lower.endsWith(".aac") || lower.endsWith(".mp4")
+        ? "audio/mp4"
+        : lower.endsWith(".mp3")
+          ? "audio/mpeg"
+          : lower.endsWith(".wav")
+            ? "audio/wav"
+            : lower.endsWith(".webm")
+              ? "audio/webm"
+              : lower.endsWith(".ogg")
+                ? "audio/ogg"
+                : null;
+    const contentType = audioType ?? res.ContentType ?? "image/jpeg";
 
     return new Response(stream, {
       status: 200,
       headers: {
         "Content-Type": contentType,
+        "Accept-Ranges": "bytes",
         "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
         "Content-Length": res.ContentLength?.toString() ?? "",
       },

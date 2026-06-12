@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
     void notifyEmails(emails, {
       title: `${who} bir yorumda senden bahsetti`,
       body: preview(text),
-      data: { type: "feed_comment", postId, url: "/" },
+      // Meydan duvarına git ve bahsedildiğin gönderinin yorumlarını aç.
+      data: { type: "feed_comment", postId, url: `/meydan?post=${postId}` },
       inApp: { type: "feed_comment", actorId: deviceId, actorName: who },
     }).catch(() => {});
   }

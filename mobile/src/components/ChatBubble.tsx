@@ -34,8 +34,16 @@ export function ChatBubble() {
     listConversations().then(setConvos).catch(() => {});
   }, []);
 
-  // Anasayfa her odaklandığında (sohbetten dönünce) okunmamış sayılarını tazele.
-  useFocusEffect(refresh);
+  // Anasayfa odaklandığında okunmamış sayılarını tazele ve odakta kaldıkça
+  // periyodik yokla — böylece kullanıcı anasayfadayken yeni mesaj gelince
+  // rozet kendiliğinden güncellenir (sohbetten dönmeyi beklemeden).
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+      const id = setInterval(refresh, 15000);
+      return () => clearInterval(id);
+    }, [refresh])
+  );
 
   const minX = MARGIN;
   const maxX = width - SIZE - MARGIN;

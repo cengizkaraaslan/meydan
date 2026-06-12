@@ -24,10 +24,25 @@ export function defaultAvatar(name?: string | null, gender?: string | null): str
 }
 
 /**
- * Foto doluysa onu, değilse cinsiyete göre default görsel URL'ini döndürür.
+ * Bir görsel URL'ini React Native Image'in yükleyebileceği biçime çevirir.
+ * - Google Drive PAYLAŞIM linki (.../file/d/<ID>/view, open?id=<ID>, uc?id=<ID>) → doğrudan
+ *   görsel linki (lh3.googleusercontent.com/d/<ID>). Aksi halde RN sayfayı yükleyemez, resim çıkmaz.
+ * - Diğer http(s) (bize/R2'ye yüklenen, Google hesap fotosu) → aynen.
+ */
+export function normalizeImageUrl(url?: string | null): string | null {
+  const u = url?.trim();
+  if (!u) return null;
+  const m = u.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=[^&]+&)?id=)([\w-]+)/);
+  if (m) return `https://lh3.googleusercontent.com/d/${m[1]}`;
+  return u;
+}
+
+/**
+ * Foto doluysa onu (Google Drive linki normalize edilerek), değilse cinsiyete göre default görsel.
+ * 3 durum: (1) Google Drive linki → dönüştürülür, (2) bize/R2 yüklenen http → aynen, (3) yok → default.
  */
 export function resolveAvatar(photo?: string | null, name?: string | null, gender?: string | null): string {
-  const p = photo?.trim();
+  const p = normalizeImageUrl(photo);
   return p ? p : defaultAvatar(name, gender);
 }
 

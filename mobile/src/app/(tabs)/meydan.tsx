@@ -16,7 +16,7 @@ import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { EventRow } from "@/components/EventCard";
@@ -106,6 +106,16 @@ export default function MeydanScreen() {
   const [tipVisible, setTipVisible] = useState(false);
   // Kısa bilgi (hata) mesajı — tip modalını yeniden kullanır.
   const [tipMsg, setTipMsg] = useState<string | null>(null);
+
+  // Bildirimden "/meydan?post=<id>" ile gelince o gönderinin yorum/alıntı thread'ini aç.
+  const { post: postParam } = useLocalSearchParams<{ post?: string }>();
+  useEffect(() => {
+    const pid = typeof postParam === "string" && postParam ? postParam : null;
+    if (!pid) return;
+    setCommentsFor(pid);
+    // Param'ı temizle → sekmeye tekrar girince modal kendiliğinden açılmasın.
+    router.setParams({ post: "" } as never);
+  }, [postParam]);
 
   useEffect(() => {
     void getOrCreateDeviceId().then(setDeviceId);
@@ -753,7 +763,7 @@ export default function MeydanScreen() {
             <EmptyState emoji="🌌" title="Henüz gönderi yok" sub="İlk paylaşan sen ol!" />
           )
         }
-        contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: 150 }}
+        contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: insets.bottom + 116 }}
         style={{ flex: 1 }}
         ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
         showsVerticalScrollIndicator={false}
@@ -919,7 +929,7 @@ const styles = StyleSheet.create({
   composerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
   photoBtn: { width: 44, height: 40, borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2, alignItems: "center", justifyContent: "center" },
   shareBtn: { borderRadius: Radius.pill, paddingHorizontal: 22, paddingVertical: 10, minWidth: 90, alignItems: "center", justifyContent: "center" },
-  eventWrap: { marginHorizontal: 16, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 14 },
+  eventWrap: { marginHorizontal: 16, borderRadius: Radius.lg, borderWidth: 0, padding: 14 },
   tipScrim: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 28 },
   tipCard: { width: "100%", maxWidth: 360, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2, padding: 20 },
   tipBtn: { alignSelf: "flex-end", borderRadius: Radius.pill, paddingHorizontal: 22, paddingVertical: 10, alignItems: "center", justifyContent: "center" },

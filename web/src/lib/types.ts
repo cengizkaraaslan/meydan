@@ -73,6 +73,16 @@ export interface ScrapedEvent {
   ticketUrl?: string;
   imageUrl?: string;
   artist?: string;
+  /** Etkinlik/organizatör web sitesi (tam URL). Doluysa detayda gösterilir. */
+  website?: string;
+  /** Instagram bağlantısı (tam URL veya kullanıcı adı). Doluysa detayda gösterilir. */
+  instagram?: string;
+  /** Facebook bağlantısı (tam URL veya sayfa adı). Doluysa detayda gösterilir. */
+  facebook?: string;
+  /** TikTok bağlantısı (tam URL veya kullanıcı adı). Doluysa detayda gösterilir. */
+  tiktok?: string;
+  /** İletişim telefonu/WhatsApp. Doluysa detayda tıklanır link olarak gösterilir. */
+  phone?: string;
 }
 
 export interface EventListItem extends ScrapedEvent {

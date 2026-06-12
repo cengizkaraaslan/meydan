@@ -216,16 +216,53 @@ export async function addComment(input: { postId: string; deviceId: string; auth
 export async function listNotifs(deviceId: string) {
   if (!isDbConfigured) return [];
   const rows = await db.mobileNotif.findMany({ where: { deviceId }, orderBy: { createdAt: "desc" }, take: 50 });
-  return rows.map((n) => ({
+  // Aktör avatarını canlı çöz (deviceId / acct:email / User.id / email) → bildirimde gerçek foto görünsün.
+  const actorIds = [...new Set(rows.map((r) => r.actorId).filter(Boolean))];
+  const emailOf = (id: string): string | null =>
+    id.startsWith("acct:") ? id.slice(5).toLowerCase() : id.includes("@") ? id.toLowerCase() : null;
+  const emails = [...new Set(actorIds.map(emailOf).filter((e): e is string => !!e))];
+  const [profs, users] = await Promise.all([
+    actorIds.length
+      ? db.mobileProfile.findMany({
+          where: { OR: [{ deviceId: { in: actorIds } }, ...(emails.length ? [{ email: { in: emails } }] : [])] },
+          select: { deviceId: true, email: true, avatar: true, name: true },
+        })
+      : [],
+    actorIds.length
+      ? db.user.findMany({
+          where: { OR: [{ id: { in: actorIds } }, ...(emails.length ? [{ email: { in: emails } }] : [])] },
+          select: { id: true, email: true, image: true, name: true },
+        })
+      : [],
+  ]);
+  const profById = new Map(profs.map((p) => [p.deviceId, p]));
+  const profByEmail = new Map(profs.filter((p) => p.email).map((p) => [p.email!.toLowerCase(), p]));
+  const userById = new Map(users.map((u) => [u.id, u]));
+  const userByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u]));
+  const pick = (actorId: string) => {
+    const e = emailOf(actorId);
+    const prof = profById.get(actorId) || (e ? profByEmail.get(e) : undefined);
+    const usr = userById.get(actorId) || (e ? userByEmail.get(e) : undefined);
+    return { prof, usr };
+  };
+  const httpAvatar = (u: string | null | undefined) => (u && /^https?:\/\//.test(u) ? u : null);
+  return rows.map((n) => {
+    const { prof, usr } = pick(n.actorId);
+    // Bildirimde gerçek ad + avatarı göster (kayıtlı değer zayıfsa canlı çözümle).
+    const resolvedName = prof?.name || usr?.name || null;
+    const resolvedAvatar = httpAvatar(prof?.avatar) || httpAvatar(usr?.image) || null;
+    return {
     id: n.id,
     type: n.type,
     actorId: n.actorId,
-    actorName: n.actorName,
+    actorName: resolvedName || n.actorName,
+    actorAvatar: resolvedAvatar,
     body: n.body ?? null,
     target: n.target ?? null,
     read: n.read,
     createdAt: n.createdAt.toISOString(),
-  }));
+    };
+  });
 }
 
 /** Uygulama-içi bildirim ekle (mention/yorum/mesaj vb. → Bildirimler listesine düşer). */

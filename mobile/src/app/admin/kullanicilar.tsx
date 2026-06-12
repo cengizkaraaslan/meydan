@@ -132,8 +132,8 @@ function UserCard({
               <Text style={[Type.title, { color: T.text, flexShrink: 1 }]} numberOfLines={1}>{title}</Text>
               <Badge T={T} kind={kind} />
             </View>
-            <Text style={[Type.label, { color: T.textFaint, marginTop: 3 }]} numberOfLines={1}>{sub}</Text>
-            <Text style={[Type.micro, { color: T.textFaint, marginTop: 4 }]}>
+            <Text style={[Type.label, { color: T.textDim, marginTop: 3 }]} numberOfLines={1}>{sub}</Text>
+            <Text style={[Type.micro, { color: T.textDim, marginTop: 4 }]}>
               {formatDate(u.createdAt)} · son: {formatRelative(u.updatedAt)}
             </Text>
           </View>

@@ -172,12 +172,24 @@ export async function scheduleProximityPing(name: string): Promise<void> {
 /** Bildirim verisinden ilgili ekrana yönlendir (hem dokunma hem soğuk başlangıç). */
 function routeFromNotification(data: Record<string, unknown> | undefined): void {
   if (!data) return;
-  // 1) Açık deep-link (yorum/mesaj @mention): data.url = "/etkinlik/<slug>" | "/mesajlar" | "/".
+  // 1) DM → doğrudan ilgili sohbeti aç (matchKey + ad ile; chat ensureMatch'le anahtarı çözer).
+  if (data.type === "dm" && typeof data.partnerId === "string") {
+    router.push({
+      pathname: "/sohbet/[id]",
+      params: {
+        id: data.partnerId,
+        ...(typeof data.matchKey === "string" ? { matchKey: data.matchKey } : {}),
+        ...(typeof data.name === "string" ? { name: data.name } : {}),
+      },
+    } as never);
+    return;
+  }
+  // 2) Açık deep-link (yorum/etkinlik @mention): data.url = "/etkinlik/<slug>" | "/mesajlar" | "/".
   if (typeof data.url === "string" && data.url.startsWith("/")) {
     router.push(data.url as never);
     return;
   }
-  // 2) Bilinen alanlar: etkinlik hatırlatıcısı / DM / yakındaki kişi.
+  // 3) Bilinen alanlar: etkinlik hatırlatıcısı / DM / yakındaki kişi.
   if (typeof data.eventId === "string") router.push(`/etkinlik/${data.eventId}`);
   else if (typeof data.partnerId === "string") router.push(`/sohbet/${data.partnerId}`);
   else if (data.matchKey) router.push("/mesajlar" as never);

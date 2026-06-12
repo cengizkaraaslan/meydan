@@ -5,7 +5,8 @@ import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import * as Linking from "expo-linking";
 import { API_BASE } from "./api";
-import { setAccountKey, restoreAvatar } from "./profileSync";
+import { setAccountKey, restoreAvatar, clearAccountScopedCache } from "./profileSync";
+import { linkSocialIdentity } from "./social";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -126,12 +127,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user?.email) {
       setAccountKey(user.email);
       void restoreAvatar();
+      // Sosyal gönderi kimliğini (cihaz UUID'si) hesaba bağla → gönderiden açılan sohbet
+      // mesajları karşı tarafın acct:email sohbet listesine ulaşsın.
+      void linkSocialIdentity(user.email);
     } else {
       setAccountKey(null);
     }
   }, [user?.email]);
 
   const handleUser = useCallback(async (u: AuthUser) => {
+    // Hesap DEĞİŞTİyse (farklı e-posta) önceki hesabın yerel verisini temizle → karışmasın.
+    // Aynı e-postayla tekrar giriş = aynı hesap (kimlik acct:email), temizlik YAPMA.
+    try {
+      const prevRaw = await AsyncStorage.getItem(KEY_USER);
+      const prevEmail = prevRaw ? (JSON.parse(prevRaw) as AuthUser).email?.trim().toLowerCase() : null;
+      if (prevEmail && prevEmail !== u.email.trim().toLowerCase()) {
+        await clearAccountScopedCache();
+      }
+    } catch {
+      /* yoksay */
+    }
     setUser(u);
     setGuest(false);
     setSigningIn(false);
@@ -188,6 +203,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setGuest(false);
     await AsyncStorage.multiRemove([KEY_USER, KEY_GUEST]);
+    // Çıkışta da hesaba özel veriyi temizle → sonraki giren önceki hesabı görmesin.
+    await clearAccountScopedCache();
   }, []);
 
   return (

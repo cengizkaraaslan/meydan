@@ -521,11 +521,13 @@ model Event {
   district      String?
   hidden        Boolean       @default(false)
   featured      Boolean       @default(false)
-  /// Kullanıcı oluşturduğu (source:"USER"/"MANUAL") etkinlikler için sosyal/web bağlantıları.
+  /// Sosyal/web bağlantıları ve iletişim — kullanıcı oluşturduğu (source:"USER"/"MANUAL")
+  /// etkinliklerde ve scraper'ın sitede bulduğu (örn. Quark Akademi) etkinliklerde dolu olabilir.
   website       String?
   instagram     String?
   facebook      String?
   tiktok        String?
+  phone         String?
   /// Kullanıcı tarafından oluşturulduysa oluşturanın e-postası/adı (scraped'lerde null).
   creatorEmail  String?
   creatorName   String?

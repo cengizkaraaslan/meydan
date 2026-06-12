@@ -154,6 +154,7 @@ export interface ChatMessage {
   fromMe: boolean;
   text: string;
   at: number; // epoch ms
+  readAt?: number | null; // karşı taraf okuduysa epoch ms (fromMe mesajlar için mavi tik)
 }
 
 /** Eşleşme özeti (sohbet listesi/balon bunu kullanır). */
@@ -210,12 +211,115 @@ export async function apiFetchMatches(deviceId: string): Promise<MatchSummary[]>
   }
 }
 
+/** Bir konuşmayı bu cihazın listesinden siler. */
+export async function apiDeleteMatch(deviceId: string, matchKey: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/dating/matches`, {
+      method: "DELETE",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ deviceId, matchKey }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Cihazın tüm sohbetlerini okundu işaretler (balon rozetini sıfırlar). */
+export async function apiMarkAllRead(deviceId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/dating/matches`, {
+      method: "PATCH",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ deviceId }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** YALNIZ bir sohbeti okundu işaretler (o satırın rozetini sıfırlar). */
+export async function apiMarkConversationRead(deviceId: string, matchKey: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/dating/matches`, {
+      method: "PATCH",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ deviceId, matchKey }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Bu cihazın bir sohbette "yazıyor" olduğunu bildirir (best-effort, TTL ~6sn). */
+export async function apiSetTyping(matchKey: string, deviceId: string): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/api/v1/dating/typing`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ matchKey, deviceId }),
+    });
+  } catch {
+    /* sessiz */
+  }
+}
+
+/** Karşı taraf bu sohbette yazıyor mu? */
+export async function apiGetTyping(matchKey: string, deviceId: string): Promise<boolean> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/dating/typing`);
+    url.searchParams.set("matchKey", matchKey);
+    url.searchParams.set("deviceId", deviceId);
+    const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return !!data?.typing;
+  } catch {
+    return false;
+  }
+}
+
+/** "Şu an aktifim" kalp atışı gönderir (çevrimiçi/son görülme için, best-effort). */
+export async function apiPingPresence(deviceId: string): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/api/v1/dating/presence`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ deviceId }),
+    });
+  } catch {
+    /* sessiz */
+  }
+}
+
+/** Bir cihazın çevrimiçi durumu + son görülme (ms). */
+export async function apiGetPresence(deviceId: string): Promise<{ online: boolean; lastSeen: number | null }> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/dating/presence`);
+    url.searchParams.set("deviceId", deviceId);
+    const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+    if (!res.ok) return { online: false, lastSeen: null };
+    const data = await res.json();
+    return { online: !!data?.online, lastSeen: typeof data?.lastSeen === "number" ? data.lastSeen : null };
+  } catch {
+    return { online: false, lastSeen: null };
+  }
+}
+
 /** Bir konuşmanın mesajlarını çeker (eski→yeni). Karşıdakini okundu işaretler. */
-export async function apiFetchMessages(matchKey: string, deviceId: string): Promise<ChatMessage[]> {
+export async function apiFetchMessages(
+  matchKey: string,
+  deviceId: string,
+  opts?: { limit?: number; before?: number },
+): Promise<ChatMessage[]> {
   try {
     const url = new URL(`${API_BASE}/api/v1/dating/messages`);
     url.searchParams.set("matchKey", matchKey);
     url.searchParams.set("deviceId", deviceId);
+    if (opts?.limit) url.searchParams.set("limit", String(opts.limit));
+    if (opts?.before) url.searchParams.set("before", String(opts.before));
     const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
     if (!res.ok) return [];
     const data = await res.json();

@@ -25,6 +25,7 @@ export interface MessageView {
   fromMe: boolean;
   text: string;
   at: number; // epoch ms
+  readAt: number | null; // karşı taraf okuduysa epoch ms (fromMe mesajlar için mavi tik), yoksa null
 }
 
 // ── In-memory fallback (globalThis singleton; cold-start'ta sıfırlanır) ──────────
@@ -49,8 +50,49 @@ interface MemStore {
   matches: MemMatch[];
   messages: MemMessage[];
 }
-const g = globalThis as unknown as { __meydateChat?: MemStore };
+const g = globalThis as unknown as { __meydateChat?: MemStore; __meydateTyping?: Map<string, number>; __meydatePresence?: Map<string, number> };
 const mem: MemStore = (g.__meydateChat ??= { matches: [], messages: [] });
+
+// ── "yazıyor…" efemeral durum (in-memory, TTL'li) ────────────────────────────────
+// Anahtar: `${matchKey}|${deviceId}` → son "yazıyor" zaman damgası (ms). Kalıcı değil;
+// serverless instance'lar arası best-effort (typing zaten geçici/önemsiz bir sinyal).
+const TYPING_TTL_MS = 6000;
+const typingMap: Map<string, number> = (g.__meydateTyping ??= new Map());
+
+/** Bu cihazın bir sohbette "yazıyor" olduğunu işaretle (TTL ~6sn). */
+export function setTyping(matchKey: string, deviceId: string): void {
+  typingMap.set(`${matchKey}|${deviceId}`, Date.now());
+}
+
+/** Bu sohbette KARŞI taraf(lar)dan biri son TTL içinde yazıyor mu? */
+export function isPartnerTyping(matchKey: string, deviceId: string): boolean {
+  const now = Date.now();
+  const prefix = `${matchKey}|`;
+  for (const [key, ts] of typingMap) {
+    if (now - ts > TYPING_TTL_MS) {
+      typingMap.delete(key); // fırsatçı temizlik
+      continue;
+    }
+    if (key.startsWith(prefix) && key.slice(prefix.length) !== deviceId) return true;
+  }
+  return false;
+}
+
+// ── Çevrimiçi/son görülme (in-memory, best-effort; serverless instance'lar arası kesin değil) ──
+const ONLINE_WINDOW_MS = 35000; // son 35sn içinde ping → çevrimiçi
+const presenceMap: Map<string, number> = (g.__meydatePresence ??= new Map());
+
+/** Bu cihazın "şu an aktif" olduğunu işaretle (kalp atışı). */
+export function setPresence(deviceId: string): void {
+  presenceMap.set(deviceId, Date.now());
+}
+
+/** Bir cihazın çevrimiçi durumu + son görülme zamanı (ms). */
+export function getPresence(deviceId: string): { online: boolean; lastSeen: number | null } {
+  const ts = presenceMap.get(deviceId) ?? null;
+  if (ts == null) return { online: false, lastSeen: null };
+  return { online: Date.now() - ts < ONLINE_WINDOW_MS, lastSeen: ts };
+}
 
 let idSeq = 0;
 function memId(prefix: string): string {
@@ -65,6 +107,27 @@ function realMatchKey(a: string, b: string): string {
 /** Mock partnerle (tek taraflı) eşleşme oda anahtarı. */
 function mockMatchKey(deviceId: string, partnerId: string): string {
   return "m_" + deviceId + "__" + partnerId;
+}
+
+/**
+ * Bir kimliği kanonik "acct:<email>" biçimine çevirir.
+ * Sistemde aynı kişi 3 farklı kimlikle dolaşabiliyor: acct:email (sohbet/profil),
+ * push/@mention deviceId'si ve sosyal gönderi authorId'si (cihaz UUID'si). Bunların
+ * hepsi e-postaya çözülürse iki taraf AYNI matchKey'i üretir → mesajlar karşıya ulaşır.
+ * E-posta bulunamazsa kimlik aynen döner (mock kişiler vb.).
+ */
+async function canonicalIdentity(rawId: string): Promise<string> {
+  const id = rawId.trim();
+  if (!id) return id;
+  if (id.startsWith("acct:")) return id.toLowerCase();
+  if (id.includes("@")) return `acct:${id.toLowerCase()}`;
+  // Ham User.id veya cihaz UUID'si → e-postaya çöz (User.email veya MobileProfile.email).
+  const [usr, prof] = await Promise.all([
+    db.user.findUnique({ where: { id }, select: { email: true } }).catch(() => null),
+    db.mobileProfile.findUnique({ where: { deviceId: id }, select: { email: true } }).catch(() => null),
+  ]);
+  const email = usr?.email || prof?.email || null;
+  return email ? `acct:${email.toLowerCase()}` : id;
 }
 
 // ── Swipe + (gerçek) eşleşme tespiti ────────────────────────────────────────────
@@ -156,20 +219,33 @@ export async function ensureMatch(input: {
 
   return withDb(
     async () => {
-      await db.mobileMatch.upsert({
-        where: { deviceId_partnerId: { deviceId, partnerId } },
-        create: { deviceId, partnerId, partnerName, partnerAvatar, matchKey: key },
-        update: { partnerName, partnerAvatar, matchKey: key },
+      // Kimlikleri kanonik acct:email'e çöz → iki taraf da AYNI anahtarı üretsin (gönderiden
+      // açılan sohbette partner = cihaz UUID'si olsa bile karşı tarafın acct:email satırına denk gelir).
+      const cDeviceId = await canonicalIdentity(deviceId);
+      const cPartnerId = await canonicalIdentity(partnerId);
+      const cIsReal = cPartnerId.startsWith("acct:") || cDeviceId.startsWith("acct:");
+      const cKey = cIsReal ? realMatchKey(cDeviceId, cPartnerId) : mockMatchKey(cDeviceId, cPartnerId);
+      // Var olan satırın matchKey'ini KORU. Mesajlar matchKey'e bağlı; yeniden hesaplanan
+      // anahtarla ezersek mesajlar "yetim" kalır. Bu yüzden mevcut anahtarı kullan.
+      const existing = await db.mobileMatch.findUnique({
+        where: { deviceId_partnerId: { deviceId: cDeviceId, partnerId: cPartnerId } },
+        select: { matchKey: true },
       });
-      if (isReal) {
+      const finalKey = existing?.matchKey ?? cKey;
+      await db.mobileMatch.upsert({
+        where: { deviceId_partnerId: { deviceId: cDeviceId, partnerId: cPartnerId } },
+        create: { deviceId: cDeviceId, partnerId: cPartnerId, partnerName, partnerAvatar, matchKey: finalKey },
+        update: { partnerName, partnerAvatar }, // matchKey'e DOKUNMA
+      });
+      if (cIsReal) {
         // Karşı taraf için de satır (benim ad/avatarım listMatches'te email'den çözülür).
         await db.mobileMatch.upsert({
-          where: { deviceId_partnerId: { deviceId: partnerId, partnerId: deviceId } },
-          create: { deviceId: partnerId, partnerId: deviceId, matchKey: key },
-          update: { matchKey: key },
+          where: { deviceId_partnerId: { deviceId: cPartnerId, partnerId: cDeviceId } },
+          create: { deviceId: cPartnerId, partnerId: cDeviceId, matchKey: finalKey },
+          update: {}, // var olan ters satırın matchKey'ini de koru
         });
       }
-      return { matchKey: key, partner: { id: partnerId, name: partnerName, avatar: partnerAvatar } };
+      return { matchKey: finalKey, partner: { id: cPartnerId, name: partnerName, avatar: partnerAvatar } };
     },
     () => {
       let m = mem.matches.find((x) => x.deviceId === deviceId && x.partnerId === partnerId);
@@ -179,9 +255,9 @@ export async function ensureMatch(input: {
       } else {
         m.partnerName = partnerName;
         m.partnerAvatar = partnerAvatar;
-        m.matchKey = key;
+        // matchKey KORU — mesajlar buna bağlı (yukarıdaki DB yolundaki açıklama geçerli).
       }
-      return { matchKey: key, partner: { id: partnerId, name: partnerName, avatar: partnerAvatar } };
+      return { matchKey: m.matchKey, partner: { id: partnerId, name: partnerName, avatar: partnerAvatar } };
     },
   );
 }
@@ -213,26 +289,31 @@ export async function listMatches(deviceId: string): Promise<MatchView[]> {
       const profEmailMap = new Map(profs.filter((p) => p.email).map((p) => [p.email!.toLowerCase(), p]));
       const userMap = new Map(users.map((u) => [u.id, u]));
       const userEmailMap = new Map(users.map((u) => [u.email.toLowerCase(), u]));
-      const out: MatchView[] = [];
+      const httpAvatar = (u: string | null | undefined) => (u && /^https?:\/\//.test(u) ? u : null);
+      // Aynı kişi birden çok partner kimliğiyle (acct:email + cihaz UUID; kanonikleştirme
+      // öncesi açılmış) iki satır olabilir → AYNI e-postaya çözülenleri TEK girişte birleştir.
+      // Okunmamışları topla; temsilci olarak daha güncel mesajlı (eşitse kanonik) odayı seç.
+      const lastAtMs = (v: MatchView) => (v.lastAt ? Date.parse(v.lastAt) : 0);
+      const isCanonical = (mk: string) => mk.startsWith("r_acct:");
+      const byKey = new Map<string, MatchView>();
       for (const r of rows) {
+        // Tepki ("[react]...") mesajları gerçek mesaj değil → önizleme & okunmamış sayısına girmez.
         const last = await db.mobileMessage.findFirst({
-          where: { matchKey: r.matchKey },
+          where: { matchKey: r.matchKey, NOT: { text: { startsWith: "[react]" } } },
           orderBy: { createdAt: "desc" },
         });
         const unread = await db.mobileMessage.count({
-          where: { matchKey: r.matchKey, senderDeviceId: { not: deviceId }, readAt: null },
+          where: { matchKey: r.matchKey, senderDeviceId: { not: deviceId }, readAt: null, NOT: { text: { startsWith: "[react]" } } },
         });
         const pEmail = emailOf(r.partnerId);
         const prof = profMap.get(r.partnerId) || (pEmail ? profEmailMap.get(pEmail) : undefined);
         const usr = userMap.get(r.partnerId) || (pEmail ? userEmailMap.get(pEmail) : undefined);
         // Gerçek ad/avatar varsa onu kullan; yoksa kayıtlı değer (mock kişiler için).
-        // Avatar yalnız http(s) ise geçerli — "file://" yerel yolları başka cihazda yüklenmez, ele.
-        const httpAvatar = (u: string | null | undefined) => (u && /^https?:\/\//.test(u) ? u : null);
         const realName = prof?.name || usr?.name || null;
         const realAvatar = httpAvatar(prof?.avatar) || httpAvatar(usr?.image) || httpAvatar(r.partnerAvatar) || null;
         // Kayıtlı isim partnerId'nin kendisiyse (eski hata) onu gösterme.
         const storedName = r.partnerName && r.partnerName !== r.partnerId ? r.partnerName : null;
-        out.push({
+        const view: MatchView = {
           matchKey: r.matchKey,
           partnerId: r.partnerId,
           partnerName: realName || storedName || "Kullanıcı",
@@ -241,9 +322,28 @@ export async function listMatches(deviceId: string): Promise<MatchView[]> {
           lastAt: last ? last.createdAt.toISOString() : null,
           unread,
           createdAt: r.createdAt.toISOString(),
+        };
+        // Birleştirme anahtarı: çözülebilen e-posta (acct:/partnerId/profil/User), yoksa partnerId.
+        const groupEmail = pEmail || prof?.email?.toLowerCase() || usr?.email?.toLowerCase() || null;
+        const groupKey = groupEmail ? `e:${groupEmail}` : `id:${r.partnerId}`;
+        const existing = byKey.get(groupKey);
+        if (!existing) {
+          byKey.set(groupKey, view);
+          continue;
+        }
+        const rep =
+          lastAtMs(view) > lastAtMs(existing) ? view
+          : lastAtMs(view) < lastAtMs(existing) ? existing
+          : isCanonical(view.matchKey) && !isCanonical(existing.matchKey) ? view
+          : existing;
+        byKey.set(groupKey, {
+          ...rep,
+          unread: existing.unread + view.unread, // okunmamış kaybolmasın
+          partnerName: existing.partnerName !== "Kullanıcı" ? existing.partnerName : view.partnerName,
+          partnerAvatar: existing.partnerAvatar || view.partnerAvatar,
         });
       }
-      return out;
+      return [...byKey.values()].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
     },
     () => {
       return mem.matches
@@ -268,31 +368,132 @@ export async function listMatches(deviceId: string): Promise<MatchView[]> {
   );
 }
 
-export async function listMessages(input: { matchKey: string; deviceId: string }): Promise<MessageView[]> {
-  const { matchKey, deviceId } = input;
+/**
+ * Bir konuşmayı (matchKey) bu cihazın listesinden siler.
+ * - Yalnız bu cihazın match satırını kaldırır (karşı taraf kendi listesini korur).
+ * - O matchKey'e bağlı başka match satırı kalmadıysa (mock/tek yönlü) mesajları da temizler.
+ */
+export async function deleteMatch(input: { deviceId: string; matchKey: string }): Promise<{ ok: boolean }> {
+  const { deviceId, matchKey } = input;
   return withDb(
     async () => {
-      // Karşı tarafın okunmamışlarını okundu işaretle
-      await db.mobileMessage.updateMany({
+      await db.mobileMatch.deleteMany({ where: { deviceId, matchKey } });
+      const remaining = await db.mobileMatch.count({ where: { matchKey } });
+      if (remaining === 0) {
+        await db.mobileMessage.deleteMany({ where: { matchKey } });
+      }
+      return { ok: true };
+    },
+    () => {
+      mem.matches = mem.matches.filter((m) => !(m.deviceId === deviceId && m.matchKey === matchKey));
+      const remaining = mem.matches.filter((m) => m.matchKey === matchKey).length;
+      if (remaining === 0) {
+        mem.messages = mem.messages.filter((x) => x.matchKey !== matchKey);
+      }
+      return { ok: true };
+    },
+  );
+}
+
+/**
+ * Bu cihazın TÜM konuşmalarındaki okunmamış (karşı taraftan gelen) mesajları okundu işaretler.
+ * Sohbet balonundaki toplam rozeti sıfırlar. Etkilenen mesaj sayısını döner.
+ */
+export async function markAllRead(deviceId: string): Promise<{ ok: boolean; count: number }> {
+  return withDb(
+    async () => {
+      const rows = await db.mobileMatch.findMany({ where: { deviceId }, select: { matchKey: true } });
+      const keys = [...new Set(rows.map((r) => r.matchKey))];
+      if (keys.length === 0) return { ok: true, count: 0 };
+      const res = await db.mobileMessage.updateMany({
+        where: { matchKey: { in: keys }, senderDeviceId: { not: deviceId }, readAt: null },
+        data: { readAt: new Date() },
+      });
+      return { ok: true, count: res.count };
+    },
+    () => {
+      const keys = new Set(mem.matches.filter((m) => m.deviceId === deviceId).map((m) => m.matchKey));
+      let count = 0;
+      for (const x of mem.messages) {
+        if (keys.has(x.matchKey) && x.senderDeviceId !== deviceId && x.readAt == null) {
+          x.readAt = Date.now();
+          count += 1;
+        }
+      }
+      return { ok: true, count };
+    },
+  );
+}
+
+/** YALNIZ bir konuşmadaki (matchKey) karşı taraftan gelen okunmamışları okundu işaretler. */
+export async function markMatchRead(deviceId: string, matchKey: string): Promise<{ ok: boolean; count: number }> {
+  return withDb(
+    async () => {
+      const res = await db.mobileMessage.updateMany({
         where: { matchKey, senderDeviceId: { not: deviceId }, readAt: null },
         data: { readAt: new Date() },
       });
-      const rows = await db.mobileMessage.findMany({ where: { matchKey }, orderBy: { createdAt: "asc" } });
-      return rows.map((r) => ({
-        id: r.id,
-        fromMe: r.senderDeviceId === deviceId,
-        text: r.text,
-        at: r.createdAt.getTime(),
-      }));
+      return { ok: true, count: res.count };
     },
     () => {
-      mem.messages
-        .filter((x) => x.matchKey === matchKey && x.senderDeviceId !== deviceId && x.readAt == null)
-        .forEach((x) => (x.readAt = Date.now()));
-      return mem.messages
-        .filter((x) => x.matchKey === matchKey)
-        .sort((a, b) => a.createdAt - b.createdAt)
-        .map((r) => ({ id: r.id, fromMe: r.senderDeviceId === deviceId, text: r.text, at: r.createdAt }));
+      let count = 0;
+      for (const x of mem.messages) {
+        if (x.matchKey === matchKey && x.senderDeviceId !== deviceId && x.readAt == null) {
+          x.readAt = Date.now();
+          count += 1;
+        }
+      }
+      return { ok: true, count };
+    },
+  );
+}
+
+export async function listMessages(input: {
+  matchKey: string;
+  deviceId: string;
+  limit?: number; // sayfa boyutu (varsayılan 20)
+  before?: number; // verilirse bu epoch ms'den ÖNCEKİ mesajlar (eski sayfa / yukarı kaydırma)
+}): Promise<MessageView[]> {
+  const { matchKey, deviceId } = input;
+  const limit = Math.min(Math.max(input.limit ?? 20, 1), 100);
+  const before = input.before && input.before > 0 ? input.before : null;
+  return withDb(
+    async () => {
+      // Okundu işaretleme YALNIZ canlı (en yeni) sayfada — eski sayfa yüklerken dokunma.
+      if (!before) {
+        await db.mobileMessage.updateMany({
+          where: { matchKey, senderDeviceId: { not: deviceId }, readAt: null },
+          data: { readAt: new Date() },
+        });
+      }
+      // En yeni `limit` mesajı (veya before'dan öncekini) desc çek, sonra asc'e çevir.
+      const rows = await db.mobileMessage.findMany({
+        where: { matchKey, ...(before ? { createdAt: { lt: new Date(before) } } : {}) },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+      });
+      return rows
+        .reverse()
+        .map((r) => ({
+          id: r.id,
+          fromMe: r.senderDeviceId === deviceId,
+          text: r.text,
+          at: r.createdAt.getTime(),
+          readAt: r.readAt ? r.readAt.getTime() : null,
+        }));
+    },
+    () => {
+      if (!before) {
+        mem.messages
+          .filter((x) => x.matchKey === matchKey && x.senderDeviceId !== deviceId && x.readAt == null)
+          .forEach((x) => (x.readAt = Date.now()));
+      }
+      const all = mem.messages
+        .filter((x) => x.matchKey === matchKey && (before ? x.createdAt < before : true))
+        .sort((a, b) => a.createdAt - b.createdAt);
+      return all
+        .slice(Math.max(0, all.length - limit)) // son `limit`
+        .map((r) => ({ id: r.id, fromMe: r.senderDeviceId === deviceId, text: r.text, at: r.createdAt, readAt: r.readAt ?? null }));
     },
   );
 }
@@ -307,7 +508,7 @@ export async function sendMessage(input: {
   return withDb(
     async () => {
       const r = await db.mobileMessage.create({ data: { matchKey, senderDeviceId, text } });
-      return { id: r.id, fromMe: true, text: r.text, at: r.createdAt.getTime() };
+      return { id: r.id, fromMe: true, text: r.text, at: r.createdAt.getTime(), readAt: null };
     },
     () => {
       const r: MemMessage = {
@@ -319,7 +520,7 @@ export async function sendMessage(input: {
         createdAt: Date.now(),
       };
       mem.messages.push(r);
-      return { id: r.id, fromMe: true, text: r.text, at: r.createdAt };
+      return { id: r.id, fromMe: true, text: r.text, at: r.createdAt, readAt: null };
     },
   );
 }
@@ -342,7 +543,25 @@ export async function recipientDevicesForMatch(matchKey: string, senderDeviceId:
 /** Gönderenin görünen adı (DM bildirim başlığı için). Yoksa null. */
 export async function deviceDisplayName(deviceId: string): Promise<string | null> {
   return withDb(
-    async () => (await db.mobileProfile.findUnique({ where: { deviceId }, select: { name: true } }))?.name ?? null,
+    async () => {
+      // Önce doğrudan profil; bulunamazsa e-postadan (acct:email/@) User.name veya MobileProfile.name'e çöz.
+      // → DM push başlığı "Yeni mesaj" yerine GERÇEK gönderen adı olur (WhatsApp gibi: kimden + mesaj).
+      const direct = await db.mobileProfile.findUnique({ where: { deviceId }, select: { name: true } });
+      if (direct?.name) return direct.name;
+      const email = deviceId.startsWith("acct:")
+        ? deviceId.slice(5).toLowerCase()
+        : deviceId.includes("@")
+          ? deviceId.toLowerCase()
+          : null;
+      if (email) {
+        const [usr, prof] = await Promise.all([
+          db.user.findFirst({ where: { email }, select: { name: true } }).catch(() => null),
+          db.mobileProfile.findFirst({ where: { email }, select: { name: true } }).catch(() => null),
+        ]);
+        return usr?.name || prof?.name || null;
+      }
+      return null;
+    },
     () => mem.matches.find((m) => m.partnerId === deviceId)?.partnerName ?? null,
   );
 }
@@ -381,7 +600,7 @@ export async function editMessage(input: {
       if (existing.senderDeviceId !== senderDeviceId) return { ok: false, reason: "forbidden" as const };
       if (Date.now() - existing.createdAt.getTime() > EDIT_WINDOW_MS) return { ok: false, reason: "expired" as const };
       const r = await db.mobileMessage.update({ where: { id }, data: { text } });
-      return { ok: true, message: { id: r.id, fromMe: true, text: r.text, at: r.createdAt.getTime() } };
+      return { ok: true, message: { id: r.id, fromMe: true, text: r.text, at: r.createdAt.getTime(), readAt: r.readAt ? r.readAt.getTime() : null } };
     },
     () => {
       const existing = mem.messages.find((x) => x.id === id);
@@ -389,7 +608,7 @@ export async function editMessage(input: {
       if (existing.senderDeviceId !== senderDeviceId) return { ok: false, reason: "forbidden" as const };
       if (Date.now() - existing.createdAt > EDIT_WINDOW_MS) return { ok: false, reason: "expired" as const };
       existing.text = text;
-      return { ok: true, message: { id: existing.id, fromMe: true, text: existing.text, at: existing.createdAt } };
+      return { ok: true, message: { id: existing.id, fromMe: true, text: existing.text, at: existing.createdAt, readAt: existing.readAt ?? null } };
     },
   );
 }

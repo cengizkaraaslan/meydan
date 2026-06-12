@@ -72,7 +72,8 @@ export async function POST(request: NextRequest) {
     void notifyEmails(emails, {
       title: `${who} bir gönderide senden bahsetti`,
       body: preview(text),
-      data: { type: "feed_post", url: "/" },
+      // Meydan duvarına git ve etiketlendiğin gönderiyi aç (post yoksa sadece duvar).
+      data: { type: "feed_post", url: post?.id ? `/meydan?post=${post.id}` : "/meydan" },
       inApp: { type: "mention", actorId: authorId, actorName: who },
     }).catch(() => {});
   }

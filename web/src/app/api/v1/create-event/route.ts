@@ -65,6 +65,7 @@ interface CreateEventBody {
   instagram?: string;
   facebook?: string;
   tiktok?: string;
+  phone?: string;
   creatorEmail?: string;
   creatorName?: string;
   imageUrl?: string;
@@ -119,6 +120,7 @@ export async function POST(request: NextRequest) {
       instagram: body.instagram?.trim() || null,
       facebook: body.facebook?.trim() || null,
       tiktok: body.tiktok?.trim() || null,
+      phone: body.phone?.trim() || null,
       creatorEmail: body.creatorEmail?.trim() || null,
       creatorName: body.creatorName?.trim() || null,
       // Düzenleyen = oluşturanın adı (varsa) — etkinlik detayında gösterilir.
