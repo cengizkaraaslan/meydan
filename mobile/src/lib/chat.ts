@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getChatPrefs } from "./chatPrefs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getProfileKey } from "./profileSync";
 import { getPerson } from "./people";
@@ -168,7 +169,7 @@ export function useChat(personId: string, override?: { name?: string | null; ava
   // yansır, eski geçmiş kaybolmaz, aradaki mesajlar prev'de durduğundan BOŞLUK oluşmaz.
   const refetch = useCallback(
     async (mk: string, did: string) => {
-      const live = await apiFetchMessages(mk, did, { limit: PAGE_SIZE });
+      const live = await apiFetchMessages(mk, did, { limit: PAGE_SIZE, noReceipt: getChatPrefs().hideReadReceipts });
       setServerMsgs((prev) => {
         if (live.length === 0) return prev;
         const liveStart = live[0].at;
@@ -247,7 +248,8 @@ export function useChat(personId: string, override?: { name?: string | null; ava
       void refetch(matchKey, deviceId);
       if (!isMock) {
         void apiGetTyping(matchKey, deviceId).then(setPartnerTyping);
-        void apiPingPresence(deviceId); // "ben aktifim" kalp atışı
+        // hideLastSeen → ping "gizli" gider; karşı taraf çevrimiçi/son görülmemizi göremez.
+        void apiPingPresence(deviceId, getChatPrefs().hideLastSeen);
         void apiGetPresence(personId).then(setPartnerPresence); // karşı tarafın durumu
       }
     };
@@ -259,6 +261,7 @@ export function useChat(personId: string, override?: { name?: string | null; ava
   // Kullanıcı yazarken karşı tarafa "yazıyor" bildir (2.5sn'de bir, gereksiz istek atma).
   const notifyTyping = useCallback(() => {
     if (isMock || !matchKey || !deviceId) return;
+    if (getChatPrefs().hideTyping) return; // "yazıyor…" göstergesini gizle
     const now = Date.now();
     if (now - lastTypingPing.current < 2500) return;
     lastTypingPing.current = now;

@@ -80,18 +80,22 @@ export function isPartnerTyping(matchKey: string, deviceId: string): boolean {
 
 // ── Çevrimiçi/son görülme (in-memory, best-effort; serverless instance'lar arası kesin değil) ──
 const ONLINE_WINDOW_MS = 35000; // son 35sn içinde ping → çevrimiçi
-const presenceMap: Map<string, number> = (g.__meydatePresence ??= new Map());
+interface PresenceEntry {
+  ts: number;
+  hidden: boolean; // kullanıcı "son görülme/çevrimiçi gizle" açtıysa → karşı taraf göremez
+}
+const presenceMap: Map<string, PresenceEntry> = (g.__meydatePresence ??= new Map());
 
-/** Bu cihazın "şu an aktif" olduğunu işaretle (kalp atışı). */
-export function setPresence(deviceId: string): void {
-  presenceMap.set(deviceId, Date.now());
+/** Bu cihazın "şu an aktif" olduğunu işaretle (kalp atışı). hidden → durumu gizle. */
+export function setPresence(deviceId: string, hidden = false): void {
+  presenceMap.set(deviceId, { ts: Date.now(), hidden });
 }
 
-/** Bir cihazın çevrimiçi durumu + son görülme zamanı (ms). */
+/** Bir cihazın çevrimiçi durumu + son görülme zamanı (ms). Gizliyse hep çevrimdışı/null. */
 export function getPresence(deviceId: string): { online: boolean; lastSeen: number | null } {
-  const ts = presenceMap.get(deviceId) ?? null;
-  if (ts == null) return { online: false, lastSeen: null };
-  return { online: Date.now() - ts < ONLINE_WINDOW_MS, lastSeen: ts };
+  const e = presenceMap.get(deviceId);
+  if (!e || e.hidden) return { online: false, lastSeen: null };
+  return { online: Date.now() - e.ts < ONLINE_WINDOW_MS, lastSeen: e.ts };
 }
 
 let idSeq = 0;
@@ -453,6 +457,7 @@ export async function listMessages(input: {
   deviceId: string;
   limit?: number; // sayfa boyutu (varsayılan 20)
   before?: number; // verilirse bu epoch ms'den ÖNCEKİ mesajlar (eski sayfa / yukarı kaydırma)
+  skipRead?: boolean; // "okundu bilgisini gizle" → karşı tarafa okundu (readAt) yazma
 }): Promise<MessageView[]> {
   const { matchKey, deviceId } = input;
   const limit = Math.min(Math.max(input.limit ?? 20, 1), 100);
@@ -460,7 +465,8 @@ export async function listMessages(input: {
   return withDb(
     async () => {
       // Okundu işaretleme YALNIZ canlı (en yeni) sayfada — eski sayfa yüklerken dokunma.
-      if (!before) {
+      // skipRead → kullanıcı "okundu bilgisini gizle" açmış, readAt yazılmaz.
+      if (!before && !input.skipRead) {
         await db.mobileMessage.updateMany({
           where: { matchKey, senderDeviceId: { not: deviceId }, readAt: null },
           data: { readAt: new Date() },
@@ -483,7 +489,7 @@ export async function listMessages(input: {
         }));
     },
     () => {
-      if (!before) {
+      if (!before && !input.skipRead) {
         mem.messages
           .filter((x) => x.matchKey === matchKey && x.senderDeviceId !== deviceId && x.readAt == null)
           .forEach((x) => (x.readAt = Date.now()));

@@ -3,17 +3,18 @@ import { setPresence, getPresence } from "@/lib/mobile-chat-store";
 
 export const dynamic = "force-dynamic";
 
-// POST /api/v1/dating/presence  body {deviceId} — "şu an aktifim" kalp atışı (best-effort).
+// POST /api/v1/dating/presence  body {deviceId, hidden?} — "şu an aktifim" kalp atışı.
+// hidden=true → "son görülme/çevrimiçi gizle" açık; karşı taraf durumu göremez.
 export async function POST(request: NextRequest) {
-  let body: { deviceId?: string };
+  let body: { deviceId?: string; hidden?: boolean };
   try {
-    body = (await request.json()) as { deviceId?: string };
+    body = (await request.json()) as { deviceId?: string; hidden?: boolean };
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
   const deviceId = body.deviceId?.trim();
   if (!deviceId) return NextResponse.json({ error: "deviceId zorunlu" }, { status: 400 });
-  setPresence(deviceId);
+  setPresence(deviceId, body.hidden === true);
   return NextResponse.json({ ok: true });
 }
 

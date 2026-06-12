@@ -287,13 +287,13 @@ export async function apiGetTyping(matchKey: string, deviceId: string): Promise<
   }
 }
 
-/** "Şu an aktifim" kalp atışı gönderir (çevrimiçi/son görülme için, best-effort). */
-export async function apiPingPresence(deviceId: string): Promise<void> {
+/** "Şu an aktifim" kalp atışı gönderir. hidden=true → durum karşı tarafa gizlenir. */
+export async function apiPingPresence(deviceId: string, hidden = false): Promise<void> {
   try {
     await fetch(`${API_BASE}/api/v1/dating/presence`, {
       method: "POST",
       headers: JSON_HEADERS,
-      body: JSON.stringify({ deviceId }),
+      body: JSON.stringify({ deviceId, hidden }),
     });
   } catch {
     /* sessiz */
@@ -318,7 +318,7 @@ export async function apiGetPresence(deviceId: string): Promise<{ online: boolea
 export async function apiFetchMessages(
   matchKey: string,
   deviceId: string,
-  opts?: { limit?: number; before?: number },
+  opts?: { limit?: number; before?: number; noReceipt?: boolean },
 ): Promise<ChatMessage[]> {
   try {
     const url = new URL(`${API_BASE}/api/v1/dating/messages`);
@@ -326,6 +326,7 @@ export async function apiFetchMessages(
     url.searchParams.set("deviceId", deviceId);
     if (opts?.limit) url.searchParams.set("limit", String(opts.limit));
     if (opts?.before) url.searchParams.set("before", String(opts.before));
+    if (opts?.noReceipt) url.searchParams.set("noReceipt", "1");
     const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
     if (!res.ok) return [];
     const data = await res.json();

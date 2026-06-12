@@ -31,6 +31,7 @@ import {
 } from "@/lib/conversations";
 import { useIsAdmin } from "@/lib/admin";
 import { searchMentionUsers, type MentionUser } from "@/lib/mentions";
+import { ChatSettingsSheet } from "@/components/ChatSettingsSheet";
 
 /**
  * Instagram-Direct tarzı tam ekran mesaj kutusu.
@@ -58,6 +59,7 @@ export default function MesajlarScreen() {
   const [showFind, setShowFind] = useState(false);
   const [findQ, setFindQ] = useState("");
   const [findResults, setFindResults] = useState<MentionUser[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const findTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const onFindChange = useCallback((txt: string) => {
@@ -181,6 +183,10 @@ export default function MesajlarScreen() {
           </LinearGradient>
         ) : null}
         <View style={{ flex: 1 }} />
+        {/* Sohbet ayarları (gizlilik) — herkese açık */}
+        <Pressable onPress={() => { tapH(); setSettingsOpen(true); }} hitSlop={10} style={[styles.iconBtn, { backgroundColor: T.surfaceStrong, marginRight: 8 }]}>
+          <Ionicons name="settings-outline" size={20} color={T.text} />
+        </Pressable>
         {admin ? (
           <Pressable onPress={toggleFind} hitSlop={10} style={[styles.iconBtn, { backgroundColor: showFind ? T.primary : T.surfaceStrong }]}>
             <Ionicons name="search" size={20} color={showFind ? "#fff" : T.text} />
@@ -191,6 +197,8 @@ export default function MesajlarScreen() {
           </View>
         )}
       </View>
+
+      <ChatSettingsSheet visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {/* Admin: büyüteçle açılan "kişi bul → sohbet aç" kutusu (yalnız admin) */}
       {admin && showFind ? (

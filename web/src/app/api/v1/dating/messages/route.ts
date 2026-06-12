@@ -66,7 +66,9 @@ export async function GET(request: NextRequest) {
   // Sayfalama: limit (varsayılan 20) + before (epoch ms; eski sayfa için).
   const limit = Number(sp.get("limit")) || undefined;
   const before = Number(sp.get("before")) || undefined;
-  const data = await listMessages({ matchKey, deviceId, limit, before });
+  // noReceipt=1 → "okundu bilgisini gizle" açık; karşı tarafa okundu (readAt) yazma.
+  const skipRead = sp.get("noReceipt") === "1";
+  const data = await listMessages({ matchKey, deviceId, limit, before, skipRead });
   return NextResponse.json({ ok: true, data });
 }
 
