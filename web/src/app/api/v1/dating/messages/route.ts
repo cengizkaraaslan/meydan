@@ -90,18 +90,24 @@ export async function POST(request: NextRequest) {
   if (!senderDeviceId.startsWith("bot_") && !text.startsWith(REACT_PREFIX)) {
     void (async () => {
       const recipients = await recipientDevicesForMatch(matchKey, senderDeviceId);
-      const name = (await deviceDisplayName(senderDeviceId)) || "Yeni mesaj";
+      const name = (await deviceDisplayName(senderDeviceId)) || "Biri";
       const shown = text.startsWith(REPLY_PREFIX) ? replyInnerText(text) : text;
+      // Push başlığı: "Ahmet Yılmaz sana mesaj yolladı!" (foto/ses'te uygun fiil); gövde = önizleme.
+      const action = shown.startsWith(IMG_PREFIX)
+        ? "sana fotoğraf yolladı!"
+        : shown.startsWith(VOICE_PREFIX)
+          ? "sana sesli mesaj yolladı!"
+          : "sana mesaj yolladı!";
       const bodyText = shown.startsWith(IMG_PREFIX)
         ? "📷 Fotoğraf"
         : shown.startsWith(VOICE_PREFIX)
           ? "🎤 Sesli mesaj"
           : preview(shown, 140);
-      // partnerId = gönderen (alıcı için sohbet karşı tarafı). name → bildirimden sohbet başlığı.
+      // partnerId = gönderen (alıcı için sohbet karşı tarafı). data.name → bildirimden sohbet başlığı (sadece ad).
       // url yok → mobil tip-bazlı (dm) yönlendirmeyle doğrudan /sohbet/[id] açılır; web fallback /mesajlar.
       const data = { type: "dm", matchKey, partnerId: senderDeviceId, name, url: "/mesajlar" };
       if (recipients.length) {
-        await notifyDevices(recipients, { title: name, body: bodyText, data, inApp: { type: "dm", actorId: senderDeviceId, actorName: name } });
+        await notifyDevices(recipients, { title: `${name} ${action}`, body: bodyText, data, inApp: { type: "dm", actorId: senderDeviceId, actorName: name } });
       }
       // DM içinde @email geçtiyse o kişilere de bildir (alıcıdan bağımsız).
       const emails = extractMentionEmails(text);
