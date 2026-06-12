@@ -18,17 +18,20 @@ export async function GET(request: NextRequest) {
   // shard'ı AYRI bir lambda (kendi 60sn + vCPU'su) olarak tetikle. Vercel cron entry (paramsız)
   // = shard 0; oradan zincir 1..N-1 ilerler. Ekstra cron entry gerekmez (Hobby 2-cron limiti).
   const url = new URL(request.url);
-  const shards = Number(url.searchParams.get("shards")) || Number(process.env.SCRAPE_SHARDS) || 4;
+  const shards = Number(url.searchParams.get("shards")) || Number(process.env.SCRAPE_SHARDS) || 8;
   const shard = Number(url.searchParams.get("shard")) || 0;
   const usingMock = process.env.USE_MOCK_DATA === "true";
 
+  console.log(`[cron/scrape] shard ${shard}/${shards} başladı`);
   const results = await runAndPersistAll({ shard, shards });
+  console.log(`[cron/scrape] shard ${shard}/${shards} bitti: ${results.length} kaynak, ${results.reduce((s, r) => s + r.written, 0)} yazıldı`);
 
   // Sıradaki shard'ı tetikle: ateşle-ve-bırak. İsteği başlat, ~3sn sonra abort et — istek
   // Vercel'e ulaşınca yeni lambda BAĞIMSIZ koşar (client abort sunucu invocation'ını iptal etmez).
   // Tam yanıtı BEKLEME: aksi halde shard0, shard1→2→3 zincirini await edip 60sn'de ölür ve kopar.
   if (shard + 1 < shards) {
     after(async () => {
+      console.log(`[cron/scrape] shard ${shard + 1}/${shards} tetikleniyor`);
       try {
         await fetch(`${url.origin}/api/cron/scrape?shard=${shard + 1}&shards=${shards}`, {
           headers: secret ? { authorization: `Bearer ${secret}` } : {},
