@@ -96,7 +96,9 @@ export class TicketmasterScraper extends TicketingScraper {
           `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${encodeURIComponent(apiKey)}` +
           `&countryCode=${req.cc}&size=${req.size}&page=${req.page}&sort=date,asc`;
         try {
-          const raw = await this.httpGet(url);
+          // Kısa timeout: TM Discovery API Vercel datacenter IP'sinden çoğu zaman engelli/yavaş
+          // (0 etkinlik döner). 15sn varsayılan × çok istek = 60sn maxDuration'ı yiyordu → 7sn'de bırak.
+          const raw = await this.httpGet(url, AbortSignal.timeout(7_000));
           const data = JSON.parse(raw) as TmResponse;
           return data._embedded?.events ?? [];
         } catch (err) {
