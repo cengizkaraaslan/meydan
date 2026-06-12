@@ -11,7 +11,7 @@ import { CATEGORIES, catMeta } from "@/lib/categories";
 import { API_BASE, fetchEvents, type ApiEvent } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
-import { useActiveCity, ALL_CITIES, districtsFor } from "@/lib/location";
+import { useActiveCity, ALL_CITIES, districtsFor, detectCity } from "@/lib/location";
 import { tapH, tapHaptic } from "@/lib/haptics";
 
 const PRICE_LABELS: Record<"all" | "free" | "paid" | "student", string> = {
@@ -53,8 +53,27 @@ export default function KategorilerScreen() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
+  // "Mevcut konumum" çipi GPS tespiti sırasında dönen spinner/etiket için.
+  const [locating, setLocating] = useState(false);
 
   const hasSelection = selected.length > 0;
+
+  // "Mevcut konumum" → GPS'ten şehri anında tespit edip şehir filtresine uygula.
+  const onUseMyLocation = async () => {
+    if (locating) return;
+    tapH();
+    setLocating(true);
+    try {
+      const c = await detectCity();
+      if (c) {
+        setCityFilter(c);
+        setCityInit(true);
+        setCityOpen(false);
+      }
+    } finally {
+      setLocating(false);
+    }
+  };
 
   // Varsayılan şehir = bulunduğu şehir (yalnızca ilk tespitte ata).
   useEffect(() => {
@@ -252,6 +271,11 @@ export default function KategorilerScreen() {
 
           {cityOpen ? (
             <Animated.View entering={FadeInDown.duration(260)} style={styles.cityChips}>
+              <Pill
+                label={locating ? "📍 Konum alınıyor…" : `📍 ${t("use_my_location")}`}
+                active={false}
+                onPress={onUseMyLocation}
+              />
               <Pill
                 label={t("all_cities")}
                 active={cityFilter === null}
