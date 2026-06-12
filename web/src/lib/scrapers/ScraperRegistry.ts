@@ -24,6 +24,11 @@ import { FestivallTrScraper } from "./providers/FestivallTrScraper";
 import { TOBBScraper } from "./providers/TOBBScraper";
 import { OdunpazariScraper } from "./providers/OdunpazariScraper";
 import { QuarkAkademiScraper } from "./providers/QuarkAkademiScraper";
+import { IsamScraper } from "./providers/IsamScraper";
+import { DiyanetScraper } from "./providers/DiyanetScraper";
+import { YapiKrediKulturScraper } from "./providers/YapiKrediKulturScraper";
+import { YunusEmreScraper } from "./providers/YunusEmreScraper";
+import { GazhaneScraper } from "./providers/GazhaneScraper";
 import { GenericMunicipalityScraper, GenericUniversityScraper } from "./GenericMunicipalityScraper";
 import { ALL_MUNICIPALITY_CONFIGS } from "./configs/municipalities";
 import { UNIVERSITY_CONFIGS } from "./configs/universities";
@@ -90,6 +95,13 @@ scraperRegistry.register(new QuarkAkademiScraper());
 
 // TOBB resmi Fuar Takvimi (B2B/mesleki fuarlar — category: FUAR, ziyaretçiye ücretsiz)
 scraperRegistry.register(new TOBBScraper());
+
+// Vakıf / dini-manevi / kültür kurumları (JSON API + SSR HTML — ücretsiz)
+scraperRegistry.register(new IsamScraper());        // dini/ilmi (DINI)
+scraperRegistry.register(new DiyanetScraper());     // dini/ilmi (DINI)
+scraperRegistry.register(new YapiKrediKulturScraper()); // kültür vakfı (söyleşi/atölye/sergi)
+scraperRegistry.register(new YunusEmreScraper());   // kültür/akademi
+scraperRegistry.register(new GazhaneScraper());     // müze/atölye/konser
 
 // Üniversiteler (özel concrete class'lar)
 scraperRegistry.register(new AnadoluScraper());

@@ -50,6 +50,7 @@ enum EventCategory {
   ATOLYE
   COCUK
   FUAR
+  DINI
   DIGER
 }
 

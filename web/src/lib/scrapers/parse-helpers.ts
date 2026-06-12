@@ -71,10 +71,24 @@ export function guessCategory(text: string): EventCategory {
   if (/(stand[\s-]?up|komedi|tek kişilik)/.test(t)) return "STANDUP";
   if (/(spor|maç|mac|koşu|kosu|turnuva|yürüyüş|yuruyus|bisiklet|atletizm|champions league|gp\b|motogp|formula)/.test(t)) return "SPOR";
   if (/(fuar|fair|expo|kongre|congress|summit|zirve)/.test(t)) return "FUAR";
+  if (/(vaaz|hutbe|tasavvuf|tefsir|hadis|siyer|ilahi|i̇lahi|mevlid|mevlit|kur'?an|kuran|namaz|manevi|irşad|irsad|zikir|semazen|i̇slami|islami|i̇slam araştırma|islam araştırma)/.test(t)) return "DINI";
   if (/(sergi|exhibition|müze|muze|galeri|bienal)/.test(t)) return "SERGI";
   if (/(atölye|atolye|workshop|kurs|seminer|eğitim|egitim|tasarım|tasarim)/.test(t)) return "ATOLYE";
   if (/(çocuk|cocuk|kids|junior|aile eğlencesi|aile eglencesi)/.test(t)) return "COCUK";
   return "DIGER";
+}
+
+/** Metinde geçen ilk Türk ili (şehir alanı olmayan kaynaklarda başlık/özetten çıkarmak için). */
+const TR_CITIES = [
+  "İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Konya", "Gaziantep", "Eskişehir", "Mersin",
+  "Trabzon", "Diyarbakır", "Samsun", "Kayseri", "Adana", "Şanlıurfa", "Kocaeli", "Sakarya", "Malatya",
+  "Erzurum", "Van", "Sivas", "Yozgat", "Mardin", "Şırnak", "Rize", "Ordu", "Tokat", "Çorum", "Bolu",
+  "Edirne", "Çanakkale", "Balıkesir", "Manisa", "Aydın", "Muğla", "Denizli", "Isparta", "Kütahya",
+  "Tekirdağ", "Hatay", "Kahramanmaraş", "Elazığ", "Erzincan", "Düzce", "Zonguldak", "Karabük", "Aksaray",
+];
+export function detectTurkishCity(text: string): string | null {
+  for (const c of TR_CITIES) if (text.includes(c)) return c;
+  return null;
 }
 
 /**

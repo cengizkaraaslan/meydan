@@ -8,6 +8,7 @@ export type EventCategory =
   | "ATOLYE"
   | "COCUK"
   | "FUAR"
+  | "DINI"
   | "DIGER";
 
 /**
@@ -153,6 +154,7 @@ export const CATEGORY_LABELS: Record<EventCategory, string> = {
   ATOLYE: "Atölye",
   COCUK: "Çocuk",
   FUAR: "Fuar",
+  DINI: "Dini & Manevi",
   DIGER: "Diğer",
 };
 
