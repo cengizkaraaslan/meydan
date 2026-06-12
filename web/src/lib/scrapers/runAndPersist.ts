@@ -27,15 +27,23 @@ export interface SourceRunSummary {
   error?: string;
 }
 
-/** Sınırlı eşzamanlı görev havuzu (harici bağımlılık yok). */
-async function runPool<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]> {
-  const results: T[] = new Array(tasks.length);
+/**
+ * Sınırlı eşzamanlı görev havuzu. deadlineTs verilirse o ana kadar YENİ görev başlatmaz
+ * (çalışanlar biter) → tüm tur mutlak bir süre bütçesinde kalır.
+ */
+async function runPool<T>(
+  tasks: Array<() => Promise<T>>,
+  concurrency: number,
+  deadlineTs?: number,
+): Promise<T[]> {
+  const results: T[] = [];
   let next = 0;
   const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, async () => {
     while (true) {
+      if (deadlineTs && Date.now() >= deadlineTs) return; // bütçe doldu → yeni başlatma
       const i = next++;
       if (i >= tasks.length) return;
-      results[i] = await tasks[i]();
+      results.push(await tasks[i]());
     }
   });
   await Promise.all(workers);
@@ -68,49 +76,50 @@ async function persistResult(r: ScraperResult): Promise<SourceRunSummary> {
 }
 
 export interface RunAndPersistOptions {
-  /** Persist (DB yazımı) eşzamanlılığı. Neon pooler'ı boğmamak için sınırlı. */
+  /** Persist (DB yazımı) eşzamanlılığı. */
   concurrency?: number;
-  /** Sharding: yalnız i % shards === shard olan scraper'ları çalıştır (round-robin, dengeli). */
-  shard?: number;
-  shards?: number;
+  /** Bu invocation için mutlak süre bütçesi (ms). Vercel maxDuration=60sn altında kalmalı. */
+  budgetMs?: number;
 }
 
 /**
- * Tüm (ya da bir shard'ın) scraper'larını çalıştırır ve sonuçları Neon'a yazar.
+ * Scraper'ları çalıştırıp sonuçları Neon'a yazar — Vercel Hobby (tek vCPU + 60sn) için tasarlanmış.
  *
- * Tek bir bounded havuz: her görev = TEK kaynağın run()+persist()'i. Böylece kaynaklar
- * arası fetch ve persist ÖRTÜŞÜR (A yazılırken B çekilir). Eski "önce tüm fetch (~15sn),
- * SONRA persist" iki-fazlı akış toplamı şişiriyordu (15sn + persist) ve Hobby 60sn'yi
- * aşıyordu; örtüşünce toplam ≈ (toplam iş)/eşzamanlılık ≈ ~30sn. Hobby planında HTTP
- * fan-out işe yaramaz (eşzamanlı fonksiyon limiti leaf'leri kuyruğa sokar) → tek invocation.
+ * GERÇEKLER (ölçümle): 109 scraper var, sıralı toplam ~640sn; tek 60sn'lik lambda ancak ~55-63
+ * kaynağı yetiştirir (chealio parse CPU-bound, eşzamanlılık ~10'da doyuyor). HTTP fan-out ve
+ * after() self-chaining Hobby'de güvenilmez (eşzamanlı fonksiyon limiti / lingering lambda).
+ *
+ * ÇÖZÜM: tek invocation + MUTLAK SÜRE BÜTÇESİ (budgetMs, ~52sn) → bütçe dolunca yeni kaynak
+ * başlatılmaz, tur ~bütçede biter ve 200 döner (asla 504 yok). Her kaynak bittiği anda yazılır
+ * (kısmi tur da kalıcı). GÜNLÜK ROTASYON: kaynak listesi her gün kaydırılır → öncelik sırası
+ * döner → tüm 109 kaynak ~2 günde taranır (önemli/hızlı biletçiler zaten her gün yetişir).
  */
 export async function runAndPersistAll(opts: RunAndPersistOptions = {}): Promise<SourceRunSummary[]> {
   const concurrency = opts.concurrency
-    ?? (process.env.SCRAPE_CONCURRENCY ? Number(process.env.SCRAPE_CONCURRENCY) : 16);
-  // Kaynak başına sabit tavan: tek bir yavaş scraper (TICKETMASTER ~20 ülke döngüsü,
-  // FESTIVALL_TR kart-başına detay fetch'i — ikisi de ~60sn takılıp lambda'yı 504 yapıyordu)
-  // tüm bütçeyi yemesin. Tavanı aşan kaynak "başarısız" sayılır; diğerleri etkilenmez.
-  // 45sn → TOBB (~43sn / 243 etkinlik) gibi yavaş ama ÜRETKEN kaynaklar korunur.
-  const capMs = Number(process.env.SCRAPE_SOURCE_TIMEOUT_MS) || 45_000;
+    ?? (process.env.SCRAPE_CONCURRENCY ? Number(process.env.SCRAPE_CONCURRENCY) : 10);
+  const budgetMs = opts.budgetMs
+    ?? (process.env.SCRAPE_BUDGET_MS ? Number(process.env.SCRAPE_BUDGET_MS) : 52_000);
+  const deadlineTs = Date.now() + budgetMs;
 
-  let scrapers = scraperRegistry.list();
-  const shards = opts.shards && opts.shards > 1 ? Math.floor(opts.shards) : 1;
-  if (shards > 1) {
-    const shard = (((opts.shard ?? 0) % shards) + shards) % shards;
-    scrapers = scrapers.filter((_, i) => i % shards === shard);
-  }
+  // Günlük rotasyon: listeyi gün-indeksine göre kaydır (her gün farklı kaynaklar öne gelir).
+  const scrapers = scraperRegistry.list();
+  const day = Math.floor(Date.now() / 86_400_000);
+  const offset = scrapers.length > 0 ? (day * 55) % scrapers.length : 0;
+  const rotated = [...scrapers.slice(offset), ...scrapers.slice(0, offset)];
 
-  // run()+persist tek görev → fetch & persist kaynaklar arası örtüşür. run() asla throw etmez.
-  // Her run() bir kaynak-bazlı tavanla yarışır (lambda 60sn'yi aşmasın).
+  // Her görev = run()+persist; fetch & persist kaynaklar arası örtüşür. run() asla throw etmez.
+  // Her run() KALAN bütçeyle yarışır → hiçbir kaynak mutlak deadline'ı aşamaz (lambda 60sn'de ölmez).
   return runPool(
-    scrapers.map((s) => async () => persistResult(await runCapped(s, capMs))),
+    rotated.map((s) => async () => persistResult(await runCapped(s, deadlineTs))),
     Math.max(1, concurrency),
+    deadlineTs,
   );
 }
 
-/** s.run()'ı capMs tavanıyla yarıştırır; tavan dolarsa başarısız ScraperResult döner. */
-function runCapped(s: BaseScraper, capMs: number): Promise<ScraperResult> {
+/** s.run()'ı KALAN bütçeyle (deadlineTs) yarıştırır; süre dolarsa başarısız ScraperResult döner. */
+function runCapped(s: BaseScraper, deadlineTs: number): Promise<ScraperResult> {
   const startedAt = new Date();
+  const capMs = Math.max(1000, deadlineTs - Date.now());
   let timer: ReturnType<typeof setTimeout>;
   const capped = new Promise<ScraperResult>((resolve) => {
     timer = setTimeout(
@@ -120,7 +129,7 @@ function runCapped(s: BaseScraper, capMs: number): Promise<ScraperResult> {
         finishedAt: new Date(),
         events: [],
         success: false,
-        errorMessage: `kaynak ${capMs}ms tavanını aştı (cron bütçesi)`,
+        errorMessage: "tur süre bütçesi doldu (bu kaynak sonraki turda)",
       }),
       capMs,
     );
