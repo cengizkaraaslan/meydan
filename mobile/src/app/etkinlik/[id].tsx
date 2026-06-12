@@ -862,9 +862,9 @@ export default function EventDetail() {
             {event.artist ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="🎤" label={t("artist")} value={event.artist} /></>) : null}
             {event.phone ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="📞" label="Telefon" value={event.phone} onPress={callPhone} actionLabel="Ara" /></>) : null}
             {event.website ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="🌐" label="Web sitesi" value={prettyLink(event.website)} onPress={() => openLink(event.website!)} actionLabel="Aç" /></>) : null}
-            {event.instagram ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="📸" label="Instagram" value={prettyLink(event.instagram)} onPress={() => openLink(event.instagram!)} actionLabel="Aç" /></>) : null}
-            {event.facebook ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="👍" label="Facebook" value={prettyLink(event.facebook)} onPress={() => openLink(event.facebook!)} actionLabel="Aç" /></>) : null}
-            {event.tiktok ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="🎵" label="TikTok" value={prettyLink(event.tiktok)} onPress={() => openLink(event.tiktok!)} actionLabel="Aç" /></>) : null}
+            {event.instagram ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="" iconNode={<Ionicons name="logo-instagram" size={21} color="#E4405F" />} label="Instagram" value={prettyLink(event.instagram)} onPress={() => openLink(event.instagram!)} actionLabel="Aç" /></>) : null}
+            {event.facebook ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="" iconNode={<Ionicons name="logo-facebook" size={21} color="#1877F2" />} label="Facebook" value={prettyLink(event.facebook)} onPress={() => openLink(event.facebook!)} actionLabel="Aç" /></>) : null}
+            {event.tiktok ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="" iconNode={<Ionicons name="logo-tiktok" size={21} color={T.text} />} label="TikTok" value={prettyLink(event.tiktok)} onPress={() => openLink(event.tiktok!)} actionLabel="Aç" /></>) : null}
           </Animated.View>
 
           {event.description ? (
@@ -1415,10 +1415,14 @@ function PreviewAvatar({
   );
 }
 
-function InfoRow({ T, icon, label, value, valueColor, onPress, actionLabel, badge, badgeColor }: { T: Palette; icon: string; label: string; value: string; valueColor?: string; onPress?: () => void; actionLabel?: string; badge?: string | null; badgeColor?: string }) {
+function InfoRow({ T, icon, iconNode, label, value, valueColor, onPress, actionLabel, badge, badgeColor }: { T: Palette; icon: string; iconNode?: React.ReactNode; label: string; value: string; valueColor?: string; onPress?: () => void; actionLabel?: string; badge?: string | null; badgeColor?: string }) {
   return (
     <Pressable onPress={onPress} disabled={!onPress} style={styles.infoRow}>
-      <Text style={{ fontSize: 20 }}>{icon}</Text>
+      {iconNode ? (
+        <View style={{ width: 24, alignItems: "center" }}>{iconNode}</View>
+      ) : (
+        <Text style={{ fontSize: 20 }}>{icon}</Text>
+      )}
       <View style={{ flex: 1 }}>
         <Text style={[Type.label, { color: T.textFaint }]}>{label}</Text>
         <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
