@@ -46,7 +46,8 @@ export function EventGallery({
   const [modalOpen, setModalOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [caption, setCaption] = useState("");
-  const [uploading, setUploading] = useState(false);
+  // Arka planda yüklenen (optimistic önizleme) fotoların geçici id'leri.
+  const [uploadingIds, setUploadingIds] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
 
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -70,7 +71,6 @@ export function EventGallery({
   }
 
   function closeModal() {
-    if (uploading) return;
     setModalOpen(false);
     setFile(null);
     setCaption("");
@@ -92,7 +92,7 @@ export function EventGallery({
     setFile(f);
   }
 
-  async function handleUpload(e?: React.FormEvent) {
+  function handleUpload(e?: React.FormEvent) {
     e?.preventDefault();
     if (!file) {
       toast.error("Önce bir foto seç");
@@ -102,49 +102,71 @@ export function EventGallery({
       toast.error(`Açıklama en fazla ${MAX_CAPTION_LEN} karakter olabilir`);
       return;
     }
-    setUploading(true);
-    try {
-      // 1) presign
-      const presignRes = await fetch("/api/upload/presign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type,
-          folder: "events",
-        }),
-      });
-      if (!presignRes.ok) {
-        const err = await presignRes.json().catch(() => ({}));
-        throw new Error(err?.error ?? "Yükleme adresi alınamadı");
-      }
-      const presign: PresignResponse = await presignRes.json();
 
-      // 2) PUT direct upload
-      const method = presign.uploadMethod ?? "PUT";
-      const putRes = await fetch(presign.uploadUrl, {
-        method,
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!putRes.ok) {
-        throw new Error("Foto R2'ye yüklenemedi");
-      }
+    // Optimistic: yerel önizlemeyi (blob URL) grid'e anında koy ve modalı kapat;
+    // presign → R2 → kayıt zinciri arkada sürer. Bitince gerçek foto ile değiştir,
+    // hata olursa placeholder'ı kaldır.
+    const theFile = file;
+    const theCaption = caption;
+    const tempId = `tmp-${Date.now()}`;
+    const previewUrl = URL.createObjectURL(theFile);
+    const placeholder: GalleryPhoto = {
+      id: tempId,
+      eventSlug: slug,
+      uploaderEmail: userEmail ?? "",
+      uploaderName: userEmail?.split("@")[0] ?? "Sen",
+      url: previewUrl,
+      caption: theCaption,
+      createdAt: new Date().toISOString(),
+      reportCount: 0,
+    };
+    setPhotos((prev) => [placeholder, ...prev]);
+    setUploadingIds((prev) => new Set(prev).add(tempId));
+    closeModal();
 
-      // 3) server action
-      const actionRes = await addPhotoAction(slug, presign.publicUrl, caption);
-      if (!actionRes.ok || !actionRes.photo) {
-        throw new Error(actionRes.error ?? "Foto kaydedilemedi");
-      }
+    void (async () => {
+      try {
+        const presignRes = await fetch("/api/upload/presign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: theFile.name,
+            contentType: theFile.type,
+            folder: "events",
+          }),
+        });
+        if (!presignRes.ok) {
+          const err = await presignRes.json().catch(() => ({}));
+          throw new Error(err?.error ?? "Yükleme adresi alınamadı");
+        }
+        const presign: PresignResponse = await presignRes.json();
 
-      setPhotos((prev) => [actionRes.photo!, ...prev]);
-      toast.success("Anın yayınlandı 📸");
-      closeModal();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Yükleme başarısız");
-    } finally {
-      setUploading(false);
-    }
+        const method = presign.uploadMethod ?? "PUT";
+        const putRes = await fetch(presign.uploadUrl, {
+          method,
+          headers: { "Content-Type": theFile.type },
+          body: theFile,
+        });
+        if (!putRes.ok) throw new Error("Foto R2'ye yüklenemedi");
+
+        const actionRes = await addPhotoAction(slug, presign.publicUrl, theCaption);
+        if (!actionRes.ok || !actionRes.photo) {
+          throw new Error(actionRes.error ?? "Foto kaydedilemedi");
+        }
+        setPhotos((prev) => prev.map((p) => (p.id === tempId ? actionRes.photo! : p)));
+        toast.success("Anın yayınlandı 📸");
+      } catch (err) {
+        setPhotos((prev) => prev.filter((p) => p.id !== tempId));
+        toast.error(err instanceof Error ? err.message : "Yükleme başarısız");
+      } finally {
+        setUploadingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(tempId);
+          return next;
+        });
+        URL.revokeObjectURL(previewUrl);
+      }
+    })();
   }
 
   function handleRemove(photo: GalleryPhoto) {
@@ -238,6 +260,7 @@ export function EventGallery({
         <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
           {photos.map((photo, idx) => {
             const isMine = !!userEmail && photo.uploaderEmail === userEmail;
+            const isUploading = uploadingIds.has(photo.id);
             return (
               <li
                 key={photo.id}
@@ -263,7 +286,7 @@ export function EventGallery({
                     </span>
                   )}
                 </button>
-                {isMine && (
+                {isMine && !isUploading && (
                   <button
                     type="button"
                     onClick={() => handleRemove(photo)}
@@ -273,6 +296,11 @@ export function EventGallery({
                   >
                     <Trash2 className="size-3.5" />
                   </button>
+                )}
+                {isUploading && (
+                  <span className="absolute inset-0 grid place-items-center bg-black/35 pointer-events-none">
+                    <span className="size-6 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                  </span>
                 )}
               </li>
             );
@@ -319,7 +347,6 @@ export function EventGallery({
                 <button
                   type="button"
                   onClick={closeModal}
-                  disabled={uploading}
                   aria-label="Kapat"
                   className="inline-flex items-center justify-center size-9 rounded-full hover:bg-[var(--muted-bg)] text-[var(--muted)] hover:text-[var(--foreground)] transition-colors disabled:opacity-50"
                 >
@@ -342,7 +369,6 @@ export function EventGallery({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
                     className="w-full rounded-xl border border-dashed border-[var(--border)] bg-[var(--muted-bg)]/40 px-3 py-6 text-sm hover:border-[var(--primary)] hover:bg-[var(--primary)]/5 transition-colors disabled:opacity-50"
                   >
                     {file ? (
@@ -385,17 +411,16 @@ export function EventGallery({
                   <button
                     type="button"
                     onClick={closeModal}
-                    disabled={uploading}
                     className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-sm font-medium hover:bg-[var(--muted-bg)] transition-colors disabled:opacity-50"
                   >
                     Vazgeç
                   </button>
                   <button
                     type="submit"
-                    disabled={uploading || !file}
+                    disabled={!file}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--primary)] text-[var(--primary-foreground)] py-2.5 text-sm font-semibold hover:opacity-95 transition-opacity disabled:opacity-50 disabled:pointer-events-none glow-primary"
                   >
-                    {uploading ? "Yükleniyor..." : "Yükle"}
+                    Yükle
                   </button>
                 </div>
               </form>

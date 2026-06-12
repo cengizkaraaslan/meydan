@@ -19,6 +19,15 @@ interface ReviewsProps {
   initialMine: SerializedReview | null;
 }
 
+/** Dağılım dizisinden (1★..5★ sayıları) özeti yeniden hesaplar — optimistic güncelleme için. */
+function recomputeSummary(
+  distribution: [number, number, number, number, number],
+): ReviewSummary {
+  const count = distribution.reduce((a, b) => a + b, 0);
+  const total = distribution.reduce((a, b, i) => a + b * (i + 1), 0);
+  return { count, average: count ? total / count : 0, distribution };
+}
+
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(diff / 60_000);
@@ -92,35 +101,70 @@ export function Reviews({
 
   function submit() {
     if (!isLoggedIn || draftRating < 1) return;
+
+    // Optimistic: yıldız/yorum anında listede ve özet grafiğinde görünsün; sunucu
+    // dönünce gerçek kayıtla (id, ad, renk) uzlaş, hata olursa eski hâli geri yükle.
+    const snapshot = { items, summary, mine };
+    const optimistic: SerializedReview = {
+      id: mine?.id ?? `tmp-${Date.now()}`,
+      authorEmail: mine?.authorEmail ?? "",
+      authorName: mine?.authorName ?? "Sen",
+      authorColor: mine?.authorColor ?? "#6366f1",
+      rating: draftRating,
+      comment: draftComment.trim(),
+      createdAt: new Date().toISOString(),
+      isMine: true,
+    };
+    const dist = [...summary.distribution] as ReviewSummary["distribution"];
+    if (mine) dist[mine.rating - 1] = Math.max(0, dist[mine.rating - 1] - 1);
+    dist[draftRating - 1] += 1;
+    const wasEditing = !!mine;
+    setMine(optimistic);
+    setSummary(recomputeSummary(dist));
+    setItems((prev) => [optimistic, ...prev.filter((r) => !r.isMine)]);
+    toast.success(wasEditing ? "Değerlendirmen güncellendi" : "Değerlendirmen yayınlandı");
+
     startTransition(async () => {
       const res = await submitReviewAction(slug, draftRating, draftComment);
       if (!res.ok || !res.review || !res.summary) {
+        setItems(snapshot.items);
+        setSummary(snapshot.summary);
+        setMine(snapshot.mine);
         toast.error(res.error ?? "Değerlendirme gönderilemedi");
         return;
       }
       setMine(res.review);
       setSummary(res.summary);
-      setItems((prev) => {
-        const withoutMine = prev.filter((r) => !r.isMine);
-        return [res.review!, ...withoutMine];
-      });
-      toast.success(mine ? "Değerlendirmen güncellendi" : "Değerlendirmen yayınlandı");
+      setItems((prev) => [res.review!, ...prev.filter((r) => !r.isMine)]);
     });
   }
 
   function remove() {
+    if (!mine) return;
+
+    // Optimistic: değerlendirmeyi anında kaldır + özeti yerelde güncelle; hata olursa geri al.
+    const snapshot = { items, summary, mine };
+    const dist = [...summary.distribution] as ReviewSummary["distribution"];
+    dist[mine.rating - 1] = Math.max(0, dist[mine.rating - 1] - 1);
+    setMine(null);
+    setSummary(recomputeSummary(dist));
+    setItems((prev) => prev.filter((r) => !r.isMine));
+    setDraftRating(0);
+    setDraftComment("");
+    toast.success("Değerlendirmen kaldırıldı");
+
     startTransition(async () => {
       const res = await removeReviewAction(slug);
       if (!res.ok || !res.summary) {
+        setItems(snapshot.items);
+        setSummary(snapshot.summary);
+        setMine(snapshot.mine);
+        setDraftRating(snapshot.mine?.rating ?? 0);
+        setDraftComment(snapshot.mine?.comment ?? "");
         toast.error(res.error ?? "Silinemedi");
         return;
       }
-      setMine(null);
       setSummary(res.summary);
-      setDraftRating(0);
-      setDraftComment("");
-      setItems((prev) => prev.filter((r) => !r.isMine));
-      toast.success("Değerlendirmen kaldırıldı");
     });
   }
 

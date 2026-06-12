@@ -64,22 +64,17 @@ export function ReportButton({
   }
 
   function submit() {
+    // Optimistic: raporu kabul edilmiş gibi modalı anında kapat + teşekkür et;
+    // gönderim arkada sürer, yalnız gerçekten başarısızsa hata göster.
+    const payload = { target, targetId, targetExcerpt, targetContext, reason, note };
+    toast.success("Raporun alındı, ekibimiz inceleyecek");
+    setOpen(false);
+    setNote("");
+    setReason("spam");
     startTransition(async () => {
-      const res = await submitReportAction({
-        target,
-        targetId,
-        targetExcerpt,
-        targetContext,
-        reason,
-        note,
-      });
-      if (res.ok) {
-        toast.success("Raporun alındı, ekibimiz inceleyecek");
-        setOpen(false);
-        setNote("");
-        setReason("spam");
-      } else {
-        toast.error(res.error ?? "Rapor gönderilemedi");
+      const res = await submitReportAction(payload);
+      if (!res.ok) {
+        toast.error(res.error ?? "Rapor gönderilemedi, tekrar dener misin?");
       }
     });
   }
