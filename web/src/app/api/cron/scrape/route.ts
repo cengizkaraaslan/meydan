@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
-import { runAndPersistAll } from "@/lib/scrapers/runAndPersist";
+import { runAndPersistAll, fanOutScrape } from "@/lib/scrapers/runAndPersist";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -12,15 +12,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Opsiyonel sharding: /api/cron/scrape?shard=0&shards=3 → scraper'ları 3 turda böler.
-  // Param yoksa TEK turda hepsini çalıştırır (varsayılan). Fetch'ler paralel + persist
-  // sınırlı havuzdan akar → eski "yalnız ilk 5 kaynak yazılıyordu / 60sn timeout" sorunu biter.
+  // İki mod:
+  //  • LEAF  (?shard=i&shards=N): yalnız o parçanın scraper'larını çalıştırıp yazar (tek lambda).
+  //  • ORCHESTRATOR (param yok): işi N parçaya böler, her parçayı AYRI lambda'ya (kendi 60sn'si)
+  //    paralel dağıtır. Tek lambda'da 74 kaynak `maxDuration=60sn`'yi aşıp 504 veriyordu; fan-out
+  //    ile her shard rahat sığar, orchestrator yalnız paralel sonuçları bekler (<60sn).
   const url = new URL(request.url);
-  const shards = Number(url.searchParams.get("shards")) || 1;
-  const shard = Number(url.searchParams.get("shard")) || 0;
-
+  const isLeaf = url.searchParams.has("shard");
   const usingMock = process.env.USE_MOCK_DATA === "true";
-  const results = await runAndPersistAll({ shard, shards });
+
+  let results;
+  if (isLeaf) {
+    const shards = Number(url.searchParams.get("shards")) || 1;
+    const shard = Number(url.searchParams.get("shard")) || 0;
+    results = await runAndPersistAll({ shard, shards });
+  } else {
+    const n = Number(process.env.SCRAPE_SHARDS) || 6;
+    results = await fanOutScrape(url.origin, n, secret);
+  }
 
   // TODO (#25 — bildirim): yeni etkinlik tespit edilince eşleşen cihazlara push gönder.
   //   İskele: setEventsForSource'tan yeni oluşturulan event'leri topla → her event için
@@ -40,7 +49,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ran_at: new Date().toISOString(),
     usingMock,
-    shard: shards > 1 ? `${shard}/${shards}` : "all",
+    mode: isLeaf ? `leaf ${url.searchParams.get("shard")}/${url.searchParams.get("shards")}` : "orchestrator",
     scraper_count: results.length,
     success_count: results.filter((r) => r.success).length,
     total_events: totalEvents,

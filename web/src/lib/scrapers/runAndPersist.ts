@@ -100,3 +100,45 @@ export async function runAndPersistAll(opts: RunAndPersistOptions = {}): Promise
     Math.max(1, concurrency),
   );
 }
+
+/**
+ * Fan-out: tek lambda'da 74 kaynağı çalıştırmak Vercel `maxDuration=60sn`'yi aşıyor
+ * (persist + syncSystemPosts ağır). Çözüm: işi N parçaya böl, her parçayı AYRI bir
+ * `/api/cron/scrape?shard=i&shards=N` çağrısına (kendi 60sn bütçeli ayrı lambda) paralel
+ * dağıt. Orchestrator yalnız paralel sonuçları bekler → toplam ~tek shard süresi (<60sn).
+ *
+ * @param origin  İstek origin'i (kendi deployment'ına çağrı → new URL(req.url).origin)
+ * @param shards  Parça sayısı (env SCRAPE_SHARDS, vars. 6)
+ * @param secret  CRON_SECRET — leaf cron çağrılarını yetkilendirmek için (runtime'da mevcut)
+ */
+export async function fanOutScrape(
+  origin: string,
+  shards: number,
+  secret?: string,
+): Promise<SourceRunSummary[]> {
+  const n = Math.max(1, Math.floor(shards));
+  const tasks = Array.from({ length: n }, (_, i) =>
+    fetch(`${origin}/api/cron/scrape?shard=${i}&shards=${n}`, {
+      headers: secret ? { authorization: `Bearer ${secret}` } : {},
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`shard ${i} HTTP ${r.status}`);
+        const j = (await r.json()) as { results?: Array<Record<string, unknown>> };
+        // Leaf cron yanıtını SourceRunSummary'ye normalize et.
+        return (j.results ?? []).map((x) => ({
+          source: String(x.source),
+          success: Boolean(x.success),
+          eventCount: Number(x.event_count ?? 0),
+          written: Number(x.written ?? 0),
+          durationMs: Number(x.duration_ms ?? 0),
+          error: (x.error as string) ?? undefined,
+        })) as SourceRunSummary[];
+      })
+      .catch((err) => {
+        console.warn(`[fanOutScrape] shard ${i} hata:`, err instanceof Error ? err.message : err);
+        return [] as SourceRunSummary[];
+      }),
+  );
+  const perShard = await Promise.all(tasks);
+  return perShard.flat();
+}

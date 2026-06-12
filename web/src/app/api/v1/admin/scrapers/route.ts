@@ -4,7 +4,7 @@ import type { EventSource } from "@/lib/types";
 import { scraperRegistry } from "@/lib/scrapers/ScraperRegistry";
 import { recordRun, persistRun, getLatestRunPerSourceFromDb } from "@/lib/scrapers/RunTracker";
 import { setEventsForSource } from "@/lib/scrapers/EventCache";
-import { runAndPersistAll, type SourceRunSummary } from "@/lib/scrapers/runAndPersist";
+import { fanOutScrape, type SourceRunSummary } from "@/lib/scrapers/runAndPersist";
 import { isAdminEmail } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
@@ -91,9 +91,10 @@ export async function POST(request: NextRequest) {
       error: r.errorMessage,
     }];
   } else {
-    // Hepsi: cron/admin ile AYNI helper — fetch'ler paralel, persist sınırlı havuzdan
-    // (eski sıralı persist döngüsü 60sn'yi aşıp çoğu kaynağı yazamıyordu).
-    summaries = await runAndPersistAll();
+    // Hepsi: tek lambda'da 74 kaynak 60sn'yi aşar → cron leaf'lerine paralel fan-out
+    // (her shard ayrı lambda, kendi 60sn bütçesi).
+    const n = Number(process.env.SCRAPE_SHARDS) || 6;
+    summaries = await fanOutScrape(request.nextUrl.origin, n, process.env.CRON_SECRET);
   }
 
   revalidatePath("/");
