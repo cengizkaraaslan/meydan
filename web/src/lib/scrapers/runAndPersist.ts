@@ -97,10 +97,11 @@ export interface RunAndPersistOptions {
 export async function runAndPersistAll(opts: RunAndPersistOptions = {}): Promise<SourceRunSummary[]> {
   const concurrency = opts.concurrency
     ?? (process.env.SCRAPE_CONCURRENCY ? Number(process.env.SCRAPE_CONCURRENCY) : 10);
-  // 44sn: yeni kaynak başlatmayı 44sn'de kes → çalışanların persist kuyruğu (büyük kaynakların
-  // DB yazımı) da 60sn'den ÖNCE bitsin (52sn'de persist taşıp 504 oluyordu).
+  // 35sn: yeni kaynak başlatmayı 35sn'de kes. Bütçe anında in-flight olan kaynakların tek
+  // fetch'i (≤15sn) + persist'i (~3sn) ancak ~53sn'de biter → 60sn'den ÖNCE 200 döner ve
+  // revalidatePath çalışır. (44sn'de in-flight 15sn fetch'ler 60sn'yi taşırıp 504 yapıyordu.)
   const budgetMs = opts.budgetMs
-    ?? (process.env.SCRAPE_BUDGET_MS ? Number(process.env.SCRAPE_BUDGET_MS) : 44_000);
+    ?? (process.env.SCRAPE_BUDGET_MS ? Number(process.env.SCRAPE_BUDGET_MS) : 35_000);
   const deadlineTs = Date.now() + budgetMs;
 
   // Günlük rotasyon: listeyi gün-indeksine göre kaydır (her gün farklı kaynaklar öne gelir).
