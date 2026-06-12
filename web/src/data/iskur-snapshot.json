@@ -1,8 +1,58 @@
 {
-  "generatedAt": "2026-06-11T08:26:25.684Z",
+  "generatedAt": "2026-06-12T08:14:49.782Z",
   "count": 15,
   "data": {
     "ISKUR": [
+      {
+        "name": "Konfeksiyon İşçisi",
+        "city": "Şanlıurfa",
+        "district": "Şanlıurfa merkez",
+        "start": "2026-06-15",
+        "schedule": "Son başvuru 15.06.2026 · Başlangıç 15.06.2026",
+        "note": "INSURE · Açılmış · Son başvuru: 15.06.2026 · Kurs No: 1238674",
+        "open": true,
+        "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
+      },
+      {
+        "name": "Konfeksiyon İşçisi",
+        "city": "Adıyaman",
+        "district": "Kahta",
+        "start": "2026-06-22",
+        "schedule": "Son başvuru 22.06.2026 · Başlangıç 22.06.2026",
+        "note": "İŞBAŞI EĞİTİM PROGRAMI (İEP) · Açılmış · Son başvuru: 22.06.2026 · Kurs No: 1238668",
+        "open": true,
+        "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
+      },
+      {
+        "name": "Dokuma Konfeksiyon Makineci",
+        "city": "Şanlıurfa",
+        "district": "Eyyübiye",
+        "start": "2026-06-15",
+        "schedule": "Son başvuru 15.06.2026 · Başlangıç 15.06.2026",
+        "note": "İŞBAŞI EĞİTİM PROGRAMI (İEP) · Açılmış · Son başvuru: 15.06.2026 · Kurs No: 1238663",
+        "open": true,
+        "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
+      },
+      {
+        "name": "Servis Elemanı (Garson) Yardımcısı",
+        "city": "Amasya",
+        "district": "Amasya merkez",
+        "start": "2026-06-15",
+        "schedule": "Son başvuru 15.06.2026 · Başlangıç 15.06.2026",
+        "note": "İŞBAŞI EĞİTİM PROGRAMI (İEP) · Açılmış · Son başvuru: 15.06.2026 · Kurs No: 1238645",
+        "open": true,
+        "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
+      },
+      {
+        "name": "Kasiyer",
+        "city": "Giresun",
+        "district": "Tirebolu",
+        "start": "2026-06-13",
+        "schedule": "Son başvuru 13.06.2026 · Başlangıç 13.06.2026",
+        "note": "İŞBAŞI EĞİTİM PROGRAMI (İEP) · Açılmış · Son başvuru: 13.06.2026 · Kurs No: 1238627",
+        "open": true,
+        "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
+      },
       {
         "name": "Diğer Elektrikli Eşya Montajcıları ve İlgili Elektrik İşçileri",
         "city": "Tekirdağ",
@@ -14,22 +64,12 @@
         "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
       },
       {
-        "name": "Büro Memuru (İdari İşler)",
-        "city": "Erzurum",
-        "district": "Yakutiye",
-        "start": "2026-06-12",
-        "schedule": "Son başvuru 12.06.2026 · Başlangıç 12.06.2026",
-        "note": "İŞBAŞI EĞİTİM PROGRAMI (İEP) · Açılmış · Son başvuru: 12.06.2026 · Kurs No: 1238557",
-        "open": true,
-        "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
-      },
-      {
-        "name": "Konfeksiyon İşçisi",
-        "city": "Tokat",
-        "district": "Zile",
+        "name": "Makineci (Dikiş)",
+        "city": "İstanbul",
+        "district": "Sultanbeyli",
         "start": "2026-06-15",
-        "schedule": "Son başvuru 11.06.2026 · Başlangıç 15.06.2026",
-        "note": "İŞBAŞI EĞİTİM PROGRAMI (İEP) · Açılmış · Son başvuru: 11.06.2026 · Kurs No: 1238486",
+        "schedule": "Son başvuru 12.06.2026 · Başlangıç 15.06.2026",
+        "note": "INSURE · Açılmış · Son başvuru: 12.06.2026 · Kurs No: 1238439",
         "open": true,
         "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
       },
@@ -38,8 +78,8 @@
         "city": "İstanbul",
         "district": "Sultangazi",
         "start": "2026-06-17",
-        "schedule": "Son başvuru 16.06.2026 · Başlangıç 17.06.2026",
-        "note": "INSURE · Açılmış · Son başvuru: 16.06.2026 · Kurs No: 1238407",
+        "schedule": "Son başvuru 12.06.2026 · Başlangıç 17.06.2026",
+        "note": "INSURE · Açılmış · Son başvuru: 12.06.2026 · Kurs No: 1238407",
         "open": true,
         "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
       },
@@ -60,26 +100,6 @@
         "start": "2026-06-11",
         "schedule": "Son başvuru 28.07.2026 · Başlangıç 11.06.2026",
         "note": "İŞBAŞI EĞİTİM PROGRAMI (İEP) · Açılmış · Son başvuru: 28.07.2026 · Kurs No: 1238383",
-        "open": true,
-        "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
-      },
-      {
-        "name": "Metal Levha İşleme Tezgah İşçisi",
-        "city": "Düzce",
-        "district": "Düzce merkez",
-        "start": "2026-06-11",
-        "schedule": "Son başvuru 28.07.2026 · Başlangıç 11.06.2026",
-        "note": "İŞBAŞI EĞİTİM PROGRAMI (İEP) · Açılmış · Son başvuru: 28.07.2026 · Kurs No: 1238382",
-        "open": true,
-        "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
-      },
-      {
-        "name": "Konfeksiyon İşçisi",
-        "city": "Malatya",
-        "district": "Yeşilyurt/malatya",
-        "start": "2026-06-11",
-        "schedule": "Son başvuru 30.06.2026 · Başlangıç 11.06.2026",
-        "note": "İŞBAŞI EĞİTİM PROGRAMI (İEP) · Açılmış · Son başvuru: 30.06.2026 · Kurs No: 1238372",
         "open": true,
         "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
       },
@@ -124,32 +144,12 @@
         "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
       },
       {
-        "name": "Plastik Film İşleme Operatörü",
-        "city": "Gaziantep",
-        "district": "Şehitkamil",
-        "start": "2026-06-15",
-        "schedule": "Son başvuru 11.06.2026 · Başlangıç 15.06.2026",
-        "note": "INSURE · Açılmış · Son başvuru: 11.06.2026 · Kurs No: 1238280",
-        "open": true,
-        "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
-      },
-      {
         "name": "Makineci (Dikiş)",
         "city": "Batman",
         "district": "Batman merkez",
         "start": "2026-06-08",
         "schedule": "Son başvuru 12.06.2026 · Başlangıç 08.06.2026",
         "note": "İŞBAŞI EĞİTİM PROGRAMI (İEP) · Açılmış · Son başvuru: 12.06.2026 · Kurs No: 1238206",
-        "open": true,
-        "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
-      },
-      {
-        "name": "Konfeksiyon İşçisi",
-        "city": "Batman",
-        "district": "Batman merkez",
-        "start": "2026-06-08",
-        "schedule": "Son başvuru 14.06.2026 · Başlangıç 08.06.2026",
-        "note": "İŞBAŞI EĞİTİM PROGRAMI (İEP) · Açılmış · Son başvuru: 14.06.2026 · Kurs No: 1238205",
         "open": true,
         "url": "https://esube.iskur.gov.tr/Kurs/KursOnAir.aspx"
       }

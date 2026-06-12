@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-06-11T08:27:37.015Z",
+  "scrapedAt": "2026-06-12T08:15:58.970Z",
   "data": {
     "GASMEK": [
       {
@@ -220,78 +220,6 @@
         "open": false
       },
       {
-        "name": "5. Sınıf Fen Bilimleri",
-        "center": "İnönü Eğitim Merkezi",
-        "start": "05.02.2026",
-        "end": "21.05.2026",
-        "schedule": "Per: 15:45 - 17:30",
-        "full": true,
-        "open": true
-      },
-      {
-        "name": "5. Sınıf Matematik",
-        "center": "İnönü Eğitim Merkezi",
-        "start": "02.02.2026",
-        "end": "18.05.2026",
-        "schedule": "Pzt: 15:45 - 17:30",
-        "full": true,
-        "open": true
-      },
-      {
-        "name": "5. Sınıf İngilizce",
-        "center": "Mihalıççık Eğitim Merkezi",
-        "start": "20.02.2026",
-        "end": "22.05.2026",
-        "schedule": "Cum: 16:00 - 19:00",
-        "full": false,
-        "open": true
-      },
-      {
-        "name": "Çocuk Etkili ve Hızlı Okuma",
-        "center": "Mihalıççık Eğitim Merkezi",
-        "start": "19.02.2026",
-        "end": "22.05.2026",
-        "schedule": "Per: 19:00 - 20:00 Cum: 19:00 - 20:00",
-        "full": false,
-        "open": true
-      },
-      {
-        "name": "Çocuk İngilizce",
-        "center": "Mihalıççık Eğitim Merkezi",
-        "start": "06.02.2026",
-        "end": "22.05.2026",
-        "schedule": "Cum: 16:00 - 18:00",
-        "full": true,
-        "open": true
-      },
-      {
-        "name": "Giyim",
-        "center": "Mihalıççık Eğitim Merkezi",
-        "start": "20.02.2026",
-        "end": "22.05.2026",
-        "schedule": "Cum: 10:00 - 16:00",
-        "full": false,
-        "open": true
-      },
-      {
-        "name": "Makrome Bağlama",
-        "center": "Mihalıççık Eğitim Merkezi",
-        "start": "03.10.2025",
-        "end": "22.05.2026",
-        "schedule": "Cum: 10:00 - 16:00",
-        "full": true,
-        "open": true
-      },
-      {
-        "name": "Oyun Evi",
-        "center": "Mihalıççık Eğitim Merkezi",
-        "start": "02.02.2026",
-        "end": "22.05.2026",
-        "schedule": "Pzt: 10:00 - 17:00 Sal: 10:00 - 17:00 Çar: 10:00 - 17:00 Per: 10:00 - 17:00 Cum: 10:00 - 17:00",
-        "full": true,
-        "open": true
-      },
-      {
         "name": "2. Sınıf Matematik",
         "center": "Sarıcakaya Eğitim Merkezi",
         "start": "02.02.2026",
@@ -346,15 +274,6 @@
         "open": true
       },
       {
-        "name": "Ahşap Boyama - Taş Boyama",
-        "center": "Sarıcakaya Eğitim Merkezi",
-        "start": "29.10.2025",
-        "end": "20.05.2026",
-        "schedule": "Çar: 13:00 - 15:50",
-        "full": false,
-        "open": true
-      },
-      {
         "name": "Kağıt Rölyef Resim",
         "center": "Sarıcakaya Eğitim Merkezi",
         "start": "02.10.2025",
@@ -402,15 +321,6 @@
       {
         "name": "Zumba",
         "center": "Sarıcakaya Eğitim Merkezi",
-        "start": "03.02.2026",
-        "end": "21.05.2026",
-        "schedule": "Sal: 20:00 - 21:50 Per: 20:00 - 21:50",
-        "full": true,
-        "open": true
-      },
-      {
-        "name": "Zumba",
-        "center": "Sarıcakaya Eğitim Merkezi",
         "start": "05.02.2026",
         "end": "21.05.2026",
         "schedule": "Per: 9:00 - 10:50",
@@ -418,11 +328,11 @@
         "open": true
       },
       {
-        "name": "Bağlama",
-        "center": "Yunusemre Eğitim Merkezi",
-        "start": "13.02.2026",
-        "end": "22.05.2026",
-        "schedule": "Cum: 9:00 - 12:50",
+        "name": "Zumba",
+        "center": "Sarıcakaya Eğitim Merkezi",
+        "start": "03.02.2026",
+        "end": "21.05.2026",
+        "schedule": "Sal: 20:00 - 21:50 Per: 20:00 - 21:50",
         "full": true,
         "open": true
       }
@@ -449,7 +359,6 @@
       "Bağlama (Bozuk Düzen)",
       "İlçe",
       "Eğitim Sağlayıcı",
-      "Kategoriler",
       "Eğitim Türü",
       "Eğitim Durumu"
     ]
