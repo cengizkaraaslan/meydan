@@ -57,6 +57,7 @@ interface EventSocial {
   instagram?: string | null;
   facebook?: string | null;
   tiktok?: string | null;
+  phone?: string | null;
   creatorName?: string | null;
 }
 
@@ -65,6 +66,7 @@ function social(e: unknown): {
   instagram: string | null;
   facebook: string | null;
   tiktok: string | null;
+  phone: string | null;
   creator_name: string | null;
 } {
   const s = e as EventSocial;
@@ -73,6 +75,7 @@ function social(e: unknown): {
     instagram: s.instagram ?? null,
     facebook: s.facebook ?? null,
     tiktok: s.tiktok ?? null,
+    phone: s.phone ?? null,
     creator_name: s.creatorName ?? null,
   };
 }

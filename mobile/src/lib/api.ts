@@ -30,6 +30,12 @@ export interface ApiEvent {
   organizer?: string | null;
   /** Düzenleyen bir kullanıcıysa profil kimliği — varsa isim tıklanınca profile gider. */
   organizer_id?: string | null;
+  /** İletişim/sosyal bağlantılar — doluysa detayda "İletişim & Sosyal" olarak gösterilir. */
+  website?: string | null;
+  instagram?: string | null;
+  facebook?: string | null;
+  tiktok?: string | null;
+  phone?: string | null;
 }
 
 export interface EventsMeta {

@@ -76,6 +76,13 @@ export async function GET(
       ticket_url: event.ticketUrl ?? null,
       image_url: hiRes(event.imageUrl ?? fallbackImage(event.category)),
       artist: event.artist ?? null,
+      // İletişim/sosyal — scraper'ın bulduğu (örn. Quark) veya kullanıcı girdiği
+      // bağlantılar. Doluysa mobil detayda "İletişim & Sosyal" olarak gösterilir.
+      website: event.website ?? null,
+      instagram: event.instagram ?? null,
+      facebook: event.facebook ?? null,
+      tiktok: event.tiktok ?? null,
+      phone: event.phone ?? null,
       attendee_count: event.attendeeCount ?? 0,
       comment_count: event.commentCount ?? 0,
     },

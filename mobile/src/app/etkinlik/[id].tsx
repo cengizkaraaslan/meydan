@@ -726,6 +726,17 @@ export default function EventDetail() {
     const q = encodeURIComponent(`${event.venue} ${event.city}`.trim());
     Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${q}`);
   };
+  // İletişim/sosyal: tam URL değilse https:// ekleyip tarayıcıda aç; telefon tel: ile aranır.
+  const openLink = (raw: string) => {
+    impactH();
+    const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw.replace(/^@/, "")}`;
+    WebBrowser.openBrowserAsync(url);
+  };
+  const callPhone = () => {
+    tapH();
+    if (event.phone) Linking.openURL(`tel:${event.phone.replace(/\s+/g, "")}`);
+  };
+  const prettyLink = (u: string) => u.replace(/^https?:\/\//i, "").replace(/\/$/, "");
   const share = () => {
     impactH();
     // Etkinlik DETAY sayfasının linki — açan kişi doğrudan bu etkinliğin sayfasına gelir
@@ -849,6 +860,11 @@ export default function EventDetail() {
               </>
             ) : null}
             {event.artist ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="🎤" label={t("artist")} value={event.artist} /></>) : null}
+            {event.phone ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="📞" label="Telefon" value={event.phone} onPress={callPhone} actionLabel="Ara" /></>) : null}
+            {event.website ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="🌐" label="Web sitesi" value={prettyLink(event.website)} onPress={() => openLink(event.website!)} actionLabel="Aç" /></>) : null}
+            {event.instagram ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="📸" label="Instagram" value={prettyLink(event.instagram)} onPress={() => openLink(event.instagram!)} actionLabel="Aç" /></>) : null}
+            {event.facebook ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="👍" label="Facebook" value={prettyLink(event.facebook)} onPress={() => openLink(event.facebook!)} actionLabel="Aç" /></>) : null}
+            {event.tiktok ? (<><View style={[styles.sep, { backgroundColor: T.hairline }]} /><InfoRow T={T} icon="🎵" label="TikTok" value={prettyLink(event.tiktok)} onPress={() => openLink(event.tiktok!)} actionLabel="Aç" /></>) : null}
           </Animated.View>
 
           {event.description ? (
