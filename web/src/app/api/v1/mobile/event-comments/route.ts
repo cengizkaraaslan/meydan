@@ -4,9 +4,10 @@ import {
   addEventComment,
   editEventComment,
   deleteEventComment,
+  eventCommentReplyTargetOwner,
   type CommentMutReason,
 } from "@/lib/event-comments-store";
-import { extractMentionEmails, notifyEmails, preview } from "@/lib/mention-notify";
+import { extractMentionEmails, notifyEmails, notifyDevices, preview } from "@/lib/mention-notify";
 
 export const dynamic = "force-dynamic";
 
@@ -22,17 +23,18 @@ function statusForReason(reason: CommentMutReason | undefined): number {
   }
 }
 
-// GET /api/v1/mobile/event-comments?eventSlug=...
+// GET /api/v1/mobile/event-comments?eventSlug=...&deviceId=...
 export async function GET(request: NextRequest) {
   const eventSlug = request.nextUrl.searchParams.get("eventSlug")?.trim();
   if (!eventSlug) return NextResponse.json({ error: "eventSlug zorunlu" }, { status: 400 });
-  const data = await listEventComments(eventSlug);
+  const viewerDeviceId = request.nextUrl.searchParams.get("deviceId")?.trim() || "";
+  const data = await listEventComments(eventSlug, viewerDeviceId);
   return NextResponse.json({ ok: true, data });
 }
 
-// POST /api/v1/mobile/event-comments  body {eventSlug, deviceId, authorName, avatar?, text}
+// POST /api/v1/mobile/event-comments  body {eventSlug, deviceId, authorName, avatar?, text, replyToId?}
 export async function POST(request: NextRequest) {
-  let body: { eventSlug?: string; deviceId?: string; authorName?: string; avatar?: string | null; text?: string };
+  let body: { eventSlug?: string; deviceId?: string; authorName?: string; avatar?: string | null; text?: string; replyToId?: string | null };
   try {
     body = await request.json();
   } catch {
@@ -45,7 +47,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "eventSlug/deviceId/text zorunlu" }, { status: 400 });
   }
   const authorName = body.authorName?.trim() || "Biri";
-  const comment = await addEventComment({ eventSlug, deviceId, authorName, avatar: body.avatar ?? null, text });
+  const replyToId = body.replyToId?.trim() || null;
+  const comment = await addEventComment({ eventSlug, deviceId, authorName, avatar: body.avatar ?? null, text, replyToId });
 
   // @mention → bahsedilen email'lere bildirim (mobil + web). Tıklayınca etkinliğe gider.
   const emails = extractMentionEmails(text);
@@ -56,6 +59,21 @@ export async function POST(request: NextRequest) {
       data: { type: "comment", eventId: eventSlug, url: `/etkinlik/${eventSlug}` },
       inApp: { type: "comment", actorId: deviceId, actorName: authorName },
     }).catch(() => {});
+  }
+
+  // Yanıt → yanıtlanan yorumun sahibine bildirim (kendine yanıt verirse atlanır).
+  if (replyToId) {
+    void (async () => {
+      const owner = await eventCommentReplyTargetOwner(replyToId);
+      if (owner && owner !== deviceId) {
+        await notifyDevices([owner], {
+          title: `${authorName} yorumuna yanıt verdi`,
+          body: preview(text),
+          data: { type: "comment", eventId: eventSlug, url: `/etkinlik/${eventSlug}` },
+          inApp: { type: "comment", actorId: deviceId, actorName: authorName },
+        });
+      }
+    })().catch(() => {});
   }
 
   return NextResponse.json({ ok: true, comment });

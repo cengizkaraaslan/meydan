@@ -148,6 +148,9 @@ export async function deletePost(input: { id: string; authorId: string }): Promi
   if (p.authorId !== input.authorId || p.authorId === "system") return { ok: false, reason: "forbidden" };
   if (Date.now() - p.createdAt.getTime() > POST_EDIT_WINDOW_MS) return { ok: false, reason: "expired" };
   await db.postReaction.deleteMany({ where: { postId: input.id } });
+  // Yorum tepkilerini de temizle (gönderinin yorumlarına ait).
+  const cids = (await db.postComment.findMany({ where: { postId: input.id }, select: { id: true } })).map((c) => c.id);
+  if (cids.length) await db.postCommentReaction.deleteMany({ where: { commentId: { in: cids } } });
   await db.postComment.deleteMany({ where: { postId: input.id } });
   await db.mobilePost.delete({ where: { id: input.id } });
   return { ok: true };
@@ -194,23 +197,133 @@ export async function reactToPost(input: { postId: string; deviceId: string; emo
   return { myReaction: emoji };
 }
 
-export async function listComments(postId: string) {
+export interface PostCommentReplyTo {
+  id: string;
+  authorName: string | null;
+  snippet: string;
+}
+export interface PostCommentView {
+  id: string;
+  deviceId: string;
+  authorName: string | null;
+  text: string;
+  replyTo: PostCommentReplyTo | null; // bu yorum bir yanıtsa alıntı özeti
+  reactions: Record<string, number>; // emoji -> sayı
+  reactionTotal: number;
+  myReaction: string | null;
+  replyCount: number;
+  createdAt: string;
+}
+
+/** Alıntı önizleme metni (boşluk sadeleştir, ~80 karakter). */
+function commentSnippet(text: string): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  return t.length > 80 ? t.slice(0, 80) + "…" : t;
+}
+
+/** Etkileşime göre azalan sırala; eşitlikte yeni üstte (Instagram "en popüler yorum"). */
+function sortByCommentEngagement(views: PostCommentView[]): PostCommentView[] {
+  return views.sort((a, b) => {
+    const sb = b.reactionTotal + b.replyCount;
+    const sa = a.reactionTotal + a.replyCount;
+    if (sb !== sa) return sb - sa;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
+
+export async function listComments(postId: string, viewerDeviceId = ""): Promise<PostCommentView[]> {
   if (!isDbConfigured) return [];
   const rows = await db.postComment.findMany({ where: { postId }, orderBy: { createdAt: "asc" } });
-  return rows.map((c) => ({
+  if (!rows.length) return [];
+  const ids = rows.map((r) => r.id);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const [grouped, mine] = await Promise.all([
+    db.postCommentReaction.groupBy({ by: ["commentId", "emoji"], where: { commentId: { in: ids } }, _count: { _all: true } }),
+    viewerDeviceId
+      ? db.postCommentReaction.findMany({ where: { commentId: { in: ids }, deviceId: viewerDeviceId } })
+      : Promise.resolve([] as { commentId: string; emoji: string }[]),
+  ]);
+  const reactionMap = new Map<string, Record<string, number>>();
+  const totalMap = new Map<string, number>();
+  for (const grp of grouped) {
+    const m = reactionMap.get(grp.commentId) ?? {};
+    m[grp.emoji] = grp._count._all;
+    reactionMap.set(grp.commentId, m);
+    totalMap.set(grp.commentId, (totalMap.get(grp.commentId) ?? 0) + grp._count._all);
+  }
+  const myMap = new Map(mine.map((r) => [r.commentId, r.emoji]));
+  const replyCountMap = new Map<string, number>();
+  for (const r of rows) if (r.replyToId) replyCountMap.set(r.replyToId, (replyCountMap.get(r.replyToId) ?? 0) + 1);
+
+  const views: PostCommentView[] = rows.map((c) => {
+    const target = c.replyToId ? byId.get(c.replyToId) : null;
+    return {
+      id: c.id,
+      deviceId: c.deviceId,
+      authorName: c.authorName,
+      text: c.text,
+      replyTo: target ? { id: target.id, authorName: target.authorName, snippet: commentSnippet(target.text) } : null,
+      reactions: reactionMap.get(c.id) ?? {},
+      reactionTotal: totalMap.get(c.id) ?? 0,
+      myReaction: myMap.get(c.id) ?? null,
+      replyCount: replyCountMap.get(c.id) ?? 0,
+      createdAt: c.createdAt.toISOString(),
+    };
+  });
+  return sortByCommentEngagement(views);
+}
+
+export async function addComment(input: {
+  postId: string;
+  deviceId: string;
+  authorName?: string | null;
+  text: string;
+  replyToId?: string | null;
+}): Promise<PostCommentView> {
+  const replyToId = input.replyToId ?? null;
+  const c = await db.postComment.create({
+    data: { postId: input.postId, deviceId: input.deviceId, authorName: input.authorName ?? null, text: input.text.slice(0, 1000), replyToId },
+  });
+  let replyTo: PostCommentReplyTo | null = null;
+  if (replyToId) {
+    const t = await db.postComment.findUnique({ where: { id: replyToId } });
+    if (t) replyTo = { id: t.id, authorName: t.authorName, snippet: commentSnippet(t.text) };
+  }
+  return {
     id: c.id,
     deviceId: c.deviceId,
     authorName: c.authorName,
     text: c.text,
+    replyTo,
+    reactions: {},
+    reactionTotal: 0,
+    myReaction: null,
+    replyCount: 0,
     createdAt: c.createdAt.toISOString(),
-  }));
+  };
 }
 
-export async function addComment(input: { postId: string; deviceId: string; authorName?: string | null; text: string }) {
-  const c = await db.postComment.create({
-    data: { postId: input.postId, deviceId: input.deviceId, authorName: input.authorName ?? null, text: input.text.slice(0, 1000) },
+/** Yanıtlanan yorumun sahibinin deviceId'si (reply bildirimi için). Yoksa null. */
+export async function postCommentReplyTargetOwner(replyToId: string): Promise<string | null> {
+  if (!isDbConfigured) return null;
+  const t = await db.postComment.findUnique({ where: { id: replyToId }, select: { deviceId: true } });
+  return t?.deviceId ?? null;
+}
+
+/** Bir feed yorumuna emoji tepki ekle/değiştir/kaldır (kişi başına tek; aynı emoji tekrar → kaldırır). */
+export async function reactToPostComment(input: { commentId: string; deviceId: string; emoji: string }) {
+  const { commentId, deviceId, emoji } = input;
+  const existing = await db.postCommentReaction.findUnique({ where: { commentId_deviceId: { commentId, deviceId } } });
+  if (existing && existing.emoji === emoji) {
+    await db.postCommentReaction.delete({ where: { commentId_deviceId: { commentId, deviceId } } });
+    return { myReaction: null };
+  }
+  await db.postCommentReaction.upsert({
+    where: { commentId_deviceId: { commentId, deviceId } },
+    create: { commentId, deviceId, emoji },
+    update: { emoji },
   });
-  return { id: c.id, deviceId: c.deviceId, authorName: c.authorName, text: c.text, createdAt: c.createdAt.toISOString() };
+  return { myReaction: emoji };
 }
 
 export async function listNotifs(deviceId: string) {

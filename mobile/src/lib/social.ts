@@ -44,11 +44,21 @@ export interface FeedPost {
   commentCount: number;
 }
 
+export interface PostCommentReplyTo {
+  id: string;
+  authorName: string | null;
+  snippet: string;
+}
 export interface PostComment {
   id: string;
   deviceId: string;
   authorName: string | null;
   text: string;
+  replyTo: PostCommentReplyTo | null;
+  reactions: Record<string, number>;
+  reactionTotal: number;
+  myReaction: string | null;
+  replyCount: number;
   createdAt: string;
 }
 
@@ -196,14 +206,30 @@ export async function reactPost(postId: string, emoji: string): Promise<string |
 }
 
 export async function fetchComments(postId: string): Promise<PostComment[]> {
-  const r = await getJson<{ data?: PostComment[] }>(`/api/v1/social/comments?postId=${encodeURIComponent(postId)}`, {});
+  const deviceId = await getOrCreateDeviceId();
+  const r = await getJson<{ data?: PostComment[] }>(
+    `/api/v1/social/comments?postId=${encodeURIComponent(postId)}&deviceId=${encodeURIComponent(deviceId)}`,
+    {},
+  );
   return r.data ?? [];
 }
 
-export async function addComment(postId: string, text: string, authorName?: string): Promise<PostComment | null> {
+export async function addComment(
+  postId: string,
+  text: string,
+  authorName?: string,
+  replyToId?: string | null,
+): Promise<PostComment | null> {
   const deviceId = await getOrCreateDeviceId();
-  const r = await send<{ comment?: PostComment }>("POST", "/api/v1/social/comments", { postId, deviceId, authorName, text }, {});
+  const r = await send<{ comment?: PostComment }>("POST", "/api/v1/social/comments", { postId, deviceId, authorName, text, replyToId }, {});
   return r.comment ?? null;
+}
+
+/** Bir feed yorumuna emoji tepki ver/değiştir/kaldır. Dönen = güncel tepkim (yoksa null). */
+export async function reactComment(commentId: string, emoji: string): Promise<string | null> {
+  const deviceId = await getOrCreateDeviceId();
+  const r = await send<{ myReaction?: string | null }>("POST", "/api/v1/social/comments/react", { commentId, deviceId, emoji }, {});
+  return r.myReaction ?? null;
 }
 
 export async function fetchNotifs(): Promise<{ data: SocialNotif[]; unread: number }> {

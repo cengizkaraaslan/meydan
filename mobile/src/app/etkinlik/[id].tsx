@@ -20,8 +20,12 @@ import {
   postEventComment,
   editEventComment,
   deleteEventComment,
+  reactEventComment,
   type EventComment,
 } from "@/lib/eventComments";
+import { CommentThread } from "@/components/CommentThread";
+import { ReplyComposerBar } from "@/components/ReplyComposerBar";
+import { eventToThread, type ThreadComment } from "@/lib/commentThread";
 import { useMentionField } from "@/lib/mentions";
 import { MentionSuggestions } from "@/components/MentionSuggestions";
 import { MentionText } from "@/components/MentionText";
@@ -59,29 +63,8 @@ import { getEventWeather, type DayWeather } from "@/lib/weather";
 
 const { width, height: SCREEN_H } = Dimensions.get("window");
 
-interface Comment {
-  id: string;
-  name: string;
-  text: string;
-  ts: number;
-  by?: string; // yükleyen kullanıcı id'si (düzenle/sil yetkisi); eski yorumlarda yok
-  editedTs?: number; // düzenlendiyse zaman damgası
-}
-
 // Yorum düzenleme penceresi: 2 dakika.
 const EDIT_WINDOW_MS = 2 * 60 * 1000;
-
-/** Sunucu yorumunu (EventComment) ekran modeline (Comment) çevir. by = sahibinin deviceId'si. */
-function toComment(ec: EventComment): Comment {
-  return {
-    id: ec.id,
-    name: ec.authorName,
-    text: ec.text,
-    ts: Date.parse(ec.createdAt) || Date.now(),
-    by: ec.deviceId,
-    editedTs: ec.editedAt ? Date.parse(ec.editedAt) : undefined,
-  };
-}
 
 // Yorum düzenle/sil ipucu (ömür boyu 1 kez gösterilir).
 const COMMENT_TIP_KEY = "meydanfest:eventCommentTipSeen";
@@ -173,12 +156,12 @@ export default function EventDetail() {
   // Kategori bazlı GERÇEK sayılar (sunucu): katılacak / belki / ilgili.
   const [serverCounts, setServerCounts] = useState({ going: 0, maybe: 0, interested: 0 });
   const coords = useUserCoords();
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<EventComment[]>([]);
+  const [replyTo, setReplyTo] = useState<ThreadComment | null>(null);
   const [draft, setDraft] = useState("");
   // @mention autocomplete: "@ad" yazınca kullanıcı listesinden öneri getirir.
   const mention = useMentionField(draft, setDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState("");
   // Yorum düzenle/sil ipucu modalı (ilk yorumdan sonra 1 kez).
   const [commentTip, setCommentTip] = useState(false);
   // Yorum & fotoğraflar sunucuda deviceId sahipliğiyle tutulur → kendi cihaz kimliğim.
@@ -351,7 +334,7 @@ export default function EventDetail() {
     if (!slug) return;
     let alive = true;
     fetchEventComments(slug).then((list) => {
-      if (alive) setComments(list.map(toComment));
+      if (alive) setComments(list);
     });
     fetchEventPhotos(slug).then((list) => {
       if (alive) setPhotos(list.map(toPhoto));
@@ -417,64 +400,48 @@ export default function EventDetail() {
     }
   };
 
-  // Sahiplik sunucuda deviceId ile: kendi yorumum düzenle/silinebilir; admin her yorumu siler.
-  const canEditComment = (cm: Comment) =>
-    !!myDeviceId && cm.by === myDeviceId && Date.now() - cm.ts < EDIT_WINDOW_MS;
-  const canDeleteComment = (cm: Comment) =>
-    (!!myDeviceId && cm.by === myDeviceId) || (!!user && isAdmin(user));
-
-  const startEditComment = (cm: Comment) => {
+  // CommentThread aksiyonları (Alert YERİNE bileşenin animasyonlu action-sheet'i kullanılır).
+  // Düzenleme alttaki ortak composer'a taşınır (replyTo gibi editingId state'iyle).
+  const startEditComment = (c: ThreadComment) => {
     tapH();
-    setEditingId(cm.id);
-    setEditDraft(cm.text);
+    setReplyTo(null);
+    setEditingId(c.id);
+    setDraft(c.text);
+  };
+  const onReplyComment = (c: ThreadComment) => {
+    tapH();
+    setEditingId(null);
+    setReplyTo(c);
   };
   const saveEditComment = async () => {
-    const text = editDraft.trim();
+    const text = draft.trim();
     const id = editingId;
-    if (!id || !text) { setEditingId(null); setEditDraft(""); return; }
+    if (!id || !text) { setEditingId(null); setDraft(""); return; }
     setEditingId(null);
-    setEditDraft("");
+    setDraft("");
+    mention.clear();
     const r = await editEventComment(id, text);
     if (r.ok && r.comment) {
       const updated = r.comment;
-      setComments((prev) => prev.map((c) => (c.id === id ? toComment(updated) : c)));
+      setComments((prev) => prev.map((c) => (c.id === id ? updated : c)));
       successH();
     } else {
-      Alert.alert(t("edit"), r.reason === "expired" ? "Düzenleme süresi doldu." : "Yorum düzenlenemedi.");
+      // Nadiren (ağ): metni geri koy, sessiz.
+      setDraft(text);
+      setEditingId(id);
     }
   };
-  const deleteComment = (cm: Comment) => {
-    if (!canDeleteComment(cm)) return;
-    tapH();
-    Alert.alert(t("delete_comment_q"), undefined, [
-      { text: t("cancel"), style: "cancel" },
-      {
-        text: t("delete"),
-        style: "destructive",
-        onPress: async () => {
-          const r = await deleteEventComment(cm.id, !!user && isAdmin(user));
-          if (r.ok) {
-            setComments((prev) => prev.filter((c) => c.id !== cm.id));
-            successH();
-          } else {
-            Alert.alert(t("delete"), "Yorum silinemedi.");
-          }
-        },
-      },
-    ]);
+  const handleDeleteComment = async (c: ThreadComment) => {
+    const r = await deleteEventComment(c.id, !!user && isAdmin(user));
+    if (r.ok) {
+      setComments((prev) => prev.filter((x) => x.id !== c.id));
+      successH();
+    }
   };
-
-  // Yoruma basılı tut → düzenle/sil aksiyon menüsü (yetkisi olan kendi yorumunda).
-  const onLongPressComment = (cm: Comment) => {
-    const canEdit = canEditComment(cm);
-    const canDel = canDeleteComment(cm);
-    if (!canEdit && !canDel) return;
-    impactH();
-    const actions: { text: string; style?: "cancel" | "destructive"; onPress?: () => void }[] = [];
-    if (canEdit) actions.push({ text: `✏️ ${t("edit")}`, onPress: () => startEditComment(cm) });
-    if (canDel) actions.push({ text: `🗑️ ${t("delete")}`, style: "destructive", onPress: () => deleteComment(cm) });
-    actions.push({ text: t("cancel"), style: "cancel" });
-    Alert.alert(cm.name, undefined, actions);
+  const onReactComment = async (commentId: string, emoji: string) => {
+    await reactEventComment(commentId, emoji);
+    // Etkileşim sıralaması + sayılar sunucuda; tazele.
+    if (event?.slug) setComments(await fetchEventComments(event.slug));
   };
 
   // İlk yorumdan sonra (ömür boyu 1 kez) "basılı tut" ipucunu göster.
@@ -490,6 +457,7 @@ export default function EventDetail() {
   };
 
   const sendComment = async () => {
+    if (editingId) { void saveEditComment(); return; }
     // Oturum açmayan yorum yazamaz → giriş modalı.
     if (!user) { showAuthPrompt(t("login_required")); return; }
     const text = draft.trim();
@@ -497,18 +465,20 @@ export default function EventDetail() {
     tapH();
     setDraft("");
     mention.clear();
+    const replyToId = replyTo?.id ?? null;
+    setReplyTo(null);
     // Sunucuya yaz (tüm cihazlarda görünür) + "@email" varsa backend o kişiye bildirir.
     const created = await postEventComment({
       eventSlug: event.slug,
       authorName: user.name,
       avatar: avatarOverride ?? null,
       text,
+      replyToId,
     });
     if (created) {
-      setComments((prev) => [...prev, toComment(created)]);
+      setComments(await fetchEventComments(event.slug)); // etkileşim sıralaması için tazele
       void maybeShowCommentTip();
     } else {
-      Alert.alert("Yorum", "Yorum gönderilemedi. Bağlantını kontrol et.");
       setDraft(text); // başarısızsa metni geri koy
     }
   };
@@ -996,54 +966,37 @@ export default function EventDetail() {
             {comments.length === 0 ? (
               <Text style={[Type.body, { color: T.textFaint, marginBottom: 14 }]}>{t("no_comments")}</Text>
             ) : (
-              <View style={{ gap: 10, marginBottom: 14 }}>
-                {comments.map((cm) => {
-                  const editing = editingId === cm.id;
-                  const initial = (cm.name?.charAt(0) || "?").toUpperCase();
-                  return (
-                    <Pressable
-                      key={cm.id}
-                      onLongPress={editing ? undefined : () => onLongPressComment(cm)}
-                      delayLongPress={300}
-                      style={[styles.bubble, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
-                    >
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                        <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cmAvatar}>
-                          <Text style={{ color: "#fff", fontSize: 12, fontWeight: "800" }}>{initial}</Text>
-                        </LinearGradient>
-                        <Text style={[Type.label, { color: T.text, flex: 1 }]} numberOfLines={1}>{cm.name}</Text>
-                        <Text style={[Type.micro, { color: T.textFaint }]}>{relTime(cm.editedTs ?? cm.ts)}</Text>
-                        {cm.editedTs ? <Text style={[Type.micro, { color: T.textFaint }]}>· {t("edited")}</Text> : null}
-                      </View>
-                      {editing ? (
-                        <View style={{ gap: 8 }}>
-                          <TextInput
-                            value={editDraft}
-                            onChangeText={setEditDraft}
-                            placeholderTextColor={T.textFaint}
-                            multiline
-                            style={[styles.input, { color: T.text, backgroundColor: T.bgElevated, borderColor: T.hairline, minHeight: 42, textAlignVertical: "top" }]}
-                          />
-                          <View style={{ flexDirection: "row", gap: 8, justifyContent: "flex-end" }}>
-                            <Pill label={t("cancel")} onPress={() => { setEditingId(null); setEditDraft(""); }} />
-                            <Pill label={t("save")} gradient={c.gradient} onPress={saveEditComment} />
-                          </View>
-                        </View>
-                      ) : (
-                        <MentionText text={cm.text} style={[Type.body, { color: T.text, lineHeight: 20 }]} />
-                      )}
-                    </Pressable>
-                  );
-                })}
+              <View style={{ marginBottom: 14 }}>
+                <CommentThread
+                  comments={comments.map(eventToThread)}
+                  myDeviceId={myDeviceId}
+                  isAdmin={!!user && isAdmin(user)}
+                  editWindowMs={EDIT_WINDOW_MS}
+                  onReact={onReactComment}
+                  onReply={onReplyComment}
+                  onEdit={startEditComment}
+                  onDelete={handleDeleteComment}
+                />
               </View>
             )}
             {/* @mention önerileri (input'un üstünde) */}
             <MentionSuggestions users={mention.results} onPick={mention.pick} />
+            {/* Düzenleme / yanıt göstergesi (input'un üstünde) */}
+            {editingId ? (
+              <View style={[styles.composerBar, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+                <Text style={[Type.micro, { color: T.primary, fontWeight: "700", flex: 1 }]}>✏️ Yorumu düzenliyorsun</Text>
+                <Pressable onPress={() => { setEditingId(null); setDraft(""); }} hitSlop={10}>
+                  <Text style={{ fontSize: 18, color: T.textDim }}>✕</Text>
+                </Pressable>
+              </View>
+            ) : replyTo ? (
+              <ReplyComposerBar authorName={replyTo.authorName} snippet={replyTo.text} onCancel={() => setReplyTo(null)} />
+            ) : null}
             <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
               <TextInput
                 value={draft}
                 onChangeText={mention.onChangeText}
-                placeholder={t("write_comment")}
+                placeholder={editingId ? t("edit") : replyTo ? `${replyTo.authorName}'e yanıt yaz…` : t("write_comment")}
                 placeholderTextColor={T.textFaint}
                 style={[styles.input, { color: T.text, backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}
                 onSubmitEditing={sendComment}
@@ -1055,7 +1008,7 @@ export default function EventDetail() {
                 style={{ borderRadius: Radius.pill, overflow: "hidden", opacity: draft.trim() ? 1 : 0.5 }}
               >
                 <LinearGradient colors={c.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.sendBtn}>
-                  <Text style={[Type.label, { color: "#fff" }]}>{t("send")}</Text>
+                  <Text style={[Type.label, { color: "#fff" }]}>{editingId ? t("save") : t("send")}</Text>
                 </LinearGradient>
               </Pressable>
             </View>
@@ -1506,6 +1459,7 @@ const styles = StyleSheet.create({
   cmAvatar: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   input: { flex: 1, borderRadius: Radius.pill, paddingHorizontal: 16, paddingVertical: 10, borderWidth: StyleSheet.hairlineWidth * 2, fontSize: 14 },
   sendBtn: { paddingHorizontal: 16, paddingVertical: 11, alignItems: "center", justifyContent: "center" },
+  composerBar: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth * 2 },
   addPhoto: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2 },
   photo: { width: 100, height: 100, borderRadius: Radius.md },
   photoModalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center", padding: 16 },

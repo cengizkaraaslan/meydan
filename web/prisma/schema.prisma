@@ -435,11 +435,26 @@ model EventCommentMobile {
   /// Yorum yazarının avatarı (denormalize — listede göstermek için).
   avatar     String?   @db.Text
   text       String    @db.Text
+  /// Yanıt verilen yorumun id'si (kalıcı alıntı/yanıt). null = kök yorum.
+  replyToId  String?
   /// Düzenlendiyse zaman damgası (null = düzenlenmemiş).
   editedAt   DateTime?
   createdAt  DateTime  @default(now())
 
   @@index([eventSlug])
+  @@index([replyToId])
+}
+
+/// Etkinlik yorumuna emoji tepkisi (PostReaction deseni — yorum seviyesinde, kişi başına tek).
+model EventCommentReaction {
+  id        String   @id @default(cuid())
+  commentId String
+  deviceId  String
+  emoji     String   // 👍 ❤️ 😂 😮 😢 🔥
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, deviceId])
+  @@index([commentId])
 }
 
 /// Mobil etkinlik fotoğrafı — deviceId bazlı, sunucu kaynaklı (tüm cihazlarda ortak).
@@ -715,9 +730,24 @@ model PostComment {
   deviceId   String
   authorName String?
   text       String   @db.Text
+  /// Yanıt verilen yorumun id'si (kalıcı alıntı/yanıt). null = kök yorum.
+  replyToId  String?
   createdAt  DateTime @default(now())
 
   @@index([postId, createdAt])
+  @@index([replyToId])
+}
+
+/// Feed gönderi yorumuna emoji tepkisi (kişi başına tek, tekrar basınca toggle).
+model PostCommentReaction {
+  id        String   @id @default(cuid())
+  commentId String
+  deviceId  String
+  emoji     String   // 👍 ❤️ 😂 😮 😢 🔥
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, deviceId])
+  @@index([commentId])
 }
 
 model MobileNotif {

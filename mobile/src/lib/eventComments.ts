@@ -5,12 +5,22 @@ import { getDeviceId } from "./profileSync";
  * Etkinlik detay yorumları — sunucu kaynaklı (tüm cihazlarda ortak), deviceId sahipliği.
  * Yorum metninde "@email" geçerse backend o kişiye bildirim atar (tıklayınca etkinliğe gelir).
  */
+export interface EventCommentReplyTo {
+  id: string;
+  authorName: string;
+  snippet: string;
+}
 export interface EventComment {
   id: string;
   deviceId: string;
   authorName: string;
   avatar: string | null;
   text: string;
+  replyTo: EventCommentReplyTo | null;
+  reactions: Record<string, number>;
+  reactionTotal: number;
+  myReaction: string | null;
+  replyCount: number;
   editedAt: string | null; // ISO
   createdAt: string; // ISO
 }
@@ -20,7 +30,8 @@ const BASE = `${API_BASE}/api/v1/mobile/event-comments`;
 
 export async function fetchEventComments(eventSlug: string): Promise<EventComment[]> {
   try {
-    const res = await fetch(`${BASE}?eventSlug=${encodeURIComponent(eventSlug)}`, {
+    const deviceId = await getDeviceId();
+    const res = await fetch(`${BASE}?eventSlug=${encodeURIComponent(eventSlug)}&deviceId=${encodeURIComponent(deviceId)}`, {
       headers: { Accept: "application/json" },
     });
     if (!res.ok) return [];
@@ -36,6 +47,7 @@ export async function postEventComment(input: {
   authorName: string;
   avatar?: string | null;
   text: string;
+  replyToId?: string | null;
 }): Promise<EventComment | null> {
   try {
     const deviceId = await getDeviceId();
@@ -47,6 +59,23 @@ export async function postEventComment(input: {
     if (!res.ok) return null;
     const json = (await res.json()) as { comment?: EventComment };
     return json.comment ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Bir etkinlik yorumuna emoji tepki ver/değiştir/kaldır. Dönen = güncel tepkim (yoksa null). */
+export async function reactEventComment(commentId: string, emoji: string): Promise<string | null> {
+  try {
+    const deviceId = await getDeviceId();
+    const res = await fetch(`${BASE}/react`, {
+      method: "POST",
+      headers: JSON_HDR,
+      body: JSON.stringify({ commentId, deviceId, emoji }),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { myReaction?: string | null };
+    return json.myReaction ?? null;
   } catch {
     return null;
   }
