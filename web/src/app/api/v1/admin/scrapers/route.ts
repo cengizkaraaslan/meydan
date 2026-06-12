@@ -4,6 +4,7 @@ import type { EventSource } from "@/lib/types";
 import { scraperRegistry } from "@/lib/scrapers/ScraperRegistry";
 import { recordRun, persistRun, getLatestRunPerSourceFromDb } from "@/lib/scrapers/RunTracker";
 import { setEventsForSource } from "@/lib/scrapers/EventCache";
+import { runAndPersistAll, type SourceRunSummary } from "@/lib/scrapers/runAndPersist";
 import { isAdminEmail } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
@@ -71,40 +72,49 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
   }
 
-  const results = body.source
-    ? [await scraperRegistry.runOne(body.source as EventSource)].filter((r): r is NonNullable<typeof r> => !!r)
-    : await scraperRegistry.runAll();
-
-  if (body.source && results.length === 0) {
-    return NextResponse.json({ error: "Bilinmeyen scraper" }, { status: 404 });
-  }
-
-  let totalWritten = 0;
-  for (const r of results) {
+  let summaries: SourceRunSummary[];
+  if (body.source) {
+    // Tek kaynak: tek fetch + tek persist (darboğaz yok), eski davranış.
+    const r = await scraperRegistry.runOne(body.source as EventSource);
+    if (!r) {
+      return NextResponse.json({ error: "Bilinmeyen scraper" }, { status: 404 });
+    }
     recordRun(r);
     const written = r.success && r.events.length > 0 ? await setEventsForSource(r.source, r.events) : 0;
-    totalWritten += written;
     await persistRun(r, { created: written });
+    summaries = [{
+      source: String(r.source),
+      success: r.success,
+      eventCount: r.events.length,
+      written,
+      durationMs: r.finishedAt.getTime() - r.startedAt.getTime(),
+      error: r.errorMessage,
+    }];
+  } else {
+    // Hepsi: cron/admin ile AYNI helper — fetch'ler paralel, persist sınırlı havuzdan
+    // (eski sıralı persist döngüsü 60sn'yi aşıp çoğu kaynağı yazamıyordu).
+    summaries = await runAndPersistAll();
   }
 
   revalidatePath("/");
   revalidatePath("/etkinlikler");
 
-  const summary = results
+  const totalWritten = summaries.reduce((sum, r) => sum + r.written, 0);
+  const summary = summaries
     .map((r) => ({
-      source: String(r.source),
+      source: r.source,
       success: r.success,
-      itemsFound: r.events.length,
-      durationMs: r.finishedAt.getTime() - r.startedAt.getTime(),
-      error: r.errorMessage ?? null,
+      itemsFound: r.eventCount,
+      durationMs: r.durationMs,
+      error: r.error ?? null,
     }))
     .sort((a, b) => b.itemsFound - a.itemsFound);
 
   return NextResponse.json({
     ok: true,
     ranAt: new Date().toISOString(),
-    scraperCount: results.length,
-    successCount: results.filter((r) => r.success).length,
+    scraperCount: summaries.length,
+    successCount: summaries.filter((r) => r.success).length,
     totalWritten,
     results: summary,
   });

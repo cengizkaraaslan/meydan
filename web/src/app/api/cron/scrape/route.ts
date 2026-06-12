@@ -1,8 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
-import { scraperRegistry } from "@/lib/scrapers/ScraperRegistry";
-import { recordRun, persistRun } from "@/lib/scrapers/RunTracker";
-import { setEventsForSource } from "@/lib/scrapers/EventCache";
+import { runAndPersistAll } from "@/lib/scrapers/runAndPersist";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -14,18 +12,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Scraper'ları senkron çalıştır + RunTracker'a kaydet (in-memory + kalıcı DB)
-  const usingMock = process.env.USE_MOCK_DATA === "true";
-  const results = await scraperRegistry.runAll();
+  // Opsiyonel sharding: /api/cron/scrape?shard=0&shards=3 → scraper'ları 3 turda böler.
+  // Param yoksa TEK turda hepsini çalıştırır (varsayılan). Fetch'ler paralel + persist
+  // sınırlı havuzdan akar → eski "yalnız ilk 5 kaynak yazılıyordu / 60sn timeout" sorunu biter.
+  const url = new URL(request.url);
+  const shards = Number(url.searchParams.get("shards")) || 1;
+  const shard = Number(url.searchParams.get("shard")) || 0;
 
-  // Scrape sonuçlarını Neon'a yaz (db.event, source != MANUAL) — kalıcı + herkese görünür
-  let totalWritten = 0;
-  for (const r of results) {
-    recordRun(r);
-    const written = r.success && r.events.length > 0 ? await setEventsForSource(r.source, r.events) : 0;
-    totalWritten += written;
-    await persistRun(r, { created: written });
-  }
+  const usingMock = process.env.USE_MOCK_DATA === "true";
+  const results = await runAndPersistAll({ shard, shards });
 
   // TODO (#25 — bildirim): yeni etkinlik tespit edilince eşleşen cihazlara push gönder.
   //   İskele: setEventsForSource'tan yeni oluşturulan event'leri topla → her event için
@@ -39,20 +34,25 @@ export async function GET(request: NextRequest) {
   revalidatePath("/etkinlikler");
   revalidatePath("/etkinlik", "layout");
 
-  const totalEvents = results.reduce((sum, r) => sum + r.events.length, 0);
+  const totalEvents = results.reduce((sum, r) => sum + r.eventCount, 0);
+  const totalWritten = results.reduce((sum, r) => sum + r.written, 0);
 
   return NextResponse.json({
     ran_at: new Date().toISOString(),
     usingMock,
+    shard: shards > 1 ? `${shard}/${shards}` : "all",
+    scraper_count: results.length,
+    success_count: results.filter((r) => r.success).length,
     total_events: totalEvents,
     total_written: totalWritten,
     note: "Scrape sonuçları db.event'e yazıldı (Neon); sayfalar + public API bunları gösterir.",
     results: results.map((r) => ({
       source: r.source,
       success: r.success,
-      event_count: r.events.length,
-      duration_ms: r.finishedAt.getTime() - r.startedAt.getTime(),
-      error: r.errorMessage,
+      event_count: r.eventCount,
+      written: r.written,
+      duration_ms: r.durationMs,
+      error: r.error,
     })),
   });
 }
