@@ -10,6 +10,9 @@ const TR_MONTH: Record<string, number> = {
   ocak: 0, şubat: 1, subat: 1, mart: 2, nisan: 3, mayıs: 4, mayis: 4, haziran: 5,
   temmuz: 6, ağustos: 7, agustos: 7, eylül: 8, eylul: 8,
   ekim: 9, kasım: 10, kasim: 10, aralık: 11, aralik: 11,
+  // Kısaltmalar (ör. BAU "05 Haz 2026"): 3 harfli ay adları.
+  oca: 0, şub: 1, sub: 1, mar: 2, nis: 3, may: 4, haz: 5,
+  tem: 6, ağu: 7, agu: 7, eyl: 8, eki: 9, kas: 10, ara: 11,
 };
 
 /**

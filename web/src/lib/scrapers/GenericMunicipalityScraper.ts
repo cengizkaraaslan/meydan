@@ -14,6 +14,13 @@ export interface MunicipalityConfig {
   headers?: Record<string, string>;
   /** Eksik sertifika zincirli (.edu.tr/.gov.tr'de yaygın) siteler için TLS doğrulamasını gevşet. */
   insecureTLS?: boolean;
+  /**
+   * Başlık filtresini sınıf varsayılanı yerine bu config'e göre seç. Üniversitelerde
+   * varsayılan true (sadece isEventTitle allowlist'i geçenler). Ama site SAF etkinlik
+   * sayfasıysa (BAU /etkinlikler/ gibi — her kart zaten etkinlik) false yap → akademik
+   * başlıklar ("Ortognatik Cerrahide…") yanlışlıkla elenmez; yalnız isAdminNotice denylist'i uygulanır.
+   */
+  requireEventSignal?: boolean;
   /** Opsiyonel CSS selector overrides (sitenin yapısına göre) */
   selectors?: {
     card?: string;
@@ -54,6 +61,9 @@ const TR_MONTH: Record<string, number> = {
   ocak: 0, şubat: 1, subat: 1, mart: 2, nisan: 3, mayıs: 4, mayis: 4, haziran: 5,
   temmuz: 6, ağustos: 7, agustos: 7, eylül: 8, eylul: 8,
   ekim: 9, kasım: 10, kasim: 10, aralık: 11, aralik: 11,
+  // Kısaltmalar (BAU "05 Haz 2026" gibi siteler): 3 harfli ay adları.
+  oca: 0, şub: 1, sub: 1, mar: 2, nis: 3, may: 4, haz: 5,
+  tem: 6, ağu: 7, agu: 7, eyl: 8, eki: 9, kas: 10, ara: 11,
 };
 
 function parseDate(text: string): Date | null {
@@ -178,7 +188,7 @@ export class GenericMunicipalityScraper extends MunicipalityScraper {
         if (!title || title.length < 4) return;
         // Duyuru-board kaynakları (üniv): sadece net etkinlik başlıklarını tut.
         // Etkinlik-listesi kaynakları (belediye): yalnız idari duyuruları (kesinti/ihale/sınav/alım) ele.
-        if (this.requireEventSignal ? !isEventTitle(title) : isAdminNotice(title)) return;
+        if ((this.config.requireEventSignal ?? this.requireEventSignal) ? !isEventTitle(title) : isAdminNotice(title)) return;
 
         // Link: çocuk <a> yoksa kartın kendisi <a> olabilir.
         const linkEl = card.find(this.selectors.link).first();
@@ -262,7 +272,7 @@ export class GenericMunicipalityScraper extends MunicipalityScraper {
         const row = list[i];
         const title = String(row[f.title] ?? "").trim().replace(/\s+/g, " ").slice(0, 160);
         if (!title || title.length < 4) continue;
-        if (this.requireEventSignal ? !isEventTitle(title) : isAdminNotice(title)) continue;
+        if ((this.config.requireEventSignal ?? this.requireEventSignal) ? !isEventTitle(title) : isAdminNotice(title)) continue;
         const href = f.url ? String(row[f.url] ?? "") : "";
         const idRaw = f.id ? String(row[f.id] ?? "") : "";
         const externalId = `${this.config.source.toLowerCase()}-${

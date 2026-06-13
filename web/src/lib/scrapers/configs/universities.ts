@@ -127,7 +127,12 @@ export const UNIVERSITY_CONFIGS: MunicipalityConfig[] = [
     baseUrl: "https://bau.edu.tr",
     eventListPath: "/etkinlikler/",
     city: "İstanbul",
-    selectors: { card: ".events-page .box", title: ".location h3", date: ".date", venue: ".location", image: "img.lazyload", link: "a[href^='/etkinlikler/']" },
+    // Saf etkinlik sayfası → allowlist'i gevşet (akademik başlıklar elenmesin).
+    requireEventSignal: false,
+    // Kart = etkinlik linki taşıyan .box (sayfada başka .box'lar da var → :has ile daralt).
+    // Tarih .date içinde gün/ay(kısaltma)/saat ayrı <p>'lerde ("05 Haz 2026 18:00").
+    // Görsel gerçek URL'i img.lazyload[data-src]'de (src placeholder bau-empty.png).
+    selectors: { card: ".box:has(a[href*='/etkinlikler/'])", title: ".location h3", date: ".date", venue: ".location", image: "img.lazyload", link: "a[href^='/etkinlikler/']" },
   },
   {
     source: "UNI_BILGI",
