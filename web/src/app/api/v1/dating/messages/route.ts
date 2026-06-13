@@ -15,6 +15,8 @@ const IMG_PREFIX = "[img]";
 const VOICE_PREFIX = "[voice]";
 // Tepki (reaction) öneki — bunlar mesaj değil, push bildirimi gönderilmez.
 const REACT_PREFIX = "[react]";
+// Titreşim ("dürt") öneki — push GİTMEZ; karşı taraf uygulamayı açınca ekran titrer.
+const BUZZ_PREFIX = "[buzz]";
 // Yanıt öneki — bildirimde alıntı meta'sını değil yalnız gerçek metni göster.
 const REPLY_PREFIX = "[reply]";
 const REPLY_SEP = String.fromCharCode(1);
@@ -89,7 +91,7 @@ export async function POST(request: NextRequest) {
   const message = await sendMessage({ matchKey, senderDeviceId, text });
 
   // Alıcıya önizlemeli bildirim (Instagram tarzı) + @mention. Bot/sistem & tepki mesajını atla.
-  if (!senderDeviceId.startsWith("bot_") && !text.startsWith(REACT_PREFIX)) {
+  if (!senderDeviceId.startsWith("bot_") && !text.startsWith(REACT_PREFIX) && !text.startsWith(BUZZ_PREFIX)) {
     void (async () => {
       const recipients = await recipientDevicesForMatch(matchKey, senderDeviceId);
       const name = (await deviceDisplayName(senderDeviceId)) || "Biri";

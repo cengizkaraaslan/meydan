@@ -42,6 +42,7 @@ export interface Msg {
   audioSec?: number; // sesli mesaj süresi (saniye)
   readAt?: number | null; // karşı taraf okuduysa epoch ms (fromMe için mavi tik)
   pending?: boolean; // gönderiliyor (henüz backend onayı yok)
+  buzz?: boolean; // titreşim ("dürt") mesajı — ekranı titretir, push göndermez
   // Alıntı/yanıt: bu mesaj başka bir mesaja yanıtsa o mesajın özeti.
   // qMine = alıntılanan mesaj, YANITI GÖNDEREN'in kendi mesajı mıydı (görüntüleyene göre çevrilir).
   replyTo?: { id: string; qMine: boolean; snippet: string } | null;
@@ -92,6 +93,7 @@ const VOICE_PREFIX = "[voice]";
 /** Tepki (reaction) öneki. text = "[react]<hedefMesajId>:<emoji>" (emoji boş = tepkiyi kaldır).
  *  Ayrı bir mesaj olarak saklanır → migration gerekmez, çift taraflı görünür; balon olarak çizilmez. */
 const REACT_PREFIX = "[react]";
+const BUZZ_PREFIX = "[buzz]";
 /** Alıntı/yanıt öneki. text = "[reply]<hedefId><qMine 0|1><özet><gerçek metin>".
  *   (kullanıcının yazamayacağı kontrol karakteri) ayraç. Normal bir metin balonu olarak çizilir,
  *  üstünde alıntı bloğu gösterilir. */
@@ -428,6 +430,10 @@ export function useChat(personId: string, override?: { name?: string | null; ava
         if (rep) {
           return { id: m.id, fromMe: m.fromMe, text: rep.text, at: m.at, readAt: m.readAt ?? null, replyTo: rep.replyTo };
         }
+        // Titreşim mesajı: "[buzz]" → buzz balonu (ekranı titretir).
+        if (m.text.startsWith(BUZZ_PREFIX)) {
+          return { id: m.id, fromMe: m.fromMe, text: "", at: m.at, buzz: true, readAt: m.readAt ?? null };
+        }
         // Backend foto mesajı: text "[img]<url>" → imageUri olarak render et (karşı taraf/öteki cihaz da görür).
         if (m.text.startsWith(IMG_PREFIX)) {
           return { id: m.id, fromMe: m.fromMe, text: "", at: m.at, imageUri: m.text.slice(IMG_PREFIX.length), readAt: m.readAt ?? null };
@@ -478,5 +484,13 @@ export function useChat(personId: string, override?: { name?: string | null; ava
     [matchKey, deviceId, refetch],
   );
 
-  return { messages, reactions, react, loadOlder, hasMoreOlder, loadingOlder, typing: typing || partnerTyping, partnerPresence, notifyTyping, send, sendImage, sendVoice, editMessage, deleteMessage, matchKey, ready: !!matchKey };
+  // Titreşim ("dürt") gönder: karşı taraf uygulamayı açınca/sohbetteyken ekranı titrer.
+  // Push GİTMEZ (backend [buzz]'ı atlar). Optimistik balon yok — refetch'le gelir.
+  const sendBuzz = useCallback(async () => {
+    if (!matchKey || !deviceId) return;
+    await apiSendMessage({ matchKey, senderDeviceId: deviceId, text: BUZZ_PREFIX });
+    await refetch(matchKey, deviceId);
+  }, [matchKey, deviceId, refetch]);
+
+  return { messages, reactions, react, loadOlder, hasMoreOlder, loadingOlder, typing: typing || partnerTyping, partnerPresence, notifyTyping, send, sendImage, sendVoice, sendBuzz, editMessage, deleteMessage, matchKey, ready: !!matchKey };
 }

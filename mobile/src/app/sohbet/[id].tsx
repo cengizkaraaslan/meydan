@@ -103,7 +103,7 @@ export default function ChatScreen() {
           gender: "male",
         }
       : null);
-  const { messages, reactions, react, loadOlder, hasMoreOlder, loadingOlder, typing, partnerPresence, notifyTyping, send, sendImage, sendVoice, editMessage, deleteMessage, matchKey, ready } = useChat(String(id), {
+  const { messages, reactions, react, loadOlder, hasMoreOlder, loadingOlder, typing, partnerPresence, notifyTyping, send, sendImage, sendVoice, sendBuzz, editMessage, deleteMessage, matchKey, ready } = useChat(String(id), {
     name: pName,
     avatar: pAvatar,
     matchKey: pMatchKey,
@@ -195,6 +195,47 @@ export default function ChatScreen() {
       withTiming(1, { duration: 110, easing: Easing.inOut(Easing.ease) }),
     );
   }, [sendScale]);
+
+  // ── Titreşim ("dürt"): ekranı sars + güçlü haptik. Gelen yeni buzz'da bir kez tetiklenir
+  // (push yok; karşı taraf uygulamayı/ sohbeti açınca görür). Son görülen buzz matchKey'e
+  // göre AsyncStorage'da → eski buzz her açılışta tekrar sarsmaz, yalnız YENİ buzz sarsar.
+  const shakeX = useSharedValue(0);
+  const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shakeX.value }] }));
+  const triggerShake = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    shakeX.value = withSequence(
+      withTiming(-11, { duration: 45 }), withTiming(11, { duration: 45 }),
+      withTiming(-9, { duration: 45 }), withTiming(9, { duration: 45 }),
+      withTiming(-5, { duration: 40 }), withTiming(5, { duration: 40 }),
+      withTiming(0, { duration: 40 }),
+    );
+  }, [shakeX]);
+
+  const buzzSeenRef = useRef<number>(-1); // -1: henüz yüklenmedi
+  useEffect(() => {
+    const key = matchKey || pMatchKey;
+    if (!key) return;
+    AsyncStorage.getItem(`meydanfest:lastBuzz:${key}`).then((v) => {
+      buzzSeenRef.current = v ? Number(v) || 0 : 0;
+    }).catch(() => { buzzSeenRef.current = 0; });
+  }, [matchKey, pMatchKey]);
+
+  useEffect(() => {
+    if (buzzSeenRef.current < 0) return; // son-görülen henüz yüklenmedi
+    const incoming = messages.filter((m) => m.buzz && !m.fromMe);
+    const newest = incoming.length ? incoming[incoming.length - 1].at : 0;
+    if (newest > buzzSeenRef.current) {
+      buzzSeenRef.current = newest;
+      const key = matchKey || pMatchKey;
+      if (key) AsyncStorage.setItem(`meydanfest:lastBuzz:${key}`, String(newest)).catch(() => {});
+      triggerShake();
+    }
+  }, [messages, triggerShake, matchKey, pMatchKey]);
+
+  const onBuzz = useCallback(() => {
+    triggerShake();      // kendi ekranında da his ver
+    void sendBuzz();
+  }, [triggerShake, sendBuzz]);
 
 
   // Dibe yalnız YENİ (alttaki) mesaj gelince kaydır; eski mesaj (yukarıda) yüklenince ZIPLAMA.
@@ -517,6 +558,7 @@ export default function ChatScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         {/* Sohbet hazır olana kadar (ensureMatch + ilk fetch) şık bir loading; header zaten yukarıda anında çiziliyor. */}
         {ready ? (
+          <Animated.View style={[{ flex: 1 }, shakeStyle]}>
           <FlatList
             ref={listRef}
             data={messages}
@@ -566,6 +608,7 @@ export default function ChatScreen() {
               })()
             }
           />
+          </Animated.View>
         ) : (
           <View style={styles.loadingWrap}>
             <ActivityIndicator size="large" color={T.primary} />
@@ -624,6 +667,10 @@ export default function ChatScreen() {
           <View style={[styles.inputBar, { paddingBottom: insets.bottom ? insets.bottom : 12, borderTopColor: T.hairline, opacity: ready ? 1 : 0.55 }]}>
             <Pressable onPress={onPickImage} disabled={!ready} hitSlop={8} style={[styles.attach, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
               <Text style={{ fontSize: 20 }}>📷</Text>
+            </Pressable>
+            {/* Titreştir ("dürt") — karşı tarafın ekranını titretir (push yok) */}
+            <Pressable onPress={onBuzz} disabled={!ready} hitSlop={8} style={[styles.attach, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+              <Text style={{ fontSize: 20 }}>🫨</Text>
             </Pressable>
             <TextInput
               value={text}
@@ -828,6 +875,19 @@ function Bubble({ T, m, read, reaction, partnerName, justSent, onLongPress, onIm
   const isImage = !!m.imageUri;
   const isAudio = !!m.audioUri;
   const isText = !isImage && !isAudio;
+  // Titreşim ("dürt") mesajı → ortada küçük sistem satırı (sağ/sol balon değil).
+  if (m.buzz) {
+    return (
+      <View style={{ alignSelf: "center", paddingVertical: 2 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: T.surfaceStrong, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14 }}>
+          <Text style={{ fontSize: 14 }}>🫨</Text>
+          <Text style={[Type.label, { color: T.textDim }]}>
+            {m.fromMe ? "Titreşim gönderdin" : `${partnerName} titreşim gönderdi`}
+          </Text>
+        </View>
+      </View>
+    );
+  }
   if (m.fromMe) {
     return (
       // Facebook Messenger tarzı gönderim: yeni balon aşağıdan yukarı + hafif scale/opaklık ile "pop".

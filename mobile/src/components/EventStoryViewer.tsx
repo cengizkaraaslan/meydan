@@ -14,6 +14,7 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withTiming,
   type SharedValue,
 } from "react-native-reanimated";
@@ -75,6 +76,9 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
   const [reply, setReply] = useState("");
   const [replying, setReplying] = useState(false);
   const [sentFlash, setSentFlash] = useState(false);
+  // Story beğeni (Instagram tarzı kalp). Segment/grup değişince sıfırlanır.
+  const [liked, setLiked] = useState(false);
+  const heartPop = useSharedValue(0);
   const progress = useSharedValue(0);
 
   // İsteğe bağlı pinch-to-zoom: parmakla yakınlaştır, bırakınca normale döner.
@@ -199,6 +203,29 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
       setTimeout(() => setSentFlash(false), 1600);
     }
   }, [groups, gi, reply]);
+
+  // Story beğen (kalp) — Instagram tarzı: ortada kalp patlar + karşı tarafa "❤️" DM.
+  const onLike = useCallback(() => {
+    const g = groups[gi];
+    if (!g) return;
+    tapH();
+    heartPop.value = 0;
+    heartPop.value = withSequence(withTiming(1, { duration: 200 }), withTiming(0, { duration: 550 }));
+    if (!liked) {
+      setLiked(true);
+      void sendStoryReply(g.id, "❤️");
+      setSentFlash(true);
+      setTimeout(() => setSentFlash(false), 1400);
+    }
+  }, [groups, gi, liked, heartPop]);
+
+  // Segment/grup değişince beğeni durumunu sıfırla.
+  useEffect(() => { setLiked(false); }, [gi, si]);
+
+  const heartPopStyle = useAnimatedStyle(() => ({
+    opacity: heartPop.value,
+    transform: [{ scale: 0.4 + heartPop.value * 1.1 }],
+  }));
 
   // Dokunma: sol yarı = geri, sağ yarı = ileri. Yakınlaştırılmışken gezinme yok.
   const tapNav = Gesture.Tap()
@@ -377,12 +404,20 @@ export function EventStoryViewer({ groups, startIndex = 0, onClose, onDeleteSegm
                 onSubmitEditing={onSendReply}
                 blurOnSubmit
               />
+              <Pressable onPress={onLike} hitSlop={8} style={styles.replySend}>
+                <Ionicons name={liked ? "heart" : "heart-outline"} size={21} color={liked ? "#FF3B30" : "#fff"} />
+              </Pressable>
               <Pressable onPress={onSendReply} hitSlop={8} style={styles.replySend}>
                 <Ionicons name="send" size={19} color="#fff" />
               </Pressable>
             </View>
           </KeyboardAvoidingView>
         ) : null}
+
+        {/* Beğeni kalbi patlama animasyonu (ortada) */}
+        <Animated.View pointerEvents="none" style={[styles.heartPop, heartPopStyle]}>
+          <Ionicons name="heart" size={120} color="#FF3B30" />
+        </Animated.View>
 
         {/* Kendi story'm: "👁 N kişi gördü" → dokununca izleyen listesi (Instagram seen-by).
             ⋯ menüsü/izleyen sheet'i açıkken gizle (alt alta gelip üst üste binmesin). */}
@@ -492,6 +527,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginBottom: 10,
   },
   sentFlashTxt: { color: "#fff", fontWeight: "700" },
+  heartPop: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
   seenBtn: {
     position: "absolute", alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 7,
     backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22,
