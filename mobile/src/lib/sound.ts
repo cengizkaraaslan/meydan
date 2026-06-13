@@ -24,6 +24,7 @@ const SOURCES: Record<string, number> = {
   send: require("../../assets/sounds/send.wav"),
   success: require("../../assets/sounds/success.wav"),
   match: require("../../assets/sounds/match.wav"),
+  buzz: require("../../assets/sounds/buzz.wav"),
 };
 
 const players: Record<string, AudioPlayer> = {};
@@ -49,3 +50,4 @@ export const sndPop = () => play("pop", 0.4);
 export const sndSend = () => play("send", 0.45);
 export const sndSuccess = () => play("success", 0.5);
 export const sndMatch = () => play("match", 0.55);
+export const sndBuzz = () => play("buzz", 0.5);

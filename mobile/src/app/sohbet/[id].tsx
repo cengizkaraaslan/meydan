@@ -31,7 +31,7 @@ import { useT } from "@/lib/i18n";
 import { useCanSeeAges } from "@/lib/dprofile";
 import { SignInPrompt } from "@/components/SignInPrompt";
 import { tapH, tapHaptic } from "@/lib/haptics";
-import { sndSend } from "@/lib/sound";
+import { sndSend, sndBuzz } from "@/lib/sound";
 import { deleteConversation } from "@/lib/conversations";
 import { apiBlockUser, apiReportUser } from "@/lib/api";
 import { getProfileKey } from "@/lib/profileSync";
@@ -203,6 +203,7 @@ export default function ChatScreen() {
   const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shakeX.value }] }));
   const triggerShake = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    sndBuzz(); // kısa titreşim sesi (gönderince/gelince sarsmayla birlikte)
     shakeX.value = withSequence(
       withTiming(-11, { duration: 45 }), withTiming(11, { duration: 45 }),
       withTiming(-9, { duration: 45 }), withTiming(9, { duration: 45 }),

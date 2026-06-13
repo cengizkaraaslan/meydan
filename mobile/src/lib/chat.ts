@@ -488,8 +488,15 @@ export function useChat(personId: string, override?: { name?: string | null; ava
   // Push GİTMEZ (backend [buzz]'ı atlar). Optimistik balon yok — refetch'le gelir.
   const sendBuzz = useCallback(async () => {
     if (!matchKey || !deviceId) return;
-    await apiSendMessage({ matchKey, senderDeviceId: deviceId, text: BUZZ_PREFIX });
-    await refetch(matchKey, deviceId);
+    counter.current += 1;
+    const tempId = `tmp_buzz_${counter.current}`;
+    // Optimistik: "Titreşim gönderdin" balonu ANINDA görünsün (server'ı bekleme).
+    setPending((p) => [...p, { id: tempId, fromMe: true, text: "", at: Date.now(), buzz: true, pending: true }]);
+    const sent = await apiSendMessage({ matchKey, senderDeviceId: deviceId, text: BUZZ_PREFIX });
+    if (sent) {
+      await refetch(matchKey, deviceId);
+      setPending((p) => p.filter((m) => m.id !== tempId));
+    }
   }, [matchKey, deviceId, refetch]);
 
   return { messages, reactions, react, loadOlder, hasMoreOlder, loadingOlder, typing: typing || partnerTyping, partnerPresence, notifyTyping, send, sendImage, sendVoice, sendBuzz, editMessage, deleteMessage, matchKey, ready: !!matchKey };
