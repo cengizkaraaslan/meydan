@@ -119,6 +119,35 @@ export abstract class BaseScraper {
     }
     return res.text();
   }
+
+  protected async httpPostForm(
+    url: string,
+    body: Record<string, string>,
+    signal?: AbortSignal,
+    opts?: { headers?: Record<string, string>; insecureTLS?: boolean },
+  ): Promise<string> {
+    // AJAX liste uçları için x-www-form-urlencoded POST. httpGet ile aynı timeout/TLS
+    // davranışı (insecureTLS: .gov.tr eksik sertifika zinciri fix'i).
+    const init: RequestInit & { dispatcher?: unknown } = {
+      method: "POST",
+      headers: {
+        "User-Agent": this.userAgent,
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        Accept: "application/json, text/html, */*",
+        "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
+        "X-Requested-With": "XMLHttpRequest",
+        ...opts?.headers,
+      },
+      body: new URLSearchParams(body).toString(),
+      signal: signal ?? AbortSignal.timeout(this.defaultTimeoutMs),
+    };
+    if (opts?.insecureTLS) init.dispatcher = await getInsecureDispatcher();
+    const res = await fetch(url, init);
+    if (!res.ok) {
+      throw new Error(`${this.source} ${url} responded ${res.status}`);
+    }
+    return res.text();
+  }
 }
 
 // Eksik sertifika zincirli siteler için tek seferlik (cache'li) gevşek-TLS dispatcher.

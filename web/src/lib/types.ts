@@ -34,6 +34,7 @@ export type EventSource =
   | "ESKISEHIR_TREND"
   | "FESTTR"
   | "FESTIVALL_TR"
+  | "GSB_GENC_OFIS"
   | "ANADOLU_UNI"
   | "BILKENT"
   | "ITU"

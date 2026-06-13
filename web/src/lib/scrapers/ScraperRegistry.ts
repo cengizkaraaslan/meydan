@@ -22,6 +22,7 @@ import { EskisehirTrendScraper } from "./providers/EskisehirTrendScraper";
 import { FestTrScraper } from "./providers/FestTrScraper";
 import { FestivallTrScraper } from "./providers/FestivallTrScraper";
 import { TOBBScraper } from "./providers/TOBBScraper";
+import { GsbGencOfisScraper } from "./providers/GsbGencOfisScraper";
 import { OdunpazariScraper } from "./providers/OdunpazariScraper";
 import { QuarkAkademiScraper } from "./providers/QuarkAkademiScraper";
 import { IsamScraper } from "./providers/IsamScraper";
@@ -96,6 +97,9 @@ scraperRegistry.register(new QuarkAkademiScraper());
 
 // TOBB resmi Fuar Takvimi (B2B/mesleki fuarlar — category: FUAR, ziyaretçiye ücretsiz)
 scraperRegistry.register(new TOBBScraper());
+
+// GSB e-Genç / Genç Ofis faaliyetleri (ülke geneli gençlik etkinlikleri — ücretsiz, bitiş tarihli)
+scraperRegistry.register(new GsbGencOfisScraper());
 
 // Vakıf / dini-manevi / kültür kurumları (JSON API + SSR HTML — ücretsiz)
 scraperRegistry.register(new IsamScraper());        // dini/ilmi (DINI)
