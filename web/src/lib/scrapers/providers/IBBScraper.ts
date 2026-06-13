@@ -1,7 +1,8 @@
 import * as cheerio from "cheerio";
 import { MunicipalityScraper } from "../MunicipalityScraper";
-import type { EventCategory, EventSource, ScrapedEvent } from "../../types";
+import type { EventSource, ScrapedEvent } from "../../types";
 import { MOCK_EVENTS } from "../../mock-data";
+import { guessCategory } from "../parse-helpers";
 
 const TR_MONTH_MAP: Record<string, number> = {
   ocak: 0, şubat: 1, subat: 1, mart: 2, nisan: 3, mayıs: 4, mayis: 4, haziran: 5,
@@ -28,19 +29,6 @@ function parseTurkishDate(text: string): Date | null {
     }
   }
   return null;
-}
-
-function guessCategory(text: string): EventCategory {
-  const t = text.toLowerCase();
-  if (/(konser|müzik|muzik|festival)/.test(t)) return "KONSER";
-  if (/(tiyatro|oyun)/.test(t)) return "TIYATRO";
-  if (/(stand[\s-]?up|komedi)/.test(t)) return "STANDUP";
-  if (/(spor|maç|koşu|kosu|turnuva)/.test(t)) return "SPOR";
-  if (/(sergi|expo|müze|muze)/.test(t)) return "SERGI";
-  if (/(atölye|atolye|workshop|kurs)/.test(t)) return "ATOLYE";
-  if (/(çocuk|cocuk|kids)/.test(t)) return "COCUK";
-  if (/festival/.test(t)) return "FESTIVAL";
-  return "DIGER";
 }
 
 const CARD_SELECTORS = [

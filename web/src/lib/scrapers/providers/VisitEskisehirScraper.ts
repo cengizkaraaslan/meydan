@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import { MunicipalityScraper } from "../MunicipalityScraper";
-import type { EventCategory, EventSource, ScrapedEvent } from "../../types";
+import type { EventSource, ScrapedEvent } from "../../types";
+import { guessCategory } from "../parse-helpers";
 
 const ESKISEHIR_MOCK: ScrapedEvent[] = [
   {
@@ -21,19 +22,6 @@ function parseTurkishDmy(text: string): Date | null {
   if (!m) return null;
   const [, dd, mm, yyyy, hh = "20", mi = "0"] = m;
   return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(mi));
-}
-
-function guessCategory(text: string): EventCategory {
-  const t = text.toLowerCase();
-  if (/(konser|resital|müzik|muzik|festival|caz|jazz)/.test(t)) return "KONSER";
-  if (/(tiyatro|oyun|sahne)/.test(t)) return "TIYATRO";
-  if (/(stand[\s-]?up|komedi)/.test(t)) return "STANDUP";
-  if (/(spor|maç|koşu|kosu|turnuva|yürüyüş|yuruyus|bisiklet)/.test(t)) return "SPOR";
-  if (/(sergi|exhibition|müze|muze|galeri)/.test(t)) return "SERGI";
-  if (/(atölye|atolye|workshop|kurs|seminer)/.test(t)) return "ATOLYE";
-  if (/(çocuk|cocuk|kids|junior)/.test(t)) return "COCUK";
-  if (/festival/.test(t)) return "FESTIVAL";
-  return "DIGER";
 }
 
 export class VisitEskisehirScraper extends MunicipalityScraper {

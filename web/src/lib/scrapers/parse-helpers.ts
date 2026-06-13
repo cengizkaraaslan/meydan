@@ -65,13 +65,16 @@ export function parseTurkishDate(text: string, hhmm?: string): Date | null {
 /** Başlık/mekan metninden kategori tahmini. */
 export function guessCategory(text: string): EventCategory {
   const t = text.toLocaleLowerCase("tr");
+  // Dini/manevi sinyal ÖNCELİKLİ: "İlahi Konseri", "Sema Gösterisi", "Tasavvuf Müziği"
+  // gibi başlıklar KONSER/TIYATRO'ya kapılmasın diye en başta değerlendirilir. Yalnız
+  // güçlü/özgül dini tokenler — genel "müzik/konser" buraya düşmez.
+  if (/(vaaz|hutbe|tasavvuf|tefsir|hadis\b|siyer|i̇lahi|ilahi|naat|kaside|mevlid|mevlit|mevlüt|kandil|regaip|mira[cç]|berat gecesi|kadir gecesi|kur['’]?an|hatim|mukabele|teravih|sahur|iftar|ramazan|namaz|manevi|maneviyat|irşad|irsad|zikir|semazen|sema göster|sema goster|sufi|hafızlık|hafizlik|icazet|i̇slami|islami|i̇slam araştırma|islam araştırma|diyanet|müftülük|muftuluk)/.test(t)) return "DINI";
   if (/(konser|resital|müzik|muzik|caz|jazz|orkestra|dj|techno|house|elektronik|rap|hip[\s-]?hop|sahne alıyor)/.test(t)) return "KONSER";
   if (/(festival|fest\b)/.test(t)) return "FESTIVAL";
   if (/(tiyatro|oyun|sahne|müzikal|muzikal|gösteri|gosteri)/.test(t)) return "TIYATRO";
   if (/(stand[\s-]?up|komedi|tek kişilik)/.test(t)) return "STANDUP";
   if (/(spor|maç|mac|koşu|kosu|turnuva|yürüyüş|yuruyus|bisiklet|atletizm|champions league|gp\b|motogp|formula)/.test(t)) return "SPOR";
   if (/(fuar|fair|expo|kongre|congress|summit|zirve)/.test(t)) return "FUAR";
-  if (/(vaaz|hutbe|tasavvuf|tefsir|hadis|siyer|ilahi|i̇lahi|mevlid|mevlit|kur'?an|kuran|namaz|manevi|irşad|irsad|zikir|semazen|i̇slami|islami|i̇slam araştırma|islam araştırma)/.test(t)) return "DINI";
   if (/(sergi|exhibition|müze|muze|galeri|bienal)/.test(t)) return "SERGI";
   if (/(atölye|atolye|workshop|kurs|seminer|eğitim|egitim|tasarım|tasarim)/.test(t)) return "ATOLYE";
   if (/(çocuk|cocuk|kids|junior|aile eğlencesi|aile eglencesi)/.test(t)) return "COCUK";

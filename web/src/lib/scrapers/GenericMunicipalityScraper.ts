@@ -1,7 +1,7 @@
 import * as cheerio from "cheerio";
 import { MunicipalityScraper } from "./MunicipalityScraper";
-import { isAdminNotice, isEventTitle } from "./parse-helpers";
-import type { EventCategory, EventSource, ScrapedEvent } from "../types";
+import { isAdminNotice, isEventTitle, guessCategory } from "./parse-helpers";
+import type { EventSource, ScrapedEvent } from "../types";
 
 export interface MunicipalityConfig {
   source: EventSource;
@@ -81,17 +81,36 @@ function parseDate(text: string): Date | null {
   return null;
 }
 
-function guessCategory(text: string): EventCategory {
-  const t = text.toLowerCase();
-  if (/(konser|resital|müzik|muzik|caz|jazz|orkestra)/.test(t)) return "KONSER";
-  if (/(festival|fest)/.test(t)) return "FESTIVAL";
-  if (/(tiyatro|oyun|sahne)/.test(t)) return "TIYATRO";
-  if (/(stand[\s-]?up|komedi)/.test(t)) return "STANDUP";
-  if (/(spor|maç|koşu|kosu|turnuva|yürüyüş|yuruyus|bisiklet|atletizm)/.test(t)) return "SPOR";
-  if (/(sergi|exhibition|müze|muze|galeri)/.test(t)) return "SERGI";
-  if (/(atölye|atolye|workshop|kurs|seminer)/.test(t)) return "ATOLYE";
-  if (/(çocuk|cocuk|kids|junior)/.test(t)) return "COCUK";
-  return "DIGER";
+/**
+ * Tarih aralığı metnini başlangıç+bitiş'e ayırır ("12 - 15 Haziran 2026",
+ * "12.06.2026 - 15.06.2026", "12 Haziran - 15 Haziran 2026", "2026-06-12 - 2026-06-15").
+ * Ayıraç çevresinde BOŞLUK arar (ASCII "-" için) ki ISO/dd.mm tarihindeki tireler
+ * bölünmesin. Aralık yoksa/çözülemezse end=null döner. "12 - 15 Haziran 2026" gibi ilk
+ * parçanın yalnız gün olduğu durumda ay/yıl bilgisini son parçadan ödünç alır.
+ */
+function parseDateRange(text: string): { start: Date | null; end: Date | null } {
+  const raw = text.trim();
+  if (!raw) return { start: null, end: null };
+  const parts = raw
+    .split(/\s+[-–—]\s+|\s*[–—→]\s*|\s+(?:ile|ila)\s+/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return { start: parseDate(raw), end: null };
+
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  let start = parseDate(first);
+  const end = parseDate(last);
+  // "12 - 15 Haziran 2026": ilk parça sadece gün → ay/yıl/saat son parçadan al.
+  if (!start && /^\d{1,2}$/.test(first) && end) {
+    start = new Date(end);
+    start.setDate(Number(first));
+  }
+  return {
+    start: start ?? end,
+    // Bitiş ancak gerçek bir aralıksa (başlangıçtan SONRA) anlamlı.
+    end: start && end && end.getTime() > start.getTime() ? end : null,
+  };
 }
 
 interface AnyCheerio {
@@ -173,7 +192,9 @@ export class GenericMunicipalityScraper extends MunicipalityScraper {
         const dateRaw =
           card.find(this.selectors.date).first().attr("datetime") ??
           card.find(this.selectors.date).first().text();
-        const startsAt = parseDate(dateRaw) ?? new Date(Date.now() + 7 * 86400_000);
+        const range = parseDateRange(dateRaw);
+        const startsAt = range.start ?? new Date(Date.now() + 7 * 86400_000);
+        const endsAt = range.end ?? undefined;
 
         const venue = card.find(this.selectors.venue).first().text().trim() || this.config.displayName;
         const descRaw = card.find(this.selectors.description).first().text().trim().replace(/\s+/g, " ");
@@ -198,6 +219,7 @@ export class GenericMunicipalityScraper extends MunicipalityScraper {
           venue,
           city: this.config.city,
           startsAt,
+          endsAt,
           isFree: true,
           imageUrl: imageUrl || undefined,
           ticketUrl: href ? new URL(href, this.baseUrl).toString() : undefined,
@@ -248,7 +270,9 @@ export class GenericMunicipalityScraper extends MunicipalityScraper {
         }`;
         if (seen.has(externalId)) continue;
         seen.add(externalId);
-        const startsAt = parseDate(String(row[f.date] ?? "")) ?? new Date(Date.now() + 7 * 86400_000);
+        const range = parseDateRange(String(row[f.date] ?? ""));
+        const startsAt = range.start ?? new Date(Date.now() + 7 * 86400_000);
+        const endsAt = range.end ?? undefined;
         const venue = (f.venue ? String(row[f.venue] ?? "") : "").trim() || this.config.displayName;
         const descRaw = (f.description ? String(row[f.description] ?? "") : "").trim().replace(/\s+/g, " ");
         const description =
@@ -262,6 +286,7 @@ export class GenericMunicipalityScraper extends MunicipalityScraper {
           venue,
           city: this.config.city,
           startsAt,
+          endsAt,
           isFree: true,
           imageUrl: toAbs(f.image ? String(row[f.image] ?? "") : undefined),
           ticketUrl: toAbs(href),

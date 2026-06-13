@@ -46,8 +46,15 @@ export class DiyanetScraper extends BaseScraper {
       if (!id || seen.has(externalId)) return;
       seen.add(externalId);
 
-      const dateText = card.find(".post-date").first().text().trim();
-      const startsAt = parseTurkishDate(dateText) ?? new Date(Date.now() + 14 * 86_400_000);
+      // Kart yalnız YAYIN tarihini verir (genelde geçmiş); gerçek etkinlik tarihi
+      // detay/PDF'de. Başlık "düzenlenecek/yapılacak" diyorsa etkinlik geleceğe ait →
+      // geçmiş yayın tarihini kullanırsak feed'in startsAt>=now filtresi eler. Bu yüzden
+      // parse edilen tarih geçmişse ~2 hafta sonrası placeholder ata ki etkinlik görünsün.
+      const parsedDate = parseTurkishDate(card.find(".post-date").first().text().trim());
+      const startsAt =
+        parsedDate && parsedDate.getTime() > Date.now()
+          ? parsedDate
+          : new Date(Date.now() + 14 * 86_400_000);
       const city = detectTurkishCity(title) ?? "Ankara";
       let image = card.find(".block-image .thumb img").attr("src") || undefined;
       if (image && image.startsWith("/")) image = this.baseUrl + image;

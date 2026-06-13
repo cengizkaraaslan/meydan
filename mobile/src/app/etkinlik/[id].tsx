@@ -828,6 +828,18 @@ export default function EventDetail() {
               badge={relativeDateLabel(event.starts_at)}
               badgeColor={c.gradient[0]}
             />
+            {/* Bitiş tarihi yalnızca kaynak verdiyse gösterilir; yoksa satır hiç çizilmez. */}
+            {event.ends_at ? (
+              <>
+                <View style={[styles.sep, { backgroundColor: T.hairline }]} />
+                <InfoRow
+                  T={T}
+                  icon="🏁"
+                  label="Bitiş"
+                  value={`${fmtLong(event.ends_at)} · ${weekdayTR(event.ends_at)}`}
+                />
+              </>
+            ) : null}
             <View style={[styles.sep, { backgroundColor: T.hairline }]} />
             <InfoRow T={T} icon="📍" label={t("venue")} value={event.venue || event.city || t("not_specified")} onPress={openMap} actionLabel={t("see_on_map")} />
             {distLabel ? (
