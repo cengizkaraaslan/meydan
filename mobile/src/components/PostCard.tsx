@@ -49,6 +49,9 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
   const [picker, setPicker] = useState(false);
 
   const isSystem = post.authorId === "system";
+  // Post bir etkinliğe BAĞLI mı? Yalnız geçerli eventSlug varsa. Kendi başına (standalone)
+  // oluşturulmuş postta eventSlug yok → etkinlik detayına BAĞLANMAZ, etkinlik etiketi/link gösterilmez.
+  const hasEvent = !!post.eventSlug && String(post.eventSlug).trim().length > 0 && String(post.eventSlug).trim().toLowerCase() !== "null";
 
   // Tepki göstergesi + yorum satırı (hem normal hem sistem kartında ortak kullanılır).
   const renderFooter = () => (
@@ -125,7 +128,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
   };
 
   const openEvent = () => {
-    if (isSystem && post.eventSlug) {
+    if (isSystem && hasEvent) {
       tapHaptic();
       // Object-form: param expo-router tarafından düzgün encode edilir (slug Türkçe
       // karakter/boşluk içerse de URL bozulmaz). Ham `/etkinlik/${slug}` URL'yi bozuyordu.
@@ -138,7 +141,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
   if (isSystem) {
     return (
       <View style={[styles.sysCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
-        <Pressable onPress={openEvent} disabled={!post.eventSlug} style={{ gap: 8 }}>
+        <Pressable onPress={openEvent} disabled={!hasEvent} style={{ gap: 8 }}>
           <View style={styles.sysHead}>
             <Text style={styles.sysIcon}>📣</Text>
             <View style={[styles.sysBadge, { backgroundColor: T.surfaceStrong, borderColor: T.primary }]}>
@@ -147,7 +150,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
             <Text style={[Type.label, { color: T.textFaint, marginLeft: "auto" }]}>{relTime(post.createdAt)}</Text>
           </View>
 
-          {post.eventTitle ? (
+          {post.eventTitle && hasEvent ? (
             <Text style={[Type.label, { color: T.primary }]} numberOfLines={1}>🎟 {post.eventTitle}</Text>
           ) : null}
 
@@ -160,7 +163,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
             ) : null}
           </View>
 
-          {post.eventSlug ? (
+          {hasEvent ? (
             <Text style={[Type.label, { color: T.primary }]}>Etkinliğe git →</Text>
           ) : null}
         </Pressable>
@@ -227,8 +230,8 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
         )}
       </View>
 
-      {/* Etkinlik etiketi */}
-      {post.eventTitle ? (
+      {/* Etkinlik etiketi — yalnız posta bağlı GERÇEK etkinlik varsa (standalone postta yok) */}
+      {post.eventTitle && hasEvent ? (
         <View style={[styles.eventTag, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
           <Text style={[Type.label, { color: T.primary }]} numberOfLines={1}>🎟 {post.eventTitle}</Text>
         </View>
