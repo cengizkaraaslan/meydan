@@ -127,6 +127,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user?.email) {
       setAccountKey(user.email);
       void restoreAvatar();
+      // Adı DB'ye yaz (hesabın adı saklansın → tekrar girişte/başka cihazda yüklenir).
+      if (user.name) void syncProfile({ name: user.name });
       // Sosyal gönderi kimliğini (cihaz UUID'si) hesaba bağla → gönderiden açılan sohbet
       // mesajları karşı tarafın acct:email sohbet listesine ulaşsın.
       void linkSocialIdentity(user.email);

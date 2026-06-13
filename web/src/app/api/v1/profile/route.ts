@@ -104,6 +104,11 @@ export async function POST(request: NextRequest) {
       ? deviceId.slice(5).toLowerCase()
       : null;
   if (emailFromKey) data.email = emailFromKey;
+  // Ad — "E-posta ile devam"ta hesabın adı saklanmalı ki tekrar girişte yüklensin.
+  if ("name" in body) {
+    const n = strOrNull(body.name);
+    if (n) data.name = n; // boş ad mevcut adı silmesin
+  }
   if ("gender" in body) data.gender = normalizeGender(body.gender);
   if ("city" in body) data.city = strOrNull(body.city);
   if ("district" in body) data.district = strOrNull(body.district);
