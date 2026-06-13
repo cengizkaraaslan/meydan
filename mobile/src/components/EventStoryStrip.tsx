@@ -56,13 +56,15 @@ interface Props {
   onShare: () => void;
   /** Story sunucuya yüklenirken: "+" butonunda + kendi avatarımda dönen loading. */
   uploading?: boolean;
+  /** Görülen story grupları (kişi id) — görülende halka kalkar. */
+  seenIds?: Set<string>;
 }
 
 /**
  * Etkinlik detayında yatay story şeridi: paylaş butonu + benim story'lerim +
  * mock katkıda bulunanlar. Hiç story yoksa "ilk story'yi sen paylaş" yer-tutucu.
  */
-export function EventStoryStrip({ myGroup, mockGroups, onOpen, onShare, uploading }: Props) {
+export function EventStoryStrip({ myGroup, mockGroups, onOpen, onShare, uploading, seenIds }: Props) {
   const { t: T } = useTheme();
   const groups: StoryGroup[] = [...(myGroup ? [myGroup] : []), ...mockGroups];
   const empty = groups.length === 0;
@@ -116,7 +118,7 @@ export function EventStoryStrip({ myGroup, mockGroups, onOpen, onShare, uploadin
       {groups.map((g, i) => (
         <Pressable key={`${g.id}-${i}`} onPress={() => onOpen(i)} style={{ alignItems: "center", width: 72 }}>
           <View>
-            <StoryAvatar uri={g.avatar} name={g.name} size={56} hasStory />
+            <StoryAvatar uri={g.avatar} name={g.name} size={56} hasStory seen={!!seenIds?.has(g.id)} />
             {/* Kendi story'm yüklenirken avatar etrafında dönen loading halkası. */}
             {g.isMe && uploading ? (
               <View style={[StyleSheet.absoluteFill, styles.avatarUploading]} pointerEvents="none">

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, BackHandler, Dimensions, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -149,6 +149,24 @@ export default function EventDetail() {
   const { user, guest } = useAuth();
   const [event, setEvent] = useState<ApiEvent | null>(null);
   const [loading, setLoading] = useState(true);
+  // Görülen story'ler (kişi id) — Meydan'daki kuralla AYNI: görülenler şeritte sona +
+  // halka kalkar. Anahtar paylaşımlı ("meydanfest:seenStories") → bir kez görülen her yerde görülü.
+  const [seenStoryIds, setSeenStoryIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    AsyncStorage.getItem("meydanfest:seenStories").then((v) => {
+      if (v) { try { setSeenStoryIds(new Set(JSON.parse(v) as string[])); } catch { /* yoksay */ } }
+    }).catch(() => {});
+  }, []);
+  const markStorySeen = useCallback((sid: string) => {
+    if (!sid) return;
+    setSeenStoryIds((prev) => {
+      if (prev.has(sid)) return prev;
+      const next = new Set(prev);
+      next.add(sid);
+      AsyncStorage.setItem("meydanfest:seenStories", JSON.stringify([...next])).catch(() => {});
+      return next;
+    });
+  }, []);
 
   // #14 — katılım / yorum / fotoğraf durumu
   const [rsvp, setRsvp] = useState<Rsvp | null>(null);
@@ -707,12 +725,18 @@ export default function EventDetail() {
           })),
         }
       : null;
-  // Mock katkıda bulunanlar (deterministik; slug+id ile sabit).
-  const mockGroups: StoryGroup[] = mockStoryContributors(`${event.slug}:${event.id}`).map(personToGroup);
+  // Mock katkıda bulunanlar (deterministik; slug+id ile sabit). GÖRÜLENLER SONA (Meydan kuralı).
+  const mockGroupsRaw: StoryGroup[] = mockStoryContributors(`${event.slug}:${event.id}`).map(personToGroup);
+  const mockGroups: StoryGroup[] = [
+    ...mockGroupsRaw.filter((g) => !seenStoryIds.has(g.id)),
+    ...mockGroupsRaw.filter((g) => seenStoryIds.has(g.id)),
+  ];
   const storyGroups: StoryGroup[] = [...(myGroup ? [myGroup] : []), ...mockGroups];
 
   const openStoryViewer = (index: number) => {
     tapH();
+    const g = storyGroups[index];
+    if (g && (!myGroup || g.id !== myGroup.id)) markStorySeen(g.id); // kendi story'm hariç görüldü işaretle
     setViewerStart(index);
     setViewerGroups(storyGroups);
   };
@@ -928,6 +952,7 @@ export default function EventDetail() {
               onOpen={openStoryViewer}
               onShare={pickStory}
               uploading={uploadingStory}
+              seenIds={seenStoryIds}
             />
           </Animated.View>
 

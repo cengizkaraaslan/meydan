@@ -530,16 +530,18 @@ export default function KategorilerScreen() {
                     end={{ x: 1, y: 1 }}
                     style={[
                       styles.tile,
-                      active ? styles.tileActive : styles.tileInactive,
+                      active && styles.tileActive,
                     ]}
                   >
-                    {/* Pasif tile: koyu scrim yerine komple soluklaştır (disabled görünüm) —
-                        gradient + emoji + yazı görünür kalır, sadece sönük olur. */}
+                    {/* Seçili: dolu ✓; seçili değil: boş daire (işaretsiz). Tile her zaman
+                        TAM renkli — Android'de gradient'e opacity vermek onu görünmez yapıyordu. */}
                     {active ? (
                       <View style={styles.check}>
                         <Text style={styles.checkTxt}>✓</Text>
                       </View>
-                    ) : null}
+                    ) : (
+                      <View style={styles.checkOff} />
+                    )}
                     <Text style={styles.emoji}>{item.emoji}</Text>
                     <View style={styles.tileBottom}>
                       <Text style={[Type.title, styles.tileLabel]} numberOfLines={1}>
@@ -654,11 +656,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth * 4,
     borderColor: "rgba(255,255,255,0.9)",
   },
-  // Seçili değil = BELİRGİN görünür ama hafif sönük (seçiliden beyaz kenarlık + ✓ ile
-  // ayrışır). Çok düşük opaklık kutuyu görünmez yapıyordu → 0.78.
-  tileInactive: {
-    opacity: 0.78,
-  },
   tileBottom: {
     flexDirection: "row",
     alignItems: "center",
@@ -687,6 +684,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   checkTxt: { fontSize: 13, fontWeight: "900", color: "#1A1430" },
+  checkOff: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.7)",
+    backgroundColor: "rgba(0,0,0,0.18)",
+  },
   emoji: { fontSize: 30 },
   tileLabel: { color: "#fff", flexShrink: 1 },
   results: { marginTop: Space.xl, paddingHorizontal: 16 },
