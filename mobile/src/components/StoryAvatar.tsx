@@ -13,6 +13,8 @@ interface Props {
   size: number;
   /** Aktif story varsa renkli halka. */
   hasStory?: boolean;
+  /** Story görüldüyse renkli halka kalkar (Instagram gibi). */
+  seen?: boolean;
   /** Sağ-alt çevrimiçi noktası. */
   online?: boolean;
   onPress?: () => void;
@@ -22,7 +24,7 @@ interface Props {
  * Story halkalı yuvarlak avatar — etkinlik katılımcıları, yakındakiler, eşleşme gibi
  * listelerde kullanılır. `hasStory` ise Instagram benzeri gradient halka çizer.
  */
-export function StoryAvatar({ uri, name, size, hasStory, online, onPress }: Props) {
+export function StoryAvatar({ uri, name, size, hasStory, seen, online, onPress }: Props) {
   const { t: T } = useTheme();
   const STROKE = Math.max(2, Math.round(size * 0.07));
   const GAP = 2;
@@ -64,7 +66,7 @@ export function StoryAvatar({ uri, name, size, hasStory, online, onPress }: Prop
     </View>
   );
 
-  const ring = hasStory ? (
+  const ring = hasStory && !seen ? (
     <LinearGradient
       colors={STORY_COLORS}
       start={{ x: 0, y: 0 }}

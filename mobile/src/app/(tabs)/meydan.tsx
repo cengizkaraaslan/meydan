@@ -56,6 +56,7 @@ import {
 type WallFilter = "all" | "follow";
 const FILTER_KEY = "meydanfest:wallFilter";
 const WALL_TIP_KEY = "meydanfest:wallTipSeen";
+const SEEN_STORIES_KEY = "meydanfest:seenStories";
 /** Kendi gönderiyi düzenle/sil penceresi (ms). */
 const EDIT_WINDOW_MS = 10 * 60 * 1000;
 /** Feed'de her N gönderide bir etkinlik serpiştir. */
@@ -103,6 +104,22 @@ export default function MeydanScreen() {
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
   const [actionsFor, setActionsFor] = useState<FeedPost | null>(null);
   const [storyPerson, setStoryPerson] = useState<Person | null>(null);
+  // Görülen story'ler (kişi id'leri) — görülenler şeritte sona gider + halkası kalkar.
+  const [seenStories, setSeenStories] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    AsyncStorage.getItem(SEEN_STORIES_KEY).then((v) => {
+      if (v) { try { setSeenStories(new Set(JSON.parse(v) as string[])); } catch { /* yoksay */ } }
+    }).catch(() => {});
+  }, []);
+  const markStorySeen = useCallback((id: string) => {
+    setSeenStories((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      AsyncStorage.setItem(SEEN_STORIES_KEY, JSON.stringify([...next])).catch(() => {});
+      return next;
+    });
+  }, []);
   const [tipVisible, setTipVisible] = useState(false);
   // Kısa bilgi (hata) mesajı — tip modalını yeniden kullanır.
   const [tipMsg, setTipMsg] = useState<string | null>(null);
@@ -220,9 +237,14 @@ export default function MeydanScreen() {
   // Story barı: kendi story'lerin + takip ettiğin (veya hasStory) kişiler.
   const followSet = useMemo(() => new Set(following), [following]);
   const storyPeople = useMemo(() => {
-    return PEOPLE.filter((p) => p.hasStory && followSet.has(followIdForPerson(p.id)))
+    const ordered = PEOPLE.filter((p) => p.hasStory && followSet.has(followIdForPerson(p.id)))
       .concat(PEOPLE.filter((p) => p.hasStory && !followSet.has(followIdForPerson(p.id))));
-  }, [followSet]);
+    // Görülmemişler önde (mevcut sıra korunur), GÖRÜLENLER en sona.
+    return [
+      ...ordered.filter((p) => !seenStories.has(p.id)),
+      ...ordered.filter((p) => seenStories.has(p.id)),
+    ];
+  }, [followSet, seenStories]);
 
   const myStoryUri = stories[0]?.uri ?? null;
   // Hiç story var mı? (myStoryUri yok ve stories boş → "+" ekle butonu göster)
@@ -667,8 +689,8 @@ export default function MeydanScreen() {
         )}
 
         {storyPeople.map((p) => (
-          <Pressable key={p.id} style={styles.storyItem} onPress={() => { tapH(); setStoryPerson(getPerson(p.id) ?? p); }}>
-            <StoryAvatar uri={p.avatar} name={p.name} size={58} hasStory online={p.online} />
+          <Pressable key={p.id} style={styles.storyItem} onPress={() => { tapH(); markStorySeen(p.id); setStoryPerson(getPerson(p.id) ?? p); }}>
+            <StoryAvatar uri={p.avatar} name={p.name} size={58} hasStory seen={seenStories.has(p.id)} online={p.online} />
             <Text style={[Type.micro, { color: T.textDim, maxWidth: 64 }]} numberOfLines={1}>{p.name}</Text>
           </Pressable>
         ))}
