@@ -307,7 +307,10 @@ export default function KategorilerScreen() {
   // venue/title içinde ilçe adı geçenleri göster.
   const visibleEvents = useMemo(() => {
     const sel = new Set(selected);
-    let data = events.filter((e) => sel.has(e.category));
+    // Tüm kategoriler seçiliyse kategoriye göre SÜZME yapma → CATEGORIES'te henüz olmayan
+    // (ileride backend'e eklenen) bir kategorideki etkinlikler "tümü"de gizlenmesin.
+    const allSelected = selected.length >= CATEGORIES.length;
+    let data = allSelected ? events : events.filter((e) => sel.has(e.category));
     // Gelişmiş fiyat: paid → biletli, student → üniversite kaynakları (öğrenciye açık).
     if (priceFilter === "paid") data = data.filter((e) => !e.is_free);
     else if (priceFilter === "student") data = data.filter((e) => (e.source || "").startsWith("UNI") || e.is_free);

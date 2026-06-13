@@ -16,6 +16,7 @@ export const CATEGORIES: CategoryMeta[] = [
   { key: "ATOLYE", label: "Atölye", emoji: "🧑‍🎨", gradient: ["#34D399", "#22D3EE"] },
   { key: "SPOR", label: "Spor", emoji: "⚽", gradient: ["#22D3EE", "#6366F1"] },
   { key: "COCUK", label: "Çocuk", emoji: "🧸", gradient: ["#F5C24B", "#F97316"] },
+  { key: "FUAR", label: "Fuar & Kongre", emoji: "🤝", gradient: ["#0EA5E9", "#6366F1"] },
   { key: "DINI", label: "Dini & Manevi", emoji: "🌙", gradient: ["#34D399", "#14B8A6"] },
   { key: "DIGER", label: "Diğer", emoji: "✨", gradient: Aurora.auroraGlow as unknown as [string, string] },
 ];
