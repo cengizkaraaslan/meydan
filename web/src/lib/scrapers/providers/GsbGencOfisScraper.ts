@@ -23,7 +23,13 @@ import { slugify } from "../../utils";
  * Kategori başlıktan tahmin edilir (kurs→ATOLYE, spor→SPOR, çocuk→COCUK ...).
  */
 
-const DEFAULT_MAX_PAGES = 5; // 5 × 12 ≈ 60 faaliyet (her biri 1 detay GET'i)
+// Sayfa başına 12 faaliyet; her biri 1 (yavaş) detay GET'i ister. Hacim env'den
+// ayarlanabilir (yeniden derleme/deploy gerekmeden): GSB_MAX_PAGES (varsayılan 20 ≈ 240
+// faaliyet), GSB_DETAIL_CONCURRENCY (varsayılan 6). Sıralama en yeni→eski olduğundan
+// ilk sayfalar yaklaşan faaliyetlerdir. NOT: cron'un ~50sn bütçesinde yüksek değer
+// zaman aşımına düşebilir; asıl yüksek hacim manuel tam-tarama (run-all-persist) içindir.
+const DEFAULT_MAX_PAGES = Number(process.env.GSB_MAX_PAGES) || 20;
+const DETAIL_CONCURRENCY = Number(process.env.GSB_DETAIL_CONCURRENCY) || 6;
 const PLACEHOLDER_IMG = "foto-cekiliyor"; // "foto çekiliyor" placeholder'ı → görsel sayma
 
 /** "ERZİNCAN", "AĞRI", "istanbul" → CITIES listesindeki kanonik il adı. */
@@ -139,7 +145,7 @@ export class GsbGencOfisScraper extends BaseScraper {
         events.push(event);
       }
     };
-    await Promise.all(Array.from({ length: Math.min(3, targets.length) }, worker));
+    await Promise.all(Array.from({ length: Math.min(DETAIL_CONCURRENCY, targets.length) }, worker));
 
     return events;
   }
