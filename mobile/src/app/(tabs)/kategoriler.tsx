@@ -653,9 +653,10 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth * 4,
     borderColor: "rgba(255,255,255,0.9)",
   },
-  // Seçili değil = disabled görünüm: gradient/emoji görünür ama soluk.
+  // Seçili değil = BELİRGİN görünür ama hafif sönük (seçiliden beyaz kenarlık + ✓ ile
+  // ayrışır). Çok düşük opaklık kutuyu görünmez yapıyordu → 0.78.
   tileInactive: {
-    opacity: 0.4,
+    opacity: 0.78,
   },
   tileBottom: {
     flexDirection: "row",
