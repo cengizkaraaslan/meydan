@@ -6,6 +6,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import {
   AudioModule,
   RecordingPresets,
@@ -805,8 +806,37 @@ function Bubble({ T, m, read, reaction, partnerName, justSent, onLongPress, onIm
 
 /** Sesli mesaj oynatıcı balonu — MESAJ BAŞINA kendi oynatıcısı (kanıtlanmış: ses çalıyor).
  *  Paylaşımlı/replace tabanlı oynatıcı expo-audio 56'da hiç çalmıyordu; bu desen çalışır. */
+/** Basit deterministik dosya adı (uri → cache anahtarı). */
+function voiceCacheName(uri: string): string {
+  let h = 0;
+  for (let i = 0; i < uri.length; i++) h = (h * 31 + uri.charCodeAt(i)) | 0;
+  return `voice-${(h >>> 0).toString(36)}.m4a`;
+}
+
 function VoiceMessage({ uri, sec, tint, track }: { uri: string; sec?: number; tint: string; track: string }) {
-  const player = useAudioPlayer(uri);
+  // Uzak (http) sesi ÖNCE yerele indir, sonra yerelden çal. ExoPlayer/AVPlayer uzak
+  // URL'den stream ederken proxy'nin Range/stream davranışına takılıp sessiz kalabiliyor;
+  // yerel m4a ise sorunsuz çalar. İndirme olmazsa uzak uri ile çalmayı dene (fallback).
+  const isRemote = uri.startsWith("http");
+  const [localUri, setLocalUri] = useState<string | null>(isRemote ? null : uri);
+  useEffect(() => {
+    if (!isRemote) { setLocalUri(uri); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const target = (FileSystem.cacheDirectory ?? "") + voiceCacheName(uri);
+        const info = await FileSystem.getInfoAsync(target);
+        if (info.exists && info.size && info.size > 0) { if (alive) setLocalUri(target); return; }
+        const dl = await FileSystem.downloadAsync(uri, target);
+        if (alive) setLocalUri(dl.uri);
+      } catch {
+        if (alive) setLocalUri(uri); // indirme başarısız → uzak uri ile dene
+      }
+    })();
+    return () => { alive = false; };
+  }, [uri, isRemote]);
+
+  const player = useAudioPlayer(localUri ?? uri);
   const status = useAudioPlayerStatus(player);
   const dur = status.duration && status.duration > 0 ? status.duration : sec ?? 0;
   const cur = status.currentTime ?? 0;
