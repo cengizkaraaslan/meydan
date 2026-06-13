@@ -25,6 +25,7 @@ export interface RsvpCounts {
 export interface EventSocial {
   attendeeCount: number;
   commentCount: number;
+  storyCount: number;
   rsvp: RsvpCounts;
 }
 
@@ -37,14 +38,15 @@ export async function fetchEventSocial(eventSlug: string): Promise<EventSocial> 
       `${API_BASE}/api/v1/event-social?eventSlug=${encodeURIComponent(eventSlug)}`,
       { headers: { "x-api-key": API_KEY, Accept: "application/json" } },
     );
-    if (!res.ok) return { attendeeCount: 0, commentCount: 0, rsvp: { ...EMPTY_RSVP } };
+    if (!res.ok) return { attendeeCount: 0, commentCount: 0, storyCount: 0, rsvp: { ...EMPTY_RSVP } };
     const json = (await res.json()) as {
-      data?: { attendeeCount?: number; comments?: unknown[]; rsvp?: Partial<RsvpCounts> };
+      data?: { attendeeCount?: number; comments?: unknown[]; commentCount?: number; storyCount?: number; rsvp?: Partial<RsvpCounts> };
     };
     const r = json.data?.rsvp;
     return {
       attendeeCount: json.data?.attendeeCount ?? 0,
-      commentCount: json.data?.comments?.length ?? 0,
+      commentCount: json.data?.commentCount ?? json.data?.comments?.length ?? 0,
+      storyCount: json.data?.storyCount ?? 0,
       rsvp: {
         going: r?.going ?? 0,
         maybe: r?.maybe ?? 0,
@@ -52,7 +54,7 @@ export async function fetchEventSocial(eventSlug: string): Promise<EventSocial> 
       },
     };
   } catch {
-    return { attendeeCount: 0, commentCount: 0, rsvp: { ...EMPTY_RSVP } };
+    return { attendeeCount: 0, commentCount: 0, storyCount: 0, rsvp: { ...EMPTY_RSVP } };
   }
 }
 

@@ -24,6 +24,8 @@ import { Radius, Space, Type, glow } from "@/theme/aurora";
 import { useFavorites } from "@/lib/favorites";
 import { useAttending } from "@/lib/attending";
 import { useStories, addStory, type Story } from "@/lib/stories";
+import { useMyEvents, removeMyEvent, type MyEvent } from "@/lib/myEvents";
+import { fetchEventSocial, type EventSocial } from "@/lib/pastEvents";
 import { useAuth } from "@/lib/auth";
 import { useIsAdmin } from "@/lib/admin";
 import { useTheme, type Palette } from "@/lib/theme";
@@ -50,6 +52,85 @@ function StatCard({ value, label, color, T, onPress }: { value: string; label: s
         {label}
       </Text>
     </Pressable>
+  );
+}
+
+/** "Organizasyonlar" sekmesi — oluşturduğum etkinlikler (gösterişli istatistik + düzenle/sil). */
+function OrganizationsTab({ myEvents, T, onEdit, onDeleted }: { myEvents: MyEvent[]; T: Palette; onEdit: (id: string) => void; onDeleted: () => void }) {
+  return (
+    <Animated.View entering={FadeInDown.duration(400)} style={{ gap: Space.md, marginBottom: Space.xl }}>
+      {myEvents.map((ev) => (
+        <OrgEventCard key={ev.id} ev={ev} T={T} onEdit={() => onEdit(ev.id)} onDeleted={onDeleted} />
+      ))}
+    </Animated.View>
+  );
+}
+
+/** Tek etkinlik kartı: kapak + başlık + gösterişli sayılar (katılan/story/yorum) + düzenle/sil. */
+function OrgEventCard({ ev, T, onEdit, onDeleted }: { ev: MyEvent; T: Palette; onEdit: () => void; onDeleted: () => void }) {
+  const [stats, setStats] = useState<EventSocial | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (ev.slug) fetchEventSocial(ev.slug).then((s) => { if (alive) setStats(s); }).catch(() => {});
+    return () => { alive = false; };
+  }, [ev.slug]);
+
+  const onDelete = () => {
+    tapH();
+    Alert.alert("Etkinliği sil", `"${ev.title}" silinsin mi? Bu işlem geri alınamaz.`, [
+      { text: "Vazgeç", style: "cancel" },
+      { text: "Sil", style: "destructive", onPress: async () => { await removeMyEvent(ev.id); onDeleted(); } },
+    ]);
+  };
+
+  const d = new Date(ev.startsAt);
+  const dateLabel = isNaN(d.getTime()) ? "" : d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short", year: "numeric" });
+
+  return (
+    <View style={[styles.orgCard, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+      <Pressable onPress={() => { tapH(); router.push(`/etkinlik/${ev.slug ?? ev.id}`); }} style={{ flexDirection: "row", gap: 12 }}>
+        {ev.imageUri ? (
+          <Image source={{ uri: ev.imageUri }} style={styles.orgThumb} contentFit="cover" transition={150} />
+        ) : (
+          <View style={[styles.orgThumb, { backgroundColor: T.surface, alignItems: "center", justifyContent: "center" }]}>
+            <Text style={{ fontSize: 24 }}>🎟️</Text>
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={[Type.title, { color: T.text }]} numberOfLines={2}>{ev.title}</Text>
+          <Text style={[Type.label, { color: T.textFaint, marginTop: 3 }]} numberOfLines={1}>
+            📍 {ev.venue || ev.city || "—"}{dateLabel ? `  ·  ${dateLabel}` : ""}
+          </Text>
+        </View>
+      </Pressable>
+
+      {/* Gösterişli istatistikler */}
+      <View style={styles.orgStats}>
+        <OrgStat T={T} icon="👥" value={stats?.attendeeCount ?? 0} label="Katılan" color={T.cyan} />
+        <OrgStat T={T} icon="📸" value={stats?.storyCount ?? 0} label="Story" color={T.pink} />
+        <OrgStat T={T} icon="💬" value={stats?.commentCount ?? 0} label="Yorum" color={T.gold} />
+      </View>
+
+      {/* Düzenle / Sil — yalnız KENDİ etkinliğim (bu sekme zaten kendi etkinliklerim). */}
+      <View style={{ flexDirection: "row", gap: 10, marginTop: 2 }}>
+        <Pressable onPress={onEdit} style={[styles.orgBtn, { borderColor: T.hairline }]}>
+          <Text style={[Type.label, { color: T.text }]}>✏️ Düzenle</Text>
+        </Pressable>
+        <Pressable onPress={onDelete} style={[styles.orgBtn, { borderColor: T.hairline }]}>
+          <Text style={[Type.label, { color: "#FF3B30" }]}>🗑️ Sil</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function OrgStat({ T, icon, value, label, color }: { T: Palette; icon: string; value: number; label: string; color: string }) {
+  return (
+    <View style={[styles.orgStat, { backgroundColor: T.surface }]}>
+      <Text style={{ fontSize: 17 }}>{icon}</Text>
+      <Text style={[Type.h2, { color, marginTop: 1 }]}>{value}</Text>
+      <Text style={[Type.micro, { color: T.textFaint }]}>{label}</Text>
+    </View>
   );
 }
 
@@ -97,6 +178,12 @@ export default function ProfileScreen() {
   const [captionDraft, setCaptionDraft] = useState("");
   const [listView, setListView] = useState<null | "upcoming" | "past" | "fav">(null);
   const [socialOpen, setSocialOpen] = useState(false);
+  // Profil sekmeleri: "Organizasyonlar" (oluşturduğum etkinlikler) + "Profil".
+  // Hiç etkinlik yoksa Organizasyonlar sekmesi GÖSTERİLMEZ.
+  const { list: myEvents, reload: reloadMyEvents } = useMyEvents();
+  const [profileTab, setProfileTab] = useState<"organizasyonlar" | "profil">("profil");
+  const hasMyEvents = myEvents.length > 0;
+  const activeTab: "organizasyonlar" | "profil" = hasMyEvents ? profileTab : "profil";
   // "Başkalarının gözünden profilim" — public önizleme modalı.
   const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -431,6 +518,22 @@ export default function ProfileScreen() {
           <Text style={[Type.label, { color: T.textFaint, marginTop: 4 }]}>{user?.email || t("exploring")}</Text>
         </Animated.View>
 
+        {/* Sekmeler: Organizasyonlar (oluşturduğum etkinlikler — VARSA) | Profil */}
+        {hasMyEvents ? (
+          <View style={styles.tabBar}>
+            <Pressable onPress={() => { tapH(); setProfileTab("organizasyonlar"); }} style={[styles.tabBtn, { borderColor: activeTab === "organizasyonlar" ? T.primary : T.hairline, backgroundColor: activeTab === "organizasyonlar" ? T.surfaceStrong : "transparent" }]}>
+              <Text style={[Type.title, { color: activeTab === "organizasyonlar" ? T.text : T.textFaint }]}>🎟️ Organizasyonlar</Text>
+            </Pressable>
+            <Pressable onPress={() => { tapH(); setProfileTab("profil"); }} style={[styles.tabBtn, { borderColor: activeTab === "profil" ? T.primary : T.hairline, backgroundColor: activeTab === "profil" ? T.surfaceStrong : "transparent" }]}>
+              <Text style={[Type.title, { color: activeTab === "profil" ? T.text : T.textFaint }]}>👤 Profil</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {activeTab === "organizasyonlar" ? (
+          <OrganizationsTab myEvents={myEvents} T={T} onEdit={(id) => { tapH(); router.push(`/olustur?id=${id}`); }} onDeleted={reloadMyEvents} />
+        ) : (
+        <>
         {/* Daha önce paylaşılan story'ler — yalnız VARSA (paylaşım profilden DEĞİL,
             Meydan sayfasındaki story-paylaş modalından yapılır). */}
         {storyGroups.length > 0 && (
@@ -609,6 +712,8 @@ export default function ProfileScreen() {
         <Text style={[Type.label, { color: T.textFaint, textAlign: "center" }]}>
           {t("tap_stat_hint")}
         </Text>
+        </>
+        )}
       </ScrollView>
 
       {/* Sayaç listesi (favori / katılacağım / katıldığım) — karta tıklayınca açılır */}
@@ -933,6 +1038,13 @@ const styles = StyleSheet.create({
   storyCount: { position: "absolute", top: 0, right: 4, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   storyCountTxt: { color: "#fff", fontSize: 11, fontWeight: "800" },
   statsRow: { flexDirection: "row", gap: Space.md, marginBottom: Space.xl },
+  tabBar: { flexDirection: "row", gap: Space.sm, marginBottom: Space.xl },
+  tabBtn: { flex: 1, alignItems: "center", paddingVertical: 11, borderRadius: Radius.pill, borderWidth: 1 },
+  orgCard: { borderRadius: Radius.lg, borderWidth: 1, padding: 12, gap: 12 },
+  orgThumb: { width: 64, height: 64, borderRadius: Radius.md },
+  orgStats: { flexDirection: "row", gap: Space.sm },
+  orgStat: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: Radius.md, gap: 1 },
+  orgBtn: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: Radius.md, borderWidth: 1 },
   statCard: {
     flex: 1,
     alignItems: "center",
