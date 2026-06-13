@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -11,6 +12,11 @@ import {
   TextInput,
   View,
 } from "react-native";
+
+const SCREEN_H = Dimensions.get("window").height;
+type SortBy = "new" | "old" | "top";
+const SORT_NEXT: Record<SortBy, SortBy> = { new: "top", top: "old", old: "new" };
+const SORT_LABEL: Record<SortBy, string> = { new: "En yeni", top: "En beğenilen", old: "En eski" };
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
@@ -41,6 +47,7 @@ export function CommentsModal({ postId, authorName, onClose, onAdded }: Props) {
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<ThreadComment | null>(null);
   const [myDeviceId, setMyDeviceId] = useState("");
+  const [sortBy, setSortBy] = useState<SortBy>("new");
   // @mention autocomplete: yorumda "@ad" yazınca kullanıcı önerisi.
   const mention = useMentionField(text, setText);
 
@@ -88,33 +95,57 @@ export function CommentsModal({ postId, authorName, onClose, onAdded }: Props) {
     if (postId) setComments(await fetchComments(postId));
   }, [postId]);
 
-  const threads = comments.map(postToThread);
+  // Sıralama (Instagram gibi): En yeni / En beğenilen / En eski.
+  const sortedComments = useMemo(() => {
+    const ts = (s: string) => new Date(s).getTime() || 0;
+    const arr = [...comments];
+    if (sortBy === "new") arr.sort((a, b) => ts(b.createdAt) - ts(a.createdAt));
+    else if (sortBy === "old") arr.sort((a, b) => ts(a.createdAt) - ts(b.createdAt));
+    else arr.sort((a, b) => (b.reactionTotal - a.reactionTotal) || (ts(b.createdAt) - ts(a.createdAt)));
+    return arr;
+  }, [comments, sortBy]);
+  const threads = sortedComments.map(postToThread);
 
   return (
     <Modal visible={!!postId} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
-          style={[styles.sheet, { backgroundColor: T.bgElevated, borderColor: T.hairline, paddingBottom: insets.bottom + 10 }]}
+          style={[styles.sheet, { backgroundColor: T.bgElevated, borderColor: T.hairline, paddingBottom: insets.bottom + 10, height: SCREEN_H * 0.82 }]}
           onPress={(e) => e.stopPropagation()}
         >
+          {/* Tutamak — Instagram tarzı alt sayfa */}
+          <View style={[styles.handle, { backgroundColor: T.hairline }]} />
           <View style={styles.header}>
-            <Text style={[Type.h2, { color: T.text }]}>Yorumlar</Text>
-            <Pressable onPress={() => { tapH(); onClose(); }} hitSlop={10}>
-              <Text style={{ fontSize: 22, color: T.textDim }}>✕</Text>
-            </Pressable>
+            <Text style={[Type.h2, { color: T.text }]}>
+              Yorumlar{comments.length ? ` · ${comments.length}` : ""}
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              {comments.length > 1 ? (
+                <Pressable
+                  onPress={() => { tapH(); setSortBy((s) => SORT_NEXT[s]); }}
+                  hitSlop={8}
+                  style={[styles.sortBtn, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}
+                >
+                  <Text style={[Type.label, { color: T.text }]}>↕ {SORT_LABEL[sortBy]}</Text>
+                </Pressable>
+              ) : null}
+              <Pressable onPress={() => { tapH(); onClose(); }} hitSlop={10}>
+                <Text style={{ fontSize: 22, color: T.textDim }}>✕</Text>
+              </Pressable>
+            </View>
           </View>
 
           {loading ? (
-            <View style={{ paddingVertical: 40, alignItems: "center" }}>
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
               <ActivityIndicator color={T.primary} />
             </View>
           ) : comments.length === 0 ? (
-            <View style={{ paddingVertical: 36, alignItems: "center", gap: 6 }}>
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 6 }}>
               <Text style={{ fontSize: 34 }}>💬</Text>
               <Text style={[Type.body, { color: T.textFaint }]}>İlk yorumu sen yaz!</Text>
             </View>
           ) : (
-            <ScrollView style={{ maxHeight: 380 }} contentContainerStyle={{ paddingVertical: 4 }} keyboardShouldPersistTaps="handled">
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 4 }} keyboardShouldPersistTaps="handled">
               <CommentThread comments={threads} myDeviceId={myDeviceId} onReact={onReact} onReply={setReplyTo} />
             </ScrollView>
           )}
@@ -158,6 +189,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth * 2,
   },
+  handle: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 10 },
+  sortBtn: { borderWidth: StyleSheet.hairlineWidth * 2, borderRadius: Radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
   inputRow: { flexDirection: "row", alignItems: "flex-end", gap: 8, marginTop: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth * 2 },
   input: { flex: 1, borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 14, paddingVertical: 10, maxHeight: 100, ...Type.body },
