@@ -211,6 +211,36 @@ export default function ChatScreen() {
     );
   }, [shakeX]);
 
+  // ── Titreşim COOLDOWN'u: peş peşe atılamaz → 2dk. Bu sürede buton pasif ve içi alttan
+  // yukarı "dolar" (loading gibi); dolunca tekrar atılabilir. matchKey'e göre kalıcı (çıkıp
+  // tekrar girince de süre devam eder → spam'i engeller).
+  const BUZZ_COOLDOWN = 120_000;
+  const [buzzReady, setBuzzReady] = useState(true);
+  const buzzFill = useSharedValue(0);
+  const buzzFillStyle = useAnimatedStyle(() => ({ height: `${Math.min(100, buzzFill.value * 100)}%` }));
+  const startBuzzCooldown = useCallback((elapsedMs: number) => {
+    const remaining = BUZZ_COOLDOWN - elapsedMs;
+    if (remaining <= 0) { setBuzzReady(true); buzzFill.value = 1; return; }
+    setBuzzReady(false);
+    buzzFill.value = elapsedMs / BUZZ_COOLDOWN;
+    buzzFill.value = withTiming(1, { duration: remaining }, (finished) => {
+      if (finished) runOnJS(setBuzzReady)(true);
+    });
+  }, [buzzFill]);
+
+  // Çıkıp tekrar girince kalan cooldown'ı sürdür.
+  useEffect(() => {
+    const key = matchKey || pMatchKey;
+    if (!key) return;
+    AsyncStorage.getItem(`meydanfest:buzzSent:${key}`).then((v) => {
+      const last = v ? Number(v) || 0 : 0;
+      if (last > 0) {
+        const elapsed = Date.now() - last;
+        if (elapsed < BUZZ_COOLDOWN) startBuzzCooldown(elapsed);
+      }
+    }).catch(() => {});
+  }, [matchKey, pMatchKey, startBuzzCooldown]);
+
   const buzzSeenRef = useRef<number>(-1); // -1: henüz yüklenmedi
   useEffect(() => {
     const key = matchKey || pMatchKey;
@@ -233,9 +263,13 @@ export default function ChatScreen() {
   }, [messages, triggerShake, matchKey, pMatchKey]);
 
   const onBuzz = useCallback(() => {
-    triggerShake();      // kendi ekranında da his ver
+    if (!buzzReady) return; // cooldown — peş peşe gönderim engellenir
+    triggerShake();          // kendi ekranında da his ver
     void sendBuzz();
-  }, [triggerShake, sendBuzz]);
+    const key = matchKey || pMatchKey;
+    if (key) AsyncStorage.setItem(`meydanfest:buzzSent:${key}`, String(Date.now())).catch(() => {});
+    startBuzzCooldown(0);
+  }, [buzzReady, triggerShake, sendBuzz, startBuzzCooldown, matchKey, pMatchKey]);
 
 
   // Dibe yalnız YENİ (alttaki) mesaj gelince kaydır; eski mesaj (yukarıda) yüklenince ZIPLAMA.
@@ -491,8 +525,8 @@ export default function ChatScreen() {
   return (
     <View style={{ flex: 1 }}>
       <AuroraBackground />
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: T.hairline }]}>
+      {/* Header — titreşimde isim + sil/üç-nokta ikonları da sarsılsın (shakeStyle). */}
+      <Animated.View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: T.hairline }, shakeStyle]}>
         <Pressable onPress={() => { tapH(); router.back(); }} hitSlop={10} style={[styles.back, { backgroundColor: T.surfaceStrong }]}>
           <Ionicons name="chevron-back" size={22} color="#fff" />
         </Pressable>
@@ -521,7 +555,7 @@ export default function ChatScreen() {
         <Pressable onPress={openMenu} hitSlop={10} style={[styles.back, { backgroundColor: T.surfaceStrong }]}>
           <Ionicons name="ellipsis-vertical" size={19} color={T.text} />
         </Pressable>
-      </View>
+      </Animated.View>
 
       {/* Üç nokta menüsü (alt sayfa): Şikayet et / Engelle + şikayet nedeni seçimi */}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
@@ -668,9 +702,13 @@ export default function ChatScreen() {
             <Pressable onPress={onPickImage} disabled={!ready} hitSlop={8} style={[styles.attach, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
               <Text style={{ fontSize: 20 }}>📷</Text>
             </Pressable>
-            {/* Titreştir ("dürt") — karşı tarafın ekranını titretir (push yok) */}
-            <Pressable onPress={onBuzz} disabled={!ready} hitSlop={8} style={[styles.attach, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-              <Text style={{ fontSize: 20 }}>🫨</Text>
+            {/* Titreştir ("dürt") — karşı tarafın ekranını titretir (push yok). Cooldown'da
+                buton pasif ve içi alttan dolar (loading gibi). */}
+            <Pressable onPress={onBuzz} disabled={!ready || !buzzReady} hitSlop={8} style={[styles.attach, { backgroundColor: T.surfaceStrong, borderColor: T.hairline, overflow: "hidden" }]}>
+              {!buzzReady ? (
+                <Animated.View pointerEvents="none" style={[styles.buzzFill, { backgroundColor: T.primary + "44" }, buzzFillStyle]} />
+              ) : null}
+              <Text style={{ fontSize: 20, opacity: buzzReady ? 1 : 0.45 }}>🫨</Text>
             </Pressable>
             <TextInput
               value={text}
@@ -1083,6 +1121,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth * 2, backgroundColor: "rgba(8,7,13,0.6)",
   },
   attach: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2 },
+  buzzFill: { position: "absolute", left: 0, right: 0, bottom: 0 },
   input: {
     flex: 1, maxHeight: 110, paddingHorizontal: 14, paddingVertical: 10,
     borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2,
