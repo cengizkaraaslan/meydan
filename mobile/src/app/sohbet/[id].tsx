@@ -211,6 +211,19 @@ export default function ChatScreen() {
     }
   }, [messages.length]);
 
+  // Sohbete girince dibe in: maintainVisibleContentPosition başta görünümü üstte
+  // sabitleyebildiği ve içerik (görsel/ses balonları) geç oturduğu için TEK scrollToEnd
+  // yetmiyordu → hazır olup ilk mesajlar gelince kademeli birkaç kez dibe kaydır.
+  const didInitScroll = useRef(false);
+  useEffect(() => {
+    if (didInitScroll.current || !ready || messages.length === 0) return;
+    didInitScroll.current = true;
+    const timers = [60, 250, 500, 900].map((d) =>
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), d),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [ready, messages.length]);
+
   if (!person) {
     return (
       <View style={{ flex: 1, backgroundColor: T.bg, alignItems: "center", justifyContent: "center" }}>
@@ -800,11 +813,19 @@ function VoiceMessage({ uri, sec, tint, track }: { uri: string; sec?: number; ti
   const playing = status.playing;
   const progress = dur > 0 ? Math.min(cur / dur, 1) : 0;
   const shown = playing || cur > 0.05 ? cur : dur;
-  const toggle = () => {
+  const toggle = async () => {
     tapHaptic(); // sessiz — play tuşunda tıklama sesi olmasın
     if (playing) {
       player.pause();
       return;
+    }
+    // Çalmadan ÖNCE ses oturumunu OYNATMA moduna zorla: kayıttan sonra Android oturumu
+    // "recording" yönlendirmesinde kalıp sesi kısabiliyor (gönderdiğim sesi oynatınca ses
+    // gelmiyor sorunu). playsInSilentMode → iOS sessiz anahtarında da duyulur.
+    try {
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+    } catch {
+      /* yoksay — yine de çalmayı dene */
     }
     // Bittiyse (veya sona gelmişse) başa sar, sonra çal; aksi halde kaldığı yerden devam.
     if (status.didJustFinish || (dur > 0 && cur >= dur - 0.15)) player.seekTo(0);

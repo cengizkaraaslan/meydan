@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect, type Href } from "expo-router";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
@@ -28,10 +28,14 @@ export function ChatBubble() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const [convos, setConvos] = useState<Conversation[]>([]);
+  // İlk veri gelene kadar (uygulama açılışı) balon etrafında loading göster.
+  const [loading, setLoading] = useState(true);
   const unread = totalUnread(convos);
 
   const refresh = useCallback(() => {
-    listConversations().then(setConvos).catch(() => {});
+    listConversations()
+      .then((c) => { setConvos(c); setLoading(false); })
+      .catch(() => setLoading(false));
   }, []);
 
   // Anasayfa odaklandığında okunmamış sayılarını tazele ve odakta kaldıkça
@@ -104,13 +108,17 @@ export function ChatBubble() {
     <GestureDetector gesture={gesture}>
       <Animated.View style={[styles.wrap, style, glow(T.primary, 20, 0.5)]}>
         <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
-          <Text style={styles.emoji}>💬</Text>
+          <Text style={[styles.emoji, loading && { opacity: 0.45 }]}>💬</Text>
         </LinearGradient>
-        {unread > 0 && (
+        {loading ? (
+          <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center" }]} pointerEvents="none">
+            <ActivityIndicator size="small" color="#fff" />
+          </View>
+        ) : unread > 0 ? (
           <View style={[styles.bubbleBadge, { borderColor: T.bg }]}>
             <Text style={styles.badgeText}>{unread > 99 ? "99+" : unread}</Text>
           </View>
-        )}
+        ) : null}
       </Animated.View>
     </GestureDetector>
   );

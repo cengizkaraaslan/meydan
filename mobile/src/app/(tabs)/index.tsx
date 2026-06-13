@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Dimensions, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Dimensions, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -121,10 +121,15 @@ export default function DiscoverScreen() {
   useEffect(() => setAvatarErr(false), [photoUri]);
   // Okunmamış bildirim sayacı — ekran her odaklandığında tazelenir.
   const [unread, setUnread] = useState(0);
+  // İlk veri gelene kadar (uygulama açılışı) bildirim butonu etrafında loading. Sonraki
+  // odaklanmalarda true'ya çekmiyoruz → loading yalnız ilk açılışta görünür.
+  const [notifLoading, setNotifLoading] = useState(true);
   useFocusEffect(
     useCallback(() => {
       let alive = true;
-      fetchNotifs().then((r) => { if (alive) setUnread(r.unread); }).catch(() => {});
+      fetchNotifs()
+        .then((r) => { if (alive) { setUnread(r.unread); setNotifLoading(false); } })
+        .catch(() => { if (alive) setNotifLoading(false); });
       return () => { alive = false; };
     }, []),
   );
@@ -304,8 +309,12 @@ export default function DiscoverScreen() {
           <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
             {/* Bildirim zili — okunmamış sayacı rozetiyle */}
             <Pressable onPress={() => { tapH(); router.push("/bildirimler"); }} style={[styles.searchBtn, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
-              <Text style={{ fontSize: 15 }}>🔔</Text>
-              {unread > 0 ? (
+              <Text style={{ fontSize: 15, opacity: notifLoading ? 0.45 : 1 }}>🔔</Text>
+              {notifLoading ? (
+                <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center" }]} pointerEvents="none">
+                  <ActivityIndicator size="small" color={T.primary} />
+                </View>
+              ) : unread > 0 ? (
                 <View style={[styles.badge, { backgroundColor: "#EF4444", borderColor: T.bg }]}>
                   <Text style={styles.badgeText}>{unread > 9 ? "9+" : String(unread)}</Text>
                 </View>
