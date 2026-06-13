@@ -820,6 +820,9 @@ export default function EventDetail() {
         {/* Bilgi kartları */}
         <View style={{ paddingHorizontal: 16, gap: 12, marginTop: 6 }}>
           <Animated.View entering={FadeInDown.duration(450)} style={[styles.infoCard, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+            {/* Tür (kategori): görsel üstündeki rozete ek olarak net bir alan. */}
+            <InfoRow T={T} icon="🏷️" label="Tür" value={`${c.emoji} ${c.label}`} />
+            <View style={[styles.sep, { backgroundColor: T.hairline }]} />
             <InfoRow
               T={T}
               icon="🗓️"

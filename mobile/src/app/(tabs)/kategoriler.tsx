@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -102,6 +102,10 @@ export default function KategorilerScreen() {
   const [cityInit, setCityInit] = useState(false);
   const [cityOpen, setCityOpen] = useState(false);
   const [advOpen, setAdvOpen] = useState(false);
+  // Gelişmiş filtre arama: kullanıcının yazdığı (searchInput) 350ms debounce ile
+  // sunucuya giden `search`e (q=isim/sanatçı/mekan) düşer.
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [priceFilter, setPriceFilter] = useState<"all" | "free" | "paid" | "student">("all");
   // Başlama tarihine göre filtre (varsayılan "all" = mevcut davranış, tüm yaklaşanlar).
   const [dateKey, setDateKey] = useState<DateKey>("all");
@@ -122,6 +126,12 @@ export default function KategorilerScreen() {
   const hasSelection = selected.length > 0;
 
   // Tarih filtresi → {from,to} ISO. Primitif string'ler effect/loadMore deps'inde stabil kalsın.
+  // Arama kutusu debounce: her tuşta sunucuya gitme, 350ms dur.
+  useEffect(() => {
+    const id = setTimeout(() => setSearch(searchInput.trim()), 350);
+    return () => clearTimeout(id);
+  }, [searchInput]);
+
   const dateRange = useMemo(() => rangeFor(dateKey), [dateKey]);
   const dateFrom = dateRange.from;
   const dateTo = dateRange.to;
@@ -242,6 +252,7 @@ export default function KategorilerScreen() {
           freeOnly: priceFilter === "free",
           from: dateFrom,
           to: dateTo,
+          search: search || undefined,
           page: 1,
           pageSize: PAGE_SIZE,
         });
@@ -261,7 +272,7 @@ export default function KategorilerScreen() {
     return () => {
       alive = false;
     };
-  }, [selectedKey, serverCategory, cityFilter, priceFilter, dateFrom, dateTo]);
+  }, [selectedKey, serverCategory, cityFilter, priceFilter, dateFrom, dateTo, search]);
 
   // Sonraki sayfayı çek ve listeye ekle (10'ar 10'ar).
   const loadMore = useCallback(async () => {
@@ -275,6 +286,7 @@ export default function KategorilerScreen() {
         freeOnly: priceFilter === "free",
         from: dateFrom,
         to: dateTo,
+        search: search || undefined,
         page: next,
         pageSize: PAGE_SIZE,
       });
@@ -289,7 +301,7 @@ export default function KategorilerScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }, [loading, loadingMore, page, totalPages, cityFilter, serverCategory, priceFilter, dateFrom, dateTo]);
+  }, [loading, loadingMore, page, totalPages, cityFilter, serverCategory, priceFilter, dateFrom, dateTo, search]);
 
   // İlçe filtresi (#C2): seçili ilçe (null = tümü). Veride district alanı yok →
   // venue/title içinde ilçe adı geçenleri göster.
@@ -411,6 +423,25 @@ export default function KategorilerScreen() {
 
           {advOpen ? (
             <Animated.View entering={FadeInDown.duration(260)} style={styles.advBody}>
+              {/* Etkinlik arama: isim / sanatçı / mekan (sunucuda q ile). */}
+              <View style={[styles.searchWrap, { backgroundColor: T.bg, borderColor: T.hairline }]}>
+                <Text style={{ fontSize: 15 }}>🔎</Text>
+                <TextInput
+                  value={searchInput}
+                  onChangeText={setSearchInput}
+                  placeholder="Etkinlik ara (isim, sanatçı, mekan)…"
+                  placeholderTextColor={T.textFaint}
+                  style={[styles.searchInput, { color: T.text }]}
+                  returnKeyType="search"
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+                {searchInput ? (
+                  <Pressable onPress={() => { tapH(); setSearchInput(""); }} hitSlop={8}>
+                    <Text style={{ color: T.textFaint, fontSize: 16 }}>✕</Text>
+                  </Pressable>
+                ) : null}
+              </View>
               <View style={styles.cityChips}>
                 {(["all", "free", "paid", "student"] as const).map((p) => (
                   <Pill
@@ -591,6 +622,17 @@ const styles = StyleSheet.create({
     marginTop: Space.md,
   },
   advBody: { marginTop: 0 },
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: Space.md,
+  },
+  searchInput: { flex: 1, fontSize: 15, padding: 0 },
   dateWrap: { paddingLeft: 16, marginBottom: Space.lg },
   dateChips: { flexDirection: "row", gap: Space.sm, paddingRight: 16 },
   grid: {
