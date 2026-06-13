@@ -12,7 +12,9 @@ import { PastEventsSection } from "@/components/PastEventsSection";
 import { Loader, Pill } from "@/ui/atoms";
 import { Radius, Type, Space } from "@/theme/aurora";
 import { CATEGORIES } from "@/lib/categories";
-import { fetchEvents, type ApiEvent } from "@/lib/api";
+import { fetchEvents, apiPingPresence, type ApiEvent } from "@/lib/api";
+import { getProfileKey } from "@/lib/profileSync";
+import { getChatPrefs } from "@/lib/chatPrefs";
 import { loadEventsCache, saveEventsCache } from "@/lib/eventCache";
 import { dayRange, isPastDay } from "@/lib/format";
 import { useActiveCity, ALL_CITIES } from "@/lib/location";
@@ -131,6 +133,22 @@ export default function DiscoverScreen() {
         .then((r) => { if (alive) { setUnread(r.unread); setNotifLoading(false); } })
         .catch(() => { if (alive) setNotifLoading(false); });
       return () => { alive = false; };
+    }, []),
+  );
+
+  // App-geneli "çevrimiçi / son görülme" kalp atışı: sohbet açık olmasa da ana sayfada
+  // presence güncellensin → karşı taraf "son görülme"yi UYGULAMAYA giriş olarak görsün
+  // (eskiden yalnız sohbet ekranı ping'liyordu). 25sn < 35sn çevrimiçi penceresi.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      const ping = async () => {
+        const key = await getProfileKey();
+        if (alive && key) void apiPingPresence(key, getChatPrefs().hideLastSeen);
+      };
+      void ping();
+      const iv = setInterval(ping, 25000);
+      return () => { alive = false; clearInterval(iv); };
     }, []),
   );
   const [cityModal, setCityModal] = useState(false);

@@ -78,7 +78,10 @@ export function isPartnerTyping(matchKey: string, deviceId: string): boolean {
   return false;
 }
 
-// ── Çevrimiçi/son görülme (in-memory, best-effort; serverless instance'lar arası kesin değil) ──
+// ── Çevrimiçi/son görülme — KALICI (DB; serverless instance'lar arası ortak) ──
+// Eskiden in-memory'di → Vercel'de ping ve get farklı instance'lara düşüp durum hiç
+// bulunamıyordu ("son görülme" hiç yazmıyordu). Artık MobilePresence tablosunda; tablo
+// yoksa withDb otomatik in-memory'e düşer (presenceMap, best-effort fallback).
 const ONLINE_WINDOW_MS = 35000; // son 35sn içinde ping → çevrimiçi
 interface PresenceEntry {
   ts: number;
@@ -87,15 +90,38 @@ interface PresenceEntry {
 const presenceMap: Map<string, PresenceEntry> = (g.__meydatePresence ??= new Map());
 
 /** Bu cihazın "şu an aktif" olduğunu işaretle (kalp atışı). hidden → durumu gizle. */
-export function setPresence(deviceId: string, hidden = false): void {
-  presenceMap.set(deviceId, { ts: Date.now(), hidden });
+export async function setPresence(deviceId: string, hidden = false): Promise<void> {
+  const identity = await canonicalIdentity(deviceId);
+  await withDb(
+    async () => {
+      await db.mobilePresence.upsert({
+        where: { identity },
+        create: { identity, lastActiveAt: new Date(), hidden },
+        update: { lastActiveAt: new Date(), hidden },
+      });
+    },
+    () => {
+      presenceMap.set(identity, { ts: Date.now(), hidden });
+    },
+  );
 }
 
 /** Bir cihazın çevrimiçi durumu + son görülme zamanı (ms). Gizliyse hep çevrimdışı/null. */
-export function getPresence(deviceId: string): { online: boolean; lastSeen: number | null } {
-  const e = presenceMap.get(deviceId);
-  if (!e || e.hidden) return { online: false, lastSeen: null };
-  return { online: Date.now() - e.ts < ONLINE_WINDOW_MS, lastSeen: e.ts };
+export async function getPresence(deviceId: string): Promise<{ online: boolean; lastSeen: number | null }> {
+  const identity = await canonicalIdentity(deviceId);
+  return withDb(
+    async () => {
+      const e = await db.mobilePresence.findUnique({ where: { identity } });
+      if (!e || e.hidden) return { online: false, lastSeen: null };
+      const ts = e.lastActiveAt.getTime();
+      return { online: Date.now() - ts < ONLINE_WINDOW_MS, lastSeen: ts };
+    },
+    () => {
+      const e = presenceMap.get(identity);
+      if (!e || e.hidden) return { online: false, lastSeen: null };
+      return { online: Date.now() - e.ts < ONLINE_WINDOW_MS, lastSeen: e.ts };
+    },
+  );
 }
 
 let idSeq = 0;
@@ -120,18 +146,28 @@ function mockMatchKey(deviceId: string, partnerId: string): string {
  * hepsi e-postaya çözülürse iki taraf AYNI matchKey'i üretir → mesajlar karşıya ulaşır.
  * E-posta bulunamazsa kimlik aynen döner (mock kişiler vb.).
  */
+// Kanonik kimlik cache'i (presence 3sn polling'inde aynı id tekrar tekrar çözülmesin →
+// DB yükü). TTL'li, globalThis singleton; nadir değişen bir eşleme.
+const CANON_TTL_MS = 5 * 60_000;
+const canonCache: Map<string, { v: string; exp: number }> = ((g as unknown as { __meydateCanon?: Map<string, { v: string; exp: number }> }).__meydateCanon ??= new Map());
+
 async function canonicalIdentity(rawId: string): Promise<string> {
   const id = rawId.trim();
   if (!id) return id;
   if (id.startsWith("acct:")) return id.toLowerCase();
   if (id.includes("@")) return `acct:${id.toLowerCase()}`;
+  const now = Date.now();
+  const hit = canonCache.get(id);
+  if (hit && hit.exp > now) return hit.v;
   // Ham User.id veya cihaz UUID'si → e-postaya çöz (User.email veya MobileProfile.email).
   const [usr, prof] = await Promise.all([
     db.user.findUnique({ where: { id }, select: { email: true } }).catch(() => null),
     db.mobileProfile.findUnique({ where: { deviceId: id }, select: { email: true } }).catch(() => null),
   ]);
   const email = usr?.email || prof?.email || null;
-  return email ? `acct:${email.toLowerCase()}` : id;
+  const v = email ? `acct:${email.toLowerCase()}` : id;
+  canonCache.set(id, { v, exp: now + CANON_TTL_MS });
+  return v;
 }
 
 // ── Swipe + (gerçek) eşleşme tespiti ────────────────────────────────────────────

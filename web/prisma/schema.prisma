@@ -511,6 +511,15 @@ model MobileMessage {
   @@index([matchKey, createdAt])
 }
 
+// Çevrimiçi / son görülme — KALICI (in-memory yerine): Vercel serverless'ta her istek
+// farklı instance'a düşebildiği için presence DB'de tutulur, aksi halde karşı tarafın
+// durumu hiç bulunamıyordu. identity = kanonik kimlik (acct:email çözülebiliyorsa).
+model MobilePresence {
+  identity     String   @id
+  lastActiveAt DateTime @default(now())
+  hidden       Boolean  @default(false)
+}
+
 model Event {
   id            String        @id @default(cuid())
   // Scraper'lar onlarca dinamik kaynak üretir (UNI_HACETTEPE, BUGECE, MUNI_BURSA...)

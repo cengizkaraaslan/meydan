@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   }
   const deviceId = body.deviceId?.trim();
   if (!deviceId) return NextResponse.json({ error: "deviceId zorunlu" }, { status: 400 });
-  setPresence(deviceId, body.hidden === true);
+  await setPresence(deviceId, body.hidden === true);
   return NextResponse.json({ ok: true });
 }
 
@@ -22,5 +22,5 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const deviceId = request.nextUrl.searchParams.get("deviceId")?.trim();
   if (!deviceId) return NextResponse.json({ error: "deviceId zorunlu" }, { status: 400 });
-  return NextResponse.json({ ok: true, ...getPresence(deviceId) });
+  return NextResponse.json({ ok: true, ...(await getPresence(deviceId)) });
 }
