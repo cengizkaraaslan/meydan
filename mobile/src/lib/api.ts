@@ -287,6 +287,39 @@ export async function apiGetTyping(matchKey: string, deviceId: string): Promise<
   }
 }
 
+/** Bir kullanıcıyı engeller (deviceId targetId'yi). Başarıda true. */
+export async function apiBlockUser(deviceId: string, targetId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/dating/block`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ deviceId, targetId }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Bir kullanıcıyı şikayet eder (admin paneline düşer). Başarıda true. */
+export async function apiReportUser(
+  deviceId: string,
+  targetId: string,
+  reason: string,
+  matchKey?: string | null,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/dating/report`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ deviceId, targetId, reason, matchKey }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** "Şu an aktifim" kalp atışı gönderir. hidden=true → durum karşı tarafa gizlenir. */
 export async function apiPingPresence(deviceId: string, hidden = false): Promise<void> {
   try {

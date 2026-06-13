@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { LayoutDashboard, CalendarDays, Users, Cable, CreditCard, ScrollText, HardDrive, Flag, Palette } from "lucide-react";
+import { LayoutDashboard, CalendarDays, Users, Cable, CreditCard, ScrollText, HardDrive, Flag, Palette, ShieldAlert } from "lucide-react";
 import { getOpenCount } from "@/lib/reports-store";
+import { mobileReportCount } from "@/lib/mobile-chat-store";
 import { auth } from "@/auth";
 import { isAdminEmail } from "@/lib/adminAuth";
 
@@ -10,6 +11,7 @@ const nav = [
   { href: "/admin/etkinlikler",    label: "Etkinlikler",  icon: CalendarDays },
   { href: "/admin/kullanicilar",   label: "Kullanıcılar", icon: Users },
   { href: "/admin/raporlar",       label: "Raporlar",     icon: Flag, badge: "reports" as const },
+  { href: "/admin/sohbet-sikayet", label: "Sohbet Şikayet", icon: ShieldAlert, badge: "chatreports" as const },
   { href: "/admin/scrapers",       label: "Scrapers",     icon: Cable },
   { href: "/admin/abonelikler",    label: "Abonelikler",  icon: CreditCard },
   { href: "/admin/depolama",       label: "Depolama",     icon: HardDrive },
@@ -25,6 +27,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!(await isAdminEmail(email))) redirect("/");
 
   const openReports = getOpenCount();
+  const chatReports = await mobileReportCount();
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-6 flex items-end justify-between flex-wrap gap-3">
@@ -49,6 +52,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               {badge === "reports" && openReports > 0 && (
                 <span className="rounded-full bg-[var(--danger)] text-white text-[10px] font-bold px-1.5 py-0.5 min-w-[18px] text-center">
                   {openReports}
+                </span>
+              )}
+              {badge === "chatreports" && chatReports > 0 && (
+                <span className="rounded-full bg-[var(--danger)] text-white text-[10px] font-bold px-1.5 py-0.5 min-w-[18px] text-center">
+                  {chatReports}
                 </span>
               )}
             </Link>

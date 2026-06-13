@@ -33,6 +33,8 @@ import { SignInPrompt } from "@/components/SignInPrompt";
 import { tapH, tapHaptic } from "@/lib/haptics";
 import { sndSend } from "@/lib/sound";
 import { deleteConversation } from "@/lib/conversations";
+import { apiBlockUser, apiReportUser } from "@/lib/api";
+import { getProfileKey } from "@/lib/profileSync";
 import { ReactionPicker } from "@/components/ReactionPicker";
 
 const READ_BLUE = "#34B7F1";
@@ -51,6 +53,16 @@ function mmss(ms: number): string {
 }
 
 /** Son görülme: az önce / X dk önce / bugün HH:MM / DD.MM HH:MM. */
+// Şikayet nedenleri (üç nokta menüsü → Şikayet et).
+const REPORT_REASONS = [
+  "Spam / reklam",
+  "Taciz / hakaret",
+  "Sahte profil",
+  "Uygunsuz içerik",
+  "Dolandırıcılık",
+  "Diğer",
+];
+
 function lastSeenText(ms: number): string {
   const diff = Date.now() - ms;
   if (diff < 60000) return "az önce";
@@ -358,6 +370,48 @@ export default function ChatScreen() {
     setText("");
   };
 
+  // ── Üç nokta menüsü: Şikayet et / Engelle ──
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuMode, setMenuMode] = useState<"menu" | "report">("menu");
+  const openMenu = () => { tapHaptic(); setMenuMode("menu"); setMenuOpen(true); };
+
+  const submitReport = (reason: string) => {
+    setMenuOpen(false);
+    (async () => {
+      const me = await getProfileKey();
+      const ok = await apiReportUser(me, String(id), reason, matchKey || pMatchKey);
+      Alert.alert(
+        ok ? "Şikayet alındı" : "Hata",
+        ok ? "Şikayetin yöneticiye iletildi. İncelenecek — teşekkürler." : "Şikayet gönderilemedi, tekrar dene.",
+      );
+    })();
+  };
+
+  const onBlock = () => {
+    setMenuOpen(false);
+    Alert.alert(
+      "Engelle",
+      `${person.name} engellensin mi? Artık sana mesaj gönderemez ve sohbet listenden kalkar.`,
+      [
+        { text: "Vazgeç", style: "cancel" },
+        {
+          text: "Engelle",
+          style: "destructive",
+          onPress: () => {
+            (async () => {
+              const me = await getProfileKey();
+              const key = matchKey || pMatchKey;
+              router.replace("/mesajlar" as Href);
+              await apiBlockUser(me, String(id));
+              if (key) void deleteConversation(key);
+            })();
+          },
+        },
+      ],
+      { cancelable: true },
+    );
+  };
+
   // Header'daki çöp kutusu: tüm sohbeti sil → listeden kalksın → listeleme sayfasına dön.
   const onDeleteConversation = () => {
     tapH();
@@ -422,7 +476,43 @@ export default function ChatScreen() {
         <Pressable onPress={onDeleteConversation} disabled={!ready} hitSlop={10} style={[styles.back, { backgroundColor: T.surfaceStrong, opacity: ready ? 1 : 0.4 }]}>
           <Ionicons name="trash-outline" size={19} color="#FF3B30" />
         </Pressable>
+        {/* Üç nokta: Şikayet et / Engelle */}
+        <Pressable onPress={openMenu} hitSlop={10} style={[styles.back, { backgroundColor: T.surfaceStrong }]}>
+          <Ionicons name="ellipsis-vertical" size={19} color={T.text} />
+        </Pressable>
       </View>
+
+      {/* Üç nokta menüsü (alt sayfa): Şikayet et / Engelle + şikayet nedeni seçimi */}
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
+          <Pressable style={[styles.menuSheet, { backgroundColor: T.surface, paddingBottom: insets.bottom + 12 }]} onPress={() => {}}>
+            <View style={[styles.menuHandle, { backgroundColor: T.hairline }]} />
+            {menuMode === "menu" ? (
+              <>
+                <Pressable style={styles.menuRow} onPress={() => { tapHaptic(); setMenuMode("report"); }}>
+                  <Ionicons name="flag-outline" size={20} color={T.text} />
+                  <Text style={[Type.title, { color: T.text }]}>Şikayet et</Text>
+                </Pressable>
+                <View style={[styles.menuSep, { backgroundColor: T.hairline }]} />
+                <Pressable style={styles.menuRow} onPress={onBlock}>
+                  <Ionicons name="ban-outline" size={20} color="#FF3B30" />
+                  <Text style={[Type.title, { color: "#FF3B30" }]}>Engelle</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={[Type.label, { color: T.textDim, paddingHorizontal: 16, paddingBottom: 6 }]}>Şikayet nedeni</Text>
+                {REPORT_REASONS.map((r) => (
+                  <Pressable key={r} style={styles.menuRow} onPress={() => submitReport(r)}>
+                    <Ionicons name="alert-circle-outline" size={18} color={T.textDim} />
+                    <Text style={[Type.title, { color: T.text }]}>{r}</Text>
+                  </Pressable>
+                ))}
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         {/* Sohbet hazır olana kadar (ensureMatch + ilk fetch) şık bir loading; header zaten yukarıda anında çiziliyor. */}
@@ -909,6 +999,11 @@ const styles = StyleSheet.create({
   },
   back: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   hAvatarWrap: { borderRadius: 21 },
+  menuBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8 },
+  menuHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
+  menuRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 15, paddingHorizontal: 18 },
+  menuSep: { height: StyleSheet.hairlineWidth, marginLeft: 18 },
   hAvatar: { width: 42, height: 42, borderRadius: 21 },
   lock: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
   loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center" },

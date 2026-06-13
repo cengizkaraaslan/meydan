@@ -124,6 +124,201 @@ export async function getPresence(deviceId: string): Promise<{ online: boolean; 
   );
 }
 
+// ── Engelle / Şikayet ────────────────────────────────────────────────────────────
+interface MemBlock { blocker: string; blocked: string }
+const g2 = globalThis as unknown as { __meydateBlocks?: MemBlock[] };
+const memBlocks: MemBlock[] = (g2.__meydateBlocks ??= []);
+
+/** A, B'yi engelle (kanonik kimlikler). Engelleyenin o konuşması da kaldırılır. */
+export async function blockUser(blockerDeviceId: string, blockedId: string): Promise<{ ok: boolean }> {
+  const blocker = await canonicalIdentity(blockerDeviceId);
+  const blocked = await canonicalIdentity(blockedId);
+  if (!blocker || !blocked || blocker === blocked) return { ok: false };
+  await withDb(
+    async () => {
+      await db.mobileBlock.upsert({
+        where: { blockerIdentity_blockedIdentity: { blockerIdentity: blocker, blockedIdentity: blocked } },
+        create: { blockerIdentity: blocker, blockedIdentity: blocked },
+        update: {},
+      });
+      // Engelleyenin bu kişiyle konuşması listeden kalksın (iki yönlü matchKey satırı).
+      await db.mobileMatch.deleteMany({ where: { deviceId: blocker, partnerId: blocked } });
+    },
+    () => {
+      if (!memBlocks.some((b) => b.blocker === blocker && b.blocked === blocked)) memBlocks.push({ blocker, blocked });
+      mem.matches = mem.matches.filter((m) => !(m.deviceId === blocker && m.partnerId === blocked));
+    },
+  );
+  return { ok: true };
+}
+
+/** İki kimlik arasında (her iki yönde) engelleme var mı? — mesaj iletimini durdurmak için. */
+export async function isBlockedBetween(a: string, b: string): Promise<boolean> {
+  const ca = await canonicalIdentity(a);
+  const cb = await canonicalIdentity(b);
+  if (!ca || !cb) return false;
+  return withDb(
+    async () => {
+      const hit = await db.mobileBlock.findFirst({
+        where: {
+          OR: [
+            { blockerIdentity: ca, blockedIdentity: cb },
+            { blockerIdentity: cb, blockedIdentity: ca },
+          ],
+        },
+        select: { id: true },
+      });
+      return !!hit;
+    },
+    () => memBlocks.some((x) => (x.blocker === ca && x.blocked === cb) || (x.blocker === cb && x.blocked === ca)),
+  );
+}
+
+/** Şikayet kaydı oluştur (admin incelemesi için). */
+export async function reportUser(input: {
+  reporterDeviceId: string;
+  reportedId: string;
+  reason: string;
+  matchKey?: string | null;
+}): Promise<{ ok: boolean }> {
+  const reporter = await canonicalIdentity(input.reporterDeviceId);
+  const reported = await canonicalIdentity(input.reportedId);
+  const reason = (input.reason || "").trim().slice(0, 1000) || "Belirtilmedi";
+  if (!reporter || !reported) return { ok: false };
+  await withDb(
+    async () => {
+      await db.mobileReport.create({
+        data: { reporterIdentity: reporter, reportedIdentity: reported, reason, matchKey: input.matchKey ?? null },
+      });
+    },
+    () => { /* in-memory'de şikayet tutmuyoruz (admin DB'de okur) */ },
+  );
+  return { ok: true };
+}
+
+/** Gerçek matchKey'den iki tarafın kimliğini çıkar ("r_a__b" → [a,b]); değilse null. */
+function identitiesFromMatchKey(matchKey: string): [string, string] | null {
+  if (!matchKey.startsWith("r_")) return null;
+  const parts = matchKey.slice(2).split("__");
+  return parts.length === 2 ? [parts[0], parts[1]] : null;
+}
+
+// ── Admin: şikayet (MobileReport) okuma ──────────────────────────────────────────
+export interface ReportRow {
+  id: string;
+  reporterIdentity: string;
+  reporterName: string;
+  reportedIdentity: string;
+  reportedName: string;
+  reason: string;
+  matchKey: string | null;
+  createdAt: string; // ISO
+}
+
+/** Kimlik(ler) → görünen ad eşlemesi (acct:email / cihaz / User.id çözülür). */
+async function resolveNames(identities: string[]): Promise<Map<string, string>> {
+  const ids = [...new Set(identities.filter(Boolean))];
+  const out = new Map<string, string>();
+  if (ids.length === 0) return out;
+  const emailOf = (id: string): string | null =>
+    id.startsWith("acct:") ? id.slice(5).toLowerCase() : id.includes("@") ? id.toLowerCase() : null;
+  const emails = [...new Set(ids.map(emailOf).filter((e): e is string => !!e))];
+  const [profs, users] = await Promise.all([
+    db.mobileProfile.findMany({
+      where: { OR: [{ deviceId: { in: ids } }, ...(emails.length ? [{ email: { in: emails } }] : [])] },
+      select: { deviceId: true, email: true, name: true },
+    }).catch(() => []),
+    db.user.findMany({
+      where: { OR: [{ id: { in: ids } }, ...(emails.length ? [{ email: { in: emails } }] : [])] },
+      select: { id: true, email: true, name: true },
+    }).catch(() => []),
+  ]);
+  const profByDev = new Map(profs.map((p) => [p.deviceId, p.name]));
+  const profByEmail = new Map(profs.filter((p) => p.email).map((p) => [p.email!.toLowerCase(), p.name]));
+  const userById = new Map(users.map((u) => [u.id, u.name]));
+  const userByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u.name]));
+  for (const id of ids) {
+    const em = emailOf(id);
+    const name =
+      profByDev.get(id) || userById.get(id) || (em ? profByEmail.get(em) || userByEmail.get(em) : null) || em || id;
+    out.set(id, name || id);
+  }
+  return out;
+}
+
+/** Açık (toplam) şikayet sayısı — admin nav rozeti için. */
+export async function mobileReportCount(): Promise<number> {
+  return withDb(
+    () => db.mobileReport.count(),
+    () => 0,
+  );
+}
+
+/** Tüm sohbet şikayetleri (yeni→eski), ad çözümlemeli. */
+export async function listMobileReports(limit = 200): Promise<ReportRow[]> {
+  return withDb(
+    async () => {
+      const rows = await db.mobileReport.findMany({ orderBy: { createdAt: "desc" }, take: limit });
+      const names = await resolveNames(rows.flatMap((r) => [r.reporterIdentity, r.reportedIdentity]));
+      return rows.map((r) => ({
+        id: r.id,
+        reporterIdentity: r.reporterIdentity,
+        reporterName: names.get(r.reporterIdentity) ?? r.reporterIdentity,
+        reportedIdentity: r.reportedIdentity,
+        reportedName: names.get(r.reportedIdentity) ?? r.reportedIdentity,
+        reason: r.reason,
+        matchKey: r.matchKey,
+        createdAt: r.createdAt.toISOString(),
+      }));
+    },
+    () => [],
+  );
+}
+
+export interface ReportDetail extends ReportRow {
+  messages: { id: string; senderIdentity: string; senderName: string; text: string; at: string; isReported: boolean }[];
+}
+
+/** Tek şikayet + (varsa) şikayet edilen konuşmanın TÜM mesajları (admin okusun diye). */
+export async function getMobileReport(id: string): Promise<ReportDetail | null> {
+  return withDb(
+    async () => {
+      const r = await db.mobileReport.findUnique({ where: { id } });
+      if (!r) return null;
+      const names = await resolveNames([r.reporterIdentity, r.reportedIdentity]);
+      const base: ReportRow = {
+        id: r.id,
+        reporterIdentity: r.reporterIdentity,
+        reporterName: names.get(r.reporterIdentity) ?? r.reporterIdentity,
+        reportedIdentity: r.reportedIdentity,
+        reportedName: names.get(r.reportedIdentity) ?? r.reportedIdentity,
+        reason: r.reason,
+        matchKey: r.matchKey,
+        createdAt: r.createdAt.toISOString(),
+      };
+      let messages: ReportDetail["messages"] = [];
+      if (r.matchKey) {
+        const msgs = await db.mobileMessage.findMany({
+          where: { matchKey: r.matchKey, NOT: { text: { startsWith: "[react]" } } },
+          orderBy: { createdAt: "asc" },
+          take: 500,
+        });
+        const msgNames = await resolveNames(msgs.map((m) => m.senderDeviceId));
+        messages = msgs.map((m) => ({
+          id: m.id,
+          senderIdentity: m.senderDeviceId,
+          senderName: msgNames.get(m.senderDeviceId) ?? m.senderDeviceId,
+          text: m.text,
+          at: m.createdAt.toISOString(),
+          isReported: m.senderDeviceId === r.reportedIdentity,
+        }));
+      }
+      return { ...base, messages };
+    },
+    () => null,
+  );
+}
+
 let idSeq = 0;
 function memId(prefix: string): string {
   idSeq += 1;
@@ -547,6 +742,12 @@ export async function sendMessage(input: {
 }): Promise<MessageView> {
   const { matchKey, senderDeviceId } = input;
   const text = input.text.trim().slice(0, 2000);
+  // Engelli çift → mesajı İLETME (kalıcılaştırma yok). Gönderene sahte başarı dön ki akış
+  // bozulmasın; mesaj karşı tarafa ulaşmaz (shadow-block).
+  const ids = identitiesFromMatchKey(matchKey);
+  if (ids && (await isBlockedBetween(ids[0], ids[1]))) {
+    return { id: memId("blocked"), fromMe: true, text, at: Date.now(), readAt: null };
+  }
   return withDb(
     async () => {
       const r = await db.mobileMessage.create({ data: { matchKey, senderDeviceId, text } });

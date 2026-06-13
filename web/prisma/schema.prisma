@@ -520,6 +520,31 @@ model MobilePresence {
   hidden       Boolean  @default(false)
 }
 
+// Engelleme: blocker, blocked'ı engelledi (kanonik kimlikler). Engellenen taraf artık
+// engelleyene mesaj ulaştıramaz ve engelleyenin listesinden konuşma kalkar.
+model MobileBlock {
+  id              String   @id @default(cuid())
+  blockerIdentity String
+  blockedIdentity String
+  createdAt       DateTime @default(now())
+
+  @@unique([blockerIdentity, blockedIdentity])
+  @@index([blockerIdentity])
+  @@index([blockedIdentity])
+}
+
+// Şikayet: reporter, reported hakkında şikayet bıraktı (admin incelemesi için).
+model MobileReport {
+  id               String   @id @default(cuid())
+  reporterIdentity String
+  reportedIdentity String
+  reason           String   @db.Text
+  matchKey         String?
+  createdAt        DateTime @default(now())
+
+  @@index([reportedIdentity])
+}
+
 model Event {
   id            String        @id @default(cuid())
   // Scraper'lar onlarca dinamik kaynak üretir (UNI_HACETTEPE, BUGECE, MUNI_BURSA...)
