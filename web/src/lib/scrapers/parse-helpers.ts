@@ -69,8 +69,10 @@ export function guessCategory(text: string): EventCategory {
   // gibi başlıklar KONSER/TIYATRO'ya kapılmasın diye en başta değerlendirilir. Yalnız
   // güçlü/özgül dini tokenler — genel "müzik/konser" buraya düşmez.
   if (/(vaaz|hutbe|tasavvuf|tefsir|hadis\b|siyer|i̇lahi|ilahi|naat|kaside|mevlid|mevlit|mevlüt|kandil|regaip|mira[cç]|berat gecesi|kadir gecesi|kur['’]?an|hatim|mukabele|teravih|sahur|iftar|ramazan|namaz|manevi|maneviyat|irşad|irsad|zikir|semazen|sema göster|sema goster|sufi|hafızlık|hafizlik|icazet|i̇slami|islami|i̇slam araştırma|islam araştırma|diyanet|müftülük|muftuluk)/.test(t)) return "DINI";
-  if (/(konser|resital|müzik|muzik|caz|jazz|orkestra|dj|techno|house|elektronik|rap|hip[\s-]?hop|sahne alıyor)/.test(t)) return "KONSER";
-  if (/(festival|fest\b)/.test(t)) return "FESTIVAL";
+  if (/(konser|resital|müzik|muzik|caz|jazz|orkestra|dj|techno|house|elektronik|\brap\b|hip[\s-]?hop|sahne alıyor)/.test(t)) return "KONSER";
+  // "şenlik/şenliği" (bahar/gençlik şenlikleri) ve "şölen" de festival sayılır — üniversite/
+  // belediye kaynakları bunları zaten çekiyor, sadece FESTIVAL yerine DIGER'e düşüyorlardı.
+  if (/(festival|fest\b|şenlik|şenliğ|senlik|senliğ|şölen|solen)/.test(t)) return "FESTIVAL";
   if (/(tiyatro|oyun|sahne|müzikal|muzikal|gösteri|gosteri)/.test(t)) return "TIYATRO";
   if (/(stand[\s-]?up|komedi|tek kişilik)/.test(t)) return "STANDUP";
   if (/(spor|maç|mac|koşu|kosu|turnuva|yürüyüş|yuruyus|bisiklet|atletizm|champions league|gp\b|motogp|formula)/.test(t)) return "SPOR";
