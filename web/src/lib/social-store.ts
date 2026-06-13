@@ -35,8 +35,9 @@ export async function listFeed(input: { deviceId: string; filter: "all" | "follo
   let where: Record<string, unknown> = {};
   if (filter === "follow") {
     const ids = await listFollowingIds(deviceId);
-    // Kendi gönderilerin + takip ettiklerin + Sistem (etkinlik duyuruları her zaman görünür).
-    where = { authorId: { in: [...ids, deviceId, "system"] } };
+    // SADECE takip ettiklerin + kendi gönderilerin. Sistem (etkinlik duyuruları) bu sekmede
+    // GÖSTERİLMEZ; yalnız "Genel" akışta serpiştirilir. ("system" bilinçli olarak hariç.)
+    where = { authorId: { in: [...ids, deviceId] } };
   }
 
   let posts = await db.mobilePost.findMany({ where, orderBy: { createdAt: "desc" }, skip: offset, take: PAGE });

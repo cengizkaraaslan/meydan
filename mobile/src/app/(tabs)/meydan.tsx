@@ -531,21 +531,24 @@ export default function MeydanScreen() {
   );
 
   // Gönderi + etkinlik serpiştirilmiş feed öğeleri.
+  // "Takip ettiklerim"de SADECE takip edilenlerin gönderileri olmalı → etkinlik kartı
+  // serpiştirme yalnız "Genel" akışta yapılır.
   const feedItems = useMemo<FeedItem[]>(() => {
     const items: FeedItem[] = [];
+    const interleaveEvents = filter === "all";
     let ei = 0;
     posts.forEach((post, i) => {
       items.push({ kind: "post", post });
-      if ((i + 1) % EVENT_EVERY === 0 && ei < events.length) {
+      if (interleaveEvents && (i + 1) % EVENT_EVERY === 0 && ei < events.length) {
         items.push({ kind: "event", event: events[ei++] });
       }
     });
-    // Hiç gönderi yoksa ama etkinlik varsa, en azından etkinlikleri göster.
-    if (posts.length === 0 && events.length > 0) {
+    // Hiç gönderi yoksa ama etkinlik varsa, en azından etkinlikleri göster (yalnız Genel).
+    if (interleaveEvents && posts.length === 0 && events.length > 0) {
       events.slice(0, 6).forEach((event) => items.push({ kind: "event", event }));
     }
     return items;
-  }, [posts, events]);
+  }, [posts, events, filter]);
 
   const keyExtractor = useCallback(
     (item: FeedItem, i: number) => (item.kind === "post" ? item.post.id : `ev-${item.event.id}-${i}`),
@@ -781,6 +784,8 @@ export default function MeydanScreen() {
         ListEmptyComponent={
           loading ? (
             <Loader label="Yükleniyor…" />
+          ) : filter === "follow" ? (
+            <EmptyState emoji="👀" title="Takip akışın boş" sub="Takip ettiğin kişilerin gönderileri burada görünür." />
           ) : (
             <EmptyState emoji="🌌" title="Henüz gönderi yok" sub="İlk paylaşan sen ol!" />
           )
