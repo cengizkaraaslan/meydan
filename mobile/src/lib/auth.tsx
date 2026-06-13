@@ -5,7 +5,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import * as Linking from "expo-linking";
 import { API_BASE } from "./api";
-import { setAccountKey, restoreAvatar, clearAccountScopedCache } from "./profileSync";
+import { setAccountKey, restoreAvatar, clearAccountScopedCache, fetchProfile, syncProfile, restoreProfileLocally } from "./profileSync";
 import { linkSocialIdentity } from "./social";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -191,7 +191,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // E-posta ile giriş — Google OAuth client ID gerektirmez (hemen çalışır).
   const signInWithEmail = useCallback(async (name: string, email: string) => {
     const clean = email.trim().toLowerCase();
-    await handleUser({ id: `email-${clean}`, name: name.trim() || clean.split("@")[0] || "Kullanıcı", email: clean });
+    // Profil anahtarını e-postaya AYARLA ki fetchProfile DB'deki eşleşen hesabı bulsun.
+    setAccountKey(clean);
+    const existing = await fetchProfile().catch(() => null);
+    const existingName =
+      existing && typeof existing.name === "string" && existing.name.trim() ? (existing.name as string).trim() : "";
+    // DB'de eşleşen hesap VARSA: onun adı + profiliyle gir. YOKSA: girilen adla YENİ kullanıcı.
+    const resolvedName = existingName || name.trim() || clean.split("@")[0] || "Kullanıcı";
+    // handleUser, e-posta DEĞİŞTİyse scoped cache'i temizler → restore'u ondan SONRA yap.
+    await handleUser({ id: `email-${clean}`, name: resolvedName, email: clean });
+    if (existing) {
+      await restoreProfileLocally(existing); // mevcut hesabın avatar/cinsiyet/şehir/profilini yükle
+    } else {
+      // Yeni kullanıcı → adı sunucuya yaz (DB'de hesabı oluştur).
+      void syncProfile({ name: resolvedName });
+    }
   }, [handleUser]);
 
   const continueAsGuest = useCallback(async () => {

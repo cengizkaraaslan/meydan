@@ -78,6 +78,49 @@ export async function restoreAvatar(): Promise<void> {
   }
 }
 
+/**
+ * Sunucudaki profili (E-posta ile devam'da DB'deki eşleşen hesap) YERELE yükler:
+ * avatar + cinsiyet + şehir + tanışma profili (dprofile). Böylece e-postayla girince
+ * o hesabın kimliği/profili geri gelir. Eksik alanlar varsayılanla doldurulur.
+ */
+export async function restoreProfileLocally(profile: Record<string, unknown>): Promise<void> {
+  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const arr = (v: unknown) => str(v).split(",").map((s) => s.trim()).filter(Boolean);
+  try {
+    const avatar = str(profile.avatar);
+    if (avatar && /^https?:\/\//.test(avatar)) {
+      await AsyncStorage.setItem(KEY_AVATAR, avatar);
+      avatarListeners.forEach((l) => l(avatar));
+    }
+    const g = str(profile.gender).toLowerCase();
+    if (g === "male" || g === "female" || g === "other") {
+      await AsyncStorage.setItem("meydanfest:gender", g);
+    }
+    const city = str(profile.city);
+    if (city) await AsyncStorage.setItem("meydanfest:city", city);
+    // Tanışma profili (DProfile şekline eşle).
+    const dp = {
+      about: str(profile.bio),
+      birthDate: str(profile.birthDate),
+      age: "",
+      showAge: profile.showAge !== false,
+      heightCm: str(profile.heightCm),
+      weightKg: str(profile.weightKg),
+      interests: arr(profile.interests),
+      goal: str(profile.goal) || null,
+      languages: arr(profile.languages),
+      zodiac: str(profile.zodiac) || null,
+      education: str(profile.education) || null,
+      drinking: str(profile.drinking) || null,
+      smoking: str(profile.smoking) || null,
+      exercise: str(profile.exercise) || null,
+    };
+    await AsyncStorage.setItem("meydanfest:dprofile", JSON.stringify(dp));
+  } catch {
+    /* yoksay */
+  }
+}
+
 /** Hesaba özel yerel önbellek anahtarları — hesap DEĞİŞİNCE temizlenir ki yeni hesap
  *  önceki hesabın avatar/profil/cinsiyet/şehir verisini görmesin. (Cihaz ayarları —
  *  dil, ses, haptics, favoriler — hesaptan bağımsızdır, dokunmuyoruz.) */

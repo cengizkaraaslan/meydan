@@ -96,6 +96,14 @@ export async function POST(request: NextRequest) {
   // Yalnızca gövdede AÇIKÇA gönderilen alanları yaz — kısmi senkron (örn. sadece
   // {city,district}) diğer kolonları (gender/avatar/bio…) null'a ÇEKMESİN.
   const data: Record<string, unknown> = {};
+  // deviceId bir e-posta/acct ise email kolonunu da doldur → "E-posta ile devam et"te
+  // eşleşen hesap email'den de bulunur (ve kanonik kimlik çözümü çalışır).
+  const emailFromKey = deviceId.includes("@")
+    ? deviceId.toLowerCase()
+    : deviceId.startsWith("acct:")
+      ? deviceId.slice(5).toLowerCase()
+      : null;
+  if (emailFromKey) data.email = emailFromKey;
   if ("gender" in body) data.gender = normalizeGender(body.gender);
   if ("city" in body) data.city = strOrNull(body.city);
   if ("district" in body) data.district = strOrNull(body.district);
@@ -179,7 +187,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "deviceId zorunlu" }, { status: 400 });
   }
 
-  const profile = await db.mobileProfile.findUnique({ where: { deviceId } });
+  // Önce deviceId ile; bulunamazsa ve param bir e-posta/acct:email ise EMAIL kolonundan ara
+  // → "E-posta ile devam et"te DB'deki eşleşen hesap (farklı deviceId'li olsa da) bulunur.
+  let profile = await db.mobileProfile.findUnique({ where: { deviceId } });
+  if (!profile) {
+    const email = deviceId.startsWith("acct:")
+      ? deviceId.slice(5).toLowerCase()
+      : deviceId.includes("@")
+        ? deviceId.toLowerCase()
+        : null;
+    if (email) {
+      profile = await db.mobileProfile
+        .findFirst({ where: { email }, orderBy: { id: "asc" } })
+        .catch(() => null);
+    }
+  }
   // birthDate/showAge yeni kolonlar — findUnique tüm kolonları döndürür; stale
   // client tipinde görünmeyebilir diye unknown üzerinden cast ile garanti et.
   const p = profile as unknown as Record<string, unknown> | null;
