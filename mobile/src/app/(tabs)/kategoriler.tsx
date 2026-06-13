@@ -499,11 +499,11 @@ export default function KategorilerScreen() {
                     end={{ x: 1, y: 1 }}
                     style={[
                       styles.tile,
-                      active && styles.tileActive,
+                      active ? styles.tileActive : styles.tileInactive,
                     ]}
                   >
-                    {/* Pasif tile: rengi soluklaştıran scrim (içeriğin ALTINDA). */}
-                    {!active ? <View style={styles.tileDim} pointerEvents="none" /> : null}
+                    {/* Pasif tile: koyu scrim yerine komple soluklaştır (disabled görünüm) —
+                        gradient + emoji + yazı görünür kalır, sadece sönük olur. */}
                     {active ? (
                       <View style={styles.check}>
                         <Text style={styles.checkTxt}>✓</Text>
@@ -611,14 +611,9 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth * 4,
     borderColor: "rgba(255,255,255,0.9)",
   },
-  // Pasif tile rengini soluklaştıran scrim (içerik üstte kaldığı için gizlemez).
-  tileDim: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(8,7,13,0.5)",
+  // Seçili değil = disabled görünüm: gradient/emoji görünür ama soluk.
+  tileInactive: {
+    opacity: 0.4,
   },
   tileBottom: {
     flexDirection: "row",
