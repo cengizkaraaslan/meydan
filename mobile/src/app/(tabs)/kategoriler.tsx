@@ -407,7 +407,7 @@ export default function KategorilerScreen() {
         <Animated.View entering={FadeInDown.delay(60).duration(450)} style={styles.locWrap}>
           <Pressable
             onPress={() => {
-              tapH();
+              tapHaptic(); // sadece titreşim — gelişmiş filtre açılışında bip sesi olmasın
               setAdvOpen((v) => !v);
             }}
             style={[
