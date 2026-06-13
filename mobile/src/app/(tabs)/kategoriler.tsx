@@ -518,9 +518,11 @@ export default function KategorilerScreen() {
             // Seçili değilse GİZLEME yok: sadece üstüne hafif koyu scrim koyup rengi
             // soluklaştırırız (emoji/yazı/rozet net kalır → "sadece rengi değişir").
             return (
-              <Animated.View
+              // entering (FadeInDown) animasyonu kaldırıldı: reanimated, kategori toggle'ında
+              // yeniden render'da kutuyu opacity 0'da bırakıp seçili-olmayanları GÖRÜNMEZ
+              // yapıyordu. Düz View → kutu her zaman tam görünür.
+              <View
                 key={item.key}
-                entering={FadeInDown.delay(Math.min(i, 8) * 55).duration(420)}
                 style={styles.cell}
               >
                 <Pressable onPress={() => toggleCategory(item.key)}>
@@ -555,7 +557,7 @@ export default function KategorilerScreen() {
                     </View>
                   </LinearGradient>
                 </Pressable>
-              </Animated.View>
+              </View>
             );
           })}
         </View>
