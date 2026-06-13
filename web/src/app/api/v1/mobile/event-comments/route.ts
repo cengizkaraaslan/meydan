@@ -8,6 +8,7 @@ import {
   type CommentMutReason,
 } from "@/lib/event-comments-store";
 import { extractMentionEmails, notifyEmails, notifyDevices, preview } from "@/lib/mention-notify";
+import { deviceDisplayName } from "@/lib/mobile-chat-store";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,12 @@ export async function POST(request: NextRequest) {
   if (!eventSlug || !deviceId || !text) {
     return NextResponse.json({ error: "eventSlug/deviceId/text zorunlu" }, { status: 400 });
   }
-  const authorName = body.authorName?.trim() || "Biri";
+  // İsim boş/yanlış gelirse (eski mobil sürüm "Meydanlı" gönderiyordu) cihazdan çöz.
+  let authorName = body.authorName?.trim() || "";
+  if (!authorName || authorName === "Meydanlı") {
+    authorName = (await deviceDisplayName(deviceId)) || authorName;
+  }
+  if (!authorName) authorName = "Biri";
   const replyToId = body.replyToId?.trim() || null;
   const comment = await addEventComment({ eventSlug, deviceId, authorName, avatar: body.avatar ?? null, text, replyToId });
 

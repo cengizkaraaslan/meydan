@@ -804,7 +804,7 @@ export default function MeydanScreen() {
         windowSize={9}
       />
 
-      <CommentsModal postId={commentsFor} eventSlug={commentsEventSlug} onClose={() => { setCommentsFor(null); setCommentsEventSlug(null); }} onAdded={onCommentAdded} />
+      <CommentsModal postId={commentsFor} eventSlug={commentsEventSlug} authorName={user?.name || undefined} authorAvatar={myAvatar || undefined} onClose={() => { setCommentsFor(null); setCommentsEventSlug(null); }} onAdded={onCommentAdded} />
       <PostActionsModal
         postId={actionsFor?.id ?? null}
         initialText={actionsFor?.text ?? ""}

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { listComments, addComment, postCommentReplyTargetOwner } from "@/lib/social-store";
 import { extractMentionEmails, notifyEmails, notifyDevices, preview } from "@/lib/mention-notify";
+import { deviceDisplayName } from "@/lib/mobile-chat-store";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +26,14 @@ export async function POST(request: NextRequest) {
   const deviceId = body.deviceId?.trim();
   const text = body.text?.trim();
   if (!postId || !deviceId || !text) return NextResponse.json({ error: "postId/deviceId/text zorunlu" }, { status: 400 });
-  const who = body.authorName?.trim() || "Biri";
+  // İsim boş/yanlış gelirse (eski mobil sürüm adı geçirmiyordu → "Meydanlı") cihazdan çöz.
+  let resolvedName = body.authorName?.trim() || null;
+  if (!resolvedName || resolvedName === "Meydanlı") {
+    resolvedName = (await deviceDisplayName(deviceId)) || resolvedName;
+  }
+  const who = resolvedName || "Biri";
   const replyToId = body.replyToId?.trim() || null;
-  const comment = await addComment({ postId, deviceId, authorName: body.authorName ?? null, text, replyToId });
+  const comment = await addComment({ postId, deviceId, authorName: resolvedName, text, replyToId });
 
   // @mention → bahsedilen email'lere bildirim (Meydan duvarına yönlendir).
   const emails = extractMentionEmails(text);

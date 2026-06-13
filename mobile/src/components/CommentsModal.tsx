@@ -33,6 +33,8 @@ import { postToThread, eventToThread, type ThreadComment } from "@/lib/commentTh
 interface Props {
   postId: string | null;
   authorName?: string;
+  /** Yorumu yazan kullanıcının avatarı (event yorumunda denormalize saklanır). */
+  authorAvatar?: string;
   /** Etkinlik (sistem) postu ise eventSlug — verilirse yorumlar EVENT-COMMENTS'ten okunur/yazılır
    *  (etkinlik detayıyla AYNI thread → feed ↔ detay yorumları birleşir). Yoksa feed (social) yorumları. */
   eventSlug?: string | null;
@@ -42,7 +44,7 @@ interface Props {
 }
 
 /** Bir gönderinin yorumlarını listeler + emoji tepki, alıntı/yanıt, etkileşime göre sıralı. */
-export function CommentsModal({ postId, authorName, eventSlug, onClose, onAdded }: Props) {
+export function CommentsModal({ postId, authorName, authorAvatar, eventSlug, onClose, onAdded }: Props) {
   const insets = useSafeAreaInsets();
   const { t: T } = useTheme();
   const isEvent = !!eventSlug;
@@ -84,7 +86,7 @@ export function CommentsModal({ postId, authorName, eventSlug, onClose, onAdded 
     try {
       let ok = false;
       if (isEvent && eventSlug) {
-        ok = !!(await postEventComment({ eventSlug, authorName: authorName ?? "Meydanlı", text: trimmed, replyToId: replyTo?.id ?? null }));
+        ok = !!(await postEventComment({ eventSlug, authorName: authorName?.trim() || "", avatar: authorAvatar ?? null, text: trimmed, replyToId: replyTo?.id ?? null }));
       } else if (postId) {
         ok = !!(await addComment(postId, trimmed, authorName, replyTo?.id ?? null));
       }
