@@ -739,15 +739,31 @@ export default function EventDetail() {
   const prettyLink = (u: string) => u.replace(/^https?:\/\//i, "").replace(/\/$/, "");
   const share = () => {
     impactH();
-    // Etkinlik DETAY sayfasının linki — açan kişi doğrudan bu etkinliğin sayfasına gelir
-    // (web /etkinlik/[slug]; OG önizleme görseliyle). Eskiden sadece bilet linki paylaşılıyordu.
+    // Etkinlik DETAY sayfasının linki (davet linki) — açan kişi doğrudan bu etkinliğin
+    // sayfasına gelir (web /etkinlik/[slug]; OG önizleme görseliyle). WhatsApp/Instagram/…
+    // native paylaşım sayfasında çıkar.
     const url = `${API_BASE}/etkinlik/${event.slug}`;
+    const place = event.venue || event.city || "Türkiye";
+    const priceLine = isUniversitySource(event.source)
+      ? "🎓 Öğrenciye açık"
+      : event.is_free
+        ? "🆓 Ücretsiz"
+        : "🎟️ Biletli";
+    // Davet metni — buz kırıcı + net bilgi + link.
+    const message =
+      `🎉 Seni bu etkinliğe davet ediyorum!\n\n` +
+      `🎫 ${event.title}\n` +
+      `🗓️ ${fmtLong(event.starts_at)}\n` +
+      `📍 ${place}${event.city && place !== event.city ? `, ${event.city}` : ""}\n` +
+      `${priceLine}\n\n` +
+      `👉 Detay & katılım: ${url}\n\n` +
+      `— Meydan'da keşfettim ✨`;
     Share.share(
       {
-        message: `${event.title} — ${fmtLong(event.starts_at)} · ${event.city}\n${url}`,
+        message,
         url, // iOS: ayrı url alanı zengin link önizlemesi verir
       },
-      { dialogTitle: event.title },
+      { dialogTitle: `${event.title} — davet et` },
     );
   };
   // katılacaklar listesinden bir kişiye mesaj — sohbet için giriş zorunlu (uygulama kuralı)
