@@ -102,6 +102,8 @@ export default function MeydanScreen() {
   const [posting, setPosting] = useState(false);
   const [photoPosting, setPhotoPosting] = useState(false);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
+  // Etkinlik (sistem) postu ise eventSlug → yorumlar event-comments'ten (detayla aynı thread).
+  const [commentsEventSlug, setCommentsEventSlug] = useState<string | null>(null);
   const [actionsFor, setActionsFor] = useState<FeedPost | null>(null);
   const [storyPerson, setStoryPerson] = useState<Person | null>(null);
   // Görülen story'ler (kişi id'leri) — görülenler şeritte sona gider + halkası kalkar.
@@ -571,7 +573,7 @@ export default function MeydanScreen() {
               following={followSet.has(item.post.authorId)}
               canEdit={canEditPost(item.post)}
               onReact={(emoji) => onReact(item.post.id, emoji)}
-              onOpenComments={() => setCommentsFor(item.post.id)}
+              onOpenComments={() => { setCommentsEventSlug(item.post.eventSlug ?? null); setCommentsFor(item.post.id); }}
               onToggleFollow={() => onToggleFollow(item.post.authorId)}
               onOpenActions={() => setActionsFor(item.post)}
             />
@@ -802,7 +804,7 @@ export default function MeydanScreen() {
         windowSize={9}
       />
 
-      <CommentsModal postId={commentsFor} onClose={() => setCommentsFor(null)} onAdded={onCommentAdded} />
+      <CommentsModal postId={commentsFor} eventSlug={commentsEventSlug} onClose={() => { setCommentsFor(null); setCommentsEventSlug(null); }} onAdded={onCommentAdded} />
       <PostActionsModal
         postId={actionsFor?.id ?? null}
         initialText={actionsFor?.text ?? ""}

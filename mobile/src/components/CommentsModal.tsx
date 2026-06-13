@@ -21,27 +21,32 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
 import { tapH } from "@/lib/haptics";
-import { addComment, fetchComments, reactComment, type PostComment } from "@/lib/social";
+import { addComment, fetchComments, reactComment } from "@/lib/social";
+import { fetchEventComments, postEventComment, reactEventComment } from "@/lib/eventComments";
 import { getOrCreateDeviceId } from "@/lib/device";
 import { useMentionField } from "@/lib/mentions";
 import { MentionSuggestions } from "@/components/MentionSuggestions";
 import { CommentThread } from "@/components/CommentThread";
 import { ReplyComposerBar } from "@/components/ReplyComposerBar";
-import { postToThread, type ThreadComment } from "@/lib/commentThread";
+import { postToThread, eventToThread, type ThreadComment } from "@/lib/commentThread";
 
 interface Props {
   postId: string | null;
   authorName?: string;
+  /** Etkinlik (sistem) postu ise eventSlug — verilirse yorumlar EVENT-COMMENTS'ten okunur/yazılır
+   *  (etkinlik detayıyla AYNI thread → feed ↔ detay yorumları birleşir). Yoksa feed (social) yorumları. */
+  eventSlug?: string | null;
   onClose: () => void;
   /** Yorum eklenince kart sayacını güncellemek için. */
   onAdded?: (postId: string) => void;
 }
 
 /** Bir gönderinin yorumlarını listeler + emoji tepki, alıntı/yanıt, etkileşime göre sıralı. */
-export function CommentsModal({ postId, authorName, onClose, onAdded }: Props) {
+export function CommentsModal({ postId, authorName, eventSlug, onClose, onAdded }: Props) {
   const insets = useSafeAreaInsets();
   const { t: T } = useTheme();
-  const [comments, setComments] = useState<PostComment[]>([]);
+  const isEvent = !!eventSlug;
+  const [items, setItems] = useState<ThreadComment[]>([]);
   const [loading, setLoading] = useState(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -55,67 +60,72 @@ export function CommentsModal({ postId, authorName, onClose, onAdded }: Props) {
     getOrCreateDeviceId().then(setMyDeviceId).catch(() => {});
   }, []);
 
-  const load = useCallback(async (id: string) => {
-    setLoading(true);
-    try {
-      setComments(await fetchComments(id));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchAll = useCallback(async (): Promise<ThreadComment[]> => {
+    if (isEvent && eventSlug) return (await fetchEventComments(eventSlug)).map(eventToThread);
+    if (postId) return (await fetchComments(postId)).map(postToThread);
+    return [];
+  }, [isEvent, eventSlug, postId]);
+
+  const reload = useCallback(async () => { setItems(await fetchAll()); }, [fetchAll]);
 
   useEffect(() => {
-    if (postId) {
-      setComments([]);
+    if (postId || eventSlug) {
+      setItems([]);
       setReplyTo(null);
-      void load(postId);
+      setLoading(true);
+      fetchAll().then(setItems).finally(() => setLoading(false));
     }
-  }, [postId, load]);
+  }, [postId, eventSlug, fetchAll]);
 
   const submit = useCallback(async () => {
     const trimmed = text.trim();
-    if (!trimmed || !postId || sending) return;
+    if (!trimmed || sending || (!postId && !eventSlug)) return;
     setSending(true);
     try {
-      const c = await addComment(postId, trimmed, authorName, replyTo?.id ?? null);
-      if (c) {
+      let ok = false;
+      if (isEvent && eventSlug) {
+        ok = !!(await postEventComment({ eventSlug, authorName: authorName ?? "Meydanlı", text: trimmed, replyToId: replyTo?.id ?? null }));
+      } else if (postId) {
+        ok = !!(await addComment(postId, trimmed, authorName, replyTo?.id ?? null));
+      }
+      if (ok) {
         setText("");
         setReplyTo(null);
         mention.clear();
-        setComments(await fetchComments(postId)); // etkileşim sıralaması için tazele
-        onAdded?.(postId);
+        await reload(); // etkileşim sıralaması için tazele
+        if (postId) onAdded?.(postId);
       }
     } finally {
       setSending(false);
     }
-  }, [text, postId, sending, authorName, replyTo, mention, onAdded]);
+  }, [text, sending, isEvent, eventSlug, postId, authorName, replyTo, mention, reload, onAdded]);
 
   const onReact = useCallback(async (commentId: string, emoji: string) => {
-    await reactComment(commentId, emoji);
-    if (postId) setComments(await fetchComments(postId));
-  }, [postId]);
+    if (isEvent) await reactEventComment(commentId, emoji);
+    else await reactComment(commentId, emoji);
+    await reload();
+  }, [isEvent, reload]);
 
   // Sıralama (Instagram gibi): En yeni / En beğenilen / En eski.
-  const sortedComments = useMemo(() => {
+  const threads = useMemo(() => {
     const ts = (s: string) => new Date(s).getTime() || 0;
-    const arr = [...comments];
+    const arr = [...items];
     if (sortBy === "new") arr.sort((a, b) => ts(b.createdAt) - ts(a.createdAt));
     else if (sortBy === "old") arr.sort((a, b) => ts(a.createdAt) - ts(b.createdAt));
     else arr.sort((a, b) => (b.reactionTotal - a.reactionTotal) || (ts(b.createdAt) - ts(a.createdAt)));
     return arr;
-  }, [comments, sortBy]);
-  const threads = sortedComments.map(postToThread);
+  }, [items, sortBy]);
 
   return (
-    <Modal visible={!!postId} animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+    <Modal visible={!!(postId || eventSlug)} animationType="slide" statusBarTranslucent onRequestClose={onClose}>
       {/* TAM EKRAN — klavye input'u kapatmasın diye KeyboardAvoidingView ile input yukarı çıkar. */}
       <View style={[styles.full, { backgroundColor: T.bg, paddingTop: insets.top + 4 }]}>
         <View style={[styles.header, { borderBottomColor: T.hairline }]}>
           <Text style={[Type.h2, { color: T.text }]}>
-            Yorumlar{comments.length ? ` · ${comments.length}` : ""}
+            Yorumlar{threads.length ? ` · ${threads.length}` : ""}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-            {comments.length > 1 ? (
+            {threads.length > 1 ? (
               <Pressable
                 onPress={() => { tapH(); setSortBy((s) => SORT_NEXT[s]); }}
                 hitSlop={8}
@@ -135,7 +145,7 @@ export function CommentsModal({ postId, authorName, onClose, onAdded }: Props) {
             <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
               <ActivityIndicator color={T.primary} />
             </View>
-          ) : comments.length === 0 ? (
+          ) : threads.length === 0 ? (
             <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 6 }}>
               <Text style={{ fontSize: 34 }}>💬</Text>
               <Text style={[Type.body, { color: T.textFaint }]}>İlk yorumu sen yaz!</Text>
