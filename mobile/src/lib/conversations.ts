@@ -1,7 +1,11 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiFetchMatches, apiDeleteMatch, apiMarkAllRead, apiMarkConversationRead } from "./api";
 import { getProfileKey } from "./profileSync";
 import { getPerson } from "./people";
 import { resolveAvatar } from "./avatar";
+
+// Sohbet listesi cache'i (WhatsApp gibi anında göster, arka planda tazele).
+const CONVOS_CACHE_KEY = "meydanfest:convosCache";
 
 /** Anasayfadaki sohbet balonu için: backend'teki eşleşmeler + okunmamış sayısı. */
 export interface Conversation {
@@ -30,11 +34,21 @@ function previewText(text: string | null): string | null {
   return text;
 }
 
-/** Backend'ten eşleşme özetlerini çekip sohbet listesine dönüştürür (yeni→eski). */
+/** Cache'lenmiş sohbet listesi (ANINDA, ağ beklemeden). Yoksa boş. */
+export async function getCachedConversations(): Promise<Conversation[]> {
+  try {
+    const raw = await AsyncStorage.getItem(CONVOS_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as Conversation[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Backend'ten eşleşme özetlerini çekip sohbet listesine dönüştürür (yeni→eski). Sonucu cache'ler. */
 export async function listConversations(): Promise<Conversation[]> {
   const deviceId = await getProfileKey();
   const matches = await apiFetchMatches(deviceId);
-  return matches.map((m) => {
+  const result = matches.map((m) => {
     const p = getPerson(m.partnerId);
     const name = p?.name ?? m.partnerName;
     return {
@@ -49,6 +63,9 @@ export async function listConversations(): Promise<Conversation[]> {
       unread: m.unread,
     };
   });
+  // Bir sonraki açılışta anında göstermek için cache'le.
+  AsyncStorage.setItem(CONVOS_CACHE_KEY, JSON.stringify(result)).catch(() => {});
+  return result;
 }
 
 /** Tüm sohbetlerdeki toplam okunmamış mesaj sayısı (balon rozeti için). */

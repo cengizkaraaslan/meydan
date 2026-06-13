@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect, type Href } from "expo-router";
@@ -11,7 +11,7 @@ import { useT } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { showAuthPrompt } from "@/lib/authPrompt";
 import { impactH } from "@/lib/haptics";
-import { listConversations, totalUnread, type Conversation } from "@/lib/conversations";
+import { listConversations, getCachedConversations, totalUnread, type Conversation } from "@/lib/conversations";
 
 const SIZE = 58;
 const MARGIN = 16;
@@ -31,6 +31,14 @@ export function ChatBubble() {
   // İlk veri gelene kadar (uygulama açılışı) balon etrafında loading göster.
   const [loading, setLoading] = useState(true);
   const unread = totalUnread(convos);
+
+  // WhatsApp gibi: açılışta cache'lenmiş listeyi ANINDA göster (loading'i hemen kapat),
+  // gerçek veri arka planda gelince güncellenir → rozet "ışık hızında".
+  useEffect(() => {
+    getCachedConversations().then((c) => {
+      if (c.length > 0) { setConvos((prev) => (prev.length ? prev : c)); setLoading(false); }
+    }).catch(() => {});
+  }, []);
 
   const refresh = useCallback(() => {
     listConversations()

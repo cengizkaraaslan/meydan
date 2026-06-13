@@ -485,7 +485,7 @@ export default function ChatScreen() {
       {/* Üç nokta menüsü (alt sayfa): Şikayet et / Engelle + şikayet nedeni seçimi */}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
-          <Pressable style={[styles.menuSheet, { backgroundColor: T.surface, paddingBottom: insets.bottom + 12 }]} onPress={() => {}}>
+          <Pressable style={[styles.menuSheet, { backgroundColor: T.bg, borderColor: T.hairline, paddingBottom: insets.bottom + 12 }]} onPress={() => {}}>
             <View style={[styles.menuHandle, { backgroundColor: T.hairline }]} />
             {menuMode === "menu" ? (
               <>
@@ -1000,7 +1000,7 @@ const styles = StyleSheet.create({
   back: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   hAvatarWrap: { borderRadius: 21 },
   menuBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
-  menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8 },
+  menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth },
   menuHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
   menuRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 15, paddingHorizontal: 18 },
   menuSep: { height: StyleSheet.hairlineWidth, marginLeft: 18 },

@@ -24,6 +24,7 @@ import { showAuthPrompt } from "@/lib/authPrompt";
 import { tapH, impactH, tapHaptic } from "@/lib/haptics";
 import {
   listConversations,
+  getCachedConversations,
   deleteConversation,
   markConversationRead,
   totalUnread,
@@ -81,18 +82,30 @@ export default function MesajlarScreen() {
     router.push({ pathname: "/sohbet/[id]", params: { id: pid, name: u.name ?? "", avatar: u.avatar ?? "" } });
   }, []);
 
+  // WhatsApp gibi: açılışta cache'lenmiş listeyi ANINDA göster (skeleton/bekleme yok),
+  // gerçek veri arka planda gelince güncellenir.
+  useEffect(() => {
+    getCachedConversations().then((cached) => {
+      if (cached.length > 0) {
+        setConvos((prev) => (prev.length ? prev : cached));
+        setLoading(false);
+      }
+    }).catch(() => {});
+  }, []);
+
   const load = useCallback(async (background: boolean) => {
     if (!user) { setLoading(false); return; }
-    if (!background) setLoading(true);
+    // Elde liste (cache) varsa skeleton gösterme → sessizce tazele, zıplama olmasın.
+    if (!background && convos.length === 0) setLoading(true);
     try {
       const list = await listConversations();
       setConvos(list);
     } catch {
       /* sessiz geç — boş/empty durum gösterilir */
     } finally {
-      if (!background) setLoading(false);
+      setLoading(false);
     }
-  }, [user]);
+  }, [user, convos.length]);
 
   // İlk açılışta skeleton'lı yükle; sonraki odaklanmalarda (sohbetten dönünce) arkaplanda tazele.
   useFocusEffect(
@@ -184,18 +197,9 @@ export default function MesajlarScreen() {
         ) : null}
         <View style={{ flex: 1 }} />
         {/* Sohbet ayarları (gizlilik) — herkese açık */}
-        <Pressable onPress={() => { tapH(); setSettingsOpen(true); }} hitSlop={10} style={[styles.iconBtn, { backgroundColor: T.surfaceStrong, marginRight: 8 }]}>
+        <Pressable onPress={() => { tapH(); setSettingsOpen(true); }} hitSlop={10} style={[styles.iconBtn, { backgroundColor: T.surfaceStrong }]}>
           <Ionicons name="settings-outline" size={20} color={T.text} />
         </Pressable>
-        {admin ? (
-          <Pressable onPress={toggleFind} hitSlop={10} style={[styles.iconBtn, { backgroundColor: showFind ? T.primary : T.surfaceStrong }]}>
-            <Ionicons name="search" size={20} color={showFind ? "#fff" : T.text} />
-          </Pressable>
-        ) : (
-          <View style={[styles.iconBtn, { backgroundColor: T.surfaceStrong }]}>
-            <Ionicons name="create-outline" size={20} color={T.text} />
-          </View>
-        )}
       </View>
 
       <ChatSettingsSheet visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
