@@ -1,7 +1,7 @@
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
-import { setUserCoords } from "./geo";
+import { setUserCoords, nearestCity } from "./geo";
 
 const KEY = "meydanfest:detectedCity";
 const KEY_MANUAL = "meydanfest:city"; // kullanıcının profilden seçtiği şehir (override)
@@ -107,13 +107,23 @@ export async function detectCity(): Promise<string | null> {
     if (!pos) pos = await Location.getLastKnownPositionAsync();
     if (!pos) return null;
     // Mesafe rozeti/sıralaması için GPS koordinatını sakla (geo.ts).
-    void setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-    const geo = await Location.reverseGeocodeAsync({
-      latitude: pos.coords.latitude,
-      longitude: pos.coords.longitude,
-    });
-    const g = geo[0];
-    const city = matchCity(g?.region) ?? matchCity(g?.city) ?? matchCity(g?.subregion);
+    const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    void setUserCoords(coords);
+    // reverseGeocode'u AYRI try/catch'e al: Android'de geocoder boş dönebilir VEYA
+    // exception fırlatabilir (Play Services'siz cihaz / backend yok). Fırlatırsa tüm
+    // tespiti düşürmeyelim — koordinattan en yakın il merkezine (nearestCity) düşelim.
+    let city: string | null = null;
+    try {
+      const geo = await Location.reverseGeocodeAsync({
+        latitude: coords.lat,
+        longitude: coords.lng,
+      });
+      const g = geo[0];
+      city = matchCity(g?.region) ?? matchCity(g?.city) ?? matchCity(g?.subregion);
+    } catch {
+      // geocoder kullanılamadı → koordinat yedeğine düş
+    }
+    if (!city) city = nearestCity(coords);
     if (city) await AsyncStorage.setItem(KEY, city);
     return city;
   } catch {

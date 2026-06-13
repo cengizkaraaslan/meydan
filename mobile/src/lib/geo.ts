@@ -156,6 +156,25 @@ const COUNTRY_COORDS: Record<string, Coords> = {
 
 const TR_LOOKUP = new Map(Object.entries(TR_CITY_COORDS).map(([k, v]) => [norm(k), v]));
 
+/**
+ * Verilen GPS koordinatına en yakın Türkiye il merkezini döner — `reverseGeocodeAsync`
+ * Android'de boş dönerse/patlarsa (Play Services'siz cihaz, geocoder backend yok) konum
+ * yine de şehre çevrilsin diye yedek. Türkiye dışındaysa (en yakın il bile >250 km) null
+ * döner ki yanlış il atanmasın.
+ */
+export function nearestCity(coords: Coords): string | null {
+  let best: string | null = null;
+  let bestKm = Infinity;
+  for (const [city, c] of Object.entries(TR_CITY_COORDS)) {
+    const km = haversineKm(coords, c);
+    if (km < bestKm) {
+      bestKm = km;
+      best = city;
+    }
+  }
+  return bestKm <= 250 ? best : null;
+}
+
 /** Etkinliğin (yaklaşık) koordinatı: önce şehir merkezi, yoksa ülke merkezi, yoksa null. */
 export function coordsForEvent(e: Pick<ApiEvent, "city" | "country">): Coords | null {
   if (e.city) {

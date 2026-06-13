@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -69,6 +69,16 @@ export default function KategorilerScreen() {
         setCityFilter(c);
         setCityInit(true);
         setCityOpen(false);
+      } else {
+        // Konum alınamadı: izin reddi ya da konum servisi kapalı. Sessiz kalma — yönlendir.
+        Alert.alert(
+          "Konum alınamadı",
+          "Konumunu bulamadık. Telefonun konum servisinin açık olduğundan ve uygulamaya konum izni verdiğinden emin ol.",
+          [
+            { text: "Vazgeç", style: "cancel" },
+            { text: "Ayarları aç", onPress: () => void Linking.openSettings() },
+          ],
+        );
       }
     } finally {
       setLocating(false);
