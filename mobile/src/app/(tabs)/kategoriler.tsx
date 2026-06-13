@@ -26,6 +26,67 @@ function lower(s: string): string {
   return s.toLocaleLowerCase("tr-TR");
 }
 
+/** Başlama tarihine göre hızlı filtre seçenekleri (sunucu from/to ile uygulanır). */
+type DateKey = "all" | "today" | "tomorrow" | "week" | "weekend" | "month";
+const DATE_FILTERS: { key: DateKey; label: string }[] = [
+  { key: "all", label: "Tümü" },
+  { key: "today", label: "Bugün" },
+  { key: "tomorrow", label: "Yarın" },
+  { key: "week", label: "Bu hafta" },
+  { key: "weekend", label: "Hafta sonu" },
+  { key: "month", label: "Bu ay" },
+];
+
+function startOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+function endOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+}
+
+/**
+ * Seçilen tarih çipini sunucunun beklediği {from,to} ISO aralığına çevirir (cihazın
+ * yerel saatine göre). "all" → aralık yok (tüm yaklaşan etkinlikler). Pazartesi başlangıçlı
+ * hafta varsayılır.
+ */
+function rangeFor(key: DateKey): { from?: string; to?: string } {
+  if (key === "all") return {};
+  const now = new Date();
+  const todayStart = startOfDay(now);
+  const dow = (now.getDay() + 6) % 7; // 0=Pzt … 6=Paz
+
+  if (key === "today") return { from: todayStart.toISOString(), to: endOfDay(now).toISOString() };
+
+  if (key === "tomorrow") {
+    const tm = new Date(todayStart);
+    tm.setDate(tm.getDate() + 1);
+    return { from: tm.toISOString(), to: endOfDay(tm).toISOString() };
+  }
+
+  if (key === "week") {
+    const sunday = new Date(todayStart);
+    sunday.setDate(sunday.getDate() + (6 - dow)); // bu haftanın Pazar'ı
+    return { from: todayStart.toISOString(), to: endOfDay(sunday).toISOString() };
+  }
+
+  if (key === "weekend") {
+    if (dow === 6) return { from: todayStart.toISOString(), to: endOfDay(now).toISOString() }; // bugün Pazar
+    const sat = new Date(todayStart);
+    sat.setDate(sat.getDate() + (5 - dow)); // bu haftanın Cumartesi'si (bugün Cmt ise = bugün)
+    const sun = new Date(sat);
+    sun.setDate(sun.getDate() + 1);
+    return { from: sat.toISOString(), to: endOfDay(sun).toISOString() };
+  }
+
+  // month
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0); // ayın son günü
+  return { from: todayStart.toISOString(), to: endOfDay(end).toISOString() };
+}
+
 /** Sayfa başına kayıt (10'ar 10'ar pagination). */
 const PAGE_SIZE = 10;
 
@@ -42,6 +103,8 @@ export default function KategorilerScreen() {
   const [cityOpen, setCityOpen] = useState(false);
   const [advOpen, setAdvOpen] = useState(false);
   const [priceFilter, setPriceFilter] = useState<"all" | "free" | "paid" | "student">("all");
+  // Başlama tarihine göre filtre (varsayılan "all" = mevcut davranış, tüm yaklaşanlar).
+  const [dateKey, setDateKey] = useState<DateKey>("all");
   // İlçe filtresi (#C2): seçili şehrin gerçek ilçeleri API'den çekilir; null = tüm ilçeler.
   const [district, setDistrict] = useState<string | null>(null);
   const [districts, setDistricts] = useState<string[]>([]);
@@ -57,6 +120,11 @@ export default function KategorilerScreen() {
   const [locating, setLocating] = useState(false);
 
   const hasSelection = selected.length > 0;
+
+  // Tarih filtresi → {from,to} ISO. Primitif string'ler effect/loadMore deps'inde stabil kalsın.
+  const dateRange = useMemo(() => rangeFor(dateKey), [dateKey]);
+  const dateFrom = dateRange.from;
+  const dateTo = dateRange.to;
 
   // "Mevcut konumum" → GPS'ten şehri anında tespit edip şehir filtresine uygula.
   const onUseMyLocation = async () => {
@@ -129,6 +197,8 @@ export default function KategorilerScreen() {
               city: cityFilter ?? undefined,
               category: c.key,
               freeOnly: priceFilter === "free",
+              from: dateFrom,
+              to: dateTo,
               page: 1,
               pageSize: 1,
             });
@@ -143,7 +213,7 @@ export default function KategorilerScreen() {
     return () => {
       alive = false;
     };
-  }, [cityFilter, priceFilter]);
+  }, [cityFilter, priceFilter, dateFrom, dateTo]);
 
   // Etkinlikleri çek. Şehir + fiyat (free) filtresi sunucu tarafında uygulanır.
   // Kategori dizisi `selected` değiştiğinde (string'e çevrilerek) yeniden tetiklenir.
@@ -170,6 +240,8 @@ export default function KategorilerScreen() {
           city: cityFilter ?? undefined,
           category: serverCategory,
           freeOnly: priceFilter === "free",
+          from: dateFrom,
+          to: dateTo,
           page: 1,
           pageSize: PAGE_SIZE,
         });
@@ -189,7 +261,7 @@ export default function KategorilerScreen() {
     return () => {
       alive = false;
     };
-  }, [selectedKey, serverCategory, cityFilter, priceFilter]);
+  }, [selectedKey, serverCategory, cityFilter, priceFilter, dateFrom, dateTo]);
 
   // Sonraki sayfayı çek ve listeye ekle (10'ar 10'ar).
   const loadMore = useCallback(async () => {
@@ -201,6 +273,8 @@ export default function KategorilerScreen() {
         city: cityFilter ?? undefined,
         category: serverCategory,
         freeOnly: priceFilter === "free",
+        from: dateFrom,
+        to: dateTo,
         page: next,
         pageSize: PAGE_SIZE,
       });
@@ -215,7 +289,7 @@ export default function KategorilerScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }, [loading, loadingMore, page, totalPages, cityFilter, serverCategory, priceFilter]);
+  }, [loading, loadingMore, page, totalPages, cityFilter, serverCategory, priceFilter, dateFrom, dateTo]);
 
   // İlçe filtresi (#C2): seçili ilçe (null = tümü). Veride district alanı yok →
   // venue/title içinde ilçe adı geçenleri göster.
@@ -239,10 +313,15 @@ export default function KategorilerScreen() {
     setSelected((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
-  // EmptyState alt metni: şehir seçiliyse "{şehir}'de bu kategoride etkinlik yok".
+  // EmptyState alt metni: şehir + (varsa) tarih filtresine göre netleştir, ör.
+  // "İstanbul'da bugün bu kategoride etkinlik yok".
+  const dateLabel = DATE_FILTERS.find((d) => d.key === dateKey)?.label ?? "";
+  const datePart = dateKey === "all" ? "" : ` ${lower(dateLabel)}`;
   const emptySub = cityFilter
-    ? `${cityFilter}${T_suffix(cityFilter)} bu kategoride etkinlik yok`
-    : t("try_another");
+    ? `${cityFilter}${T_suffix(cityFilter)}${datePart} bu kategoride etkinlik yok`
+    : dateKey === "all"
+      ? t("try_another")
+      : `${dateLabel} bu kategoride etkinlik yok`;
 
   return (
     <View style={[styles.root, { backgroundColor: T.bg }]}>
@@ -379,6 +458,28 @@ export default function KategorilerScreen() {
           ) : null}
         </Animated.View>
 
+        {/* Başlama tarihi hızlı filtresi — her zaman görünür, tek dokunuşta "Bugün". */}
+        <Animated.View entering={FadeInDown.delay(90).duration(450)} style={styles.dateWrap}>
+          <Text style={[Type.label, { color: T.textDim, marginBottom: Space.sm }]}>🗓️ Tarih</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.dateChips}
+          >
+            {DATE_FILTERS.map((d) => (
+              <Pill
+                key={d.key}
+                label={d.label}
+                active={dateKey === d.key}
+                onPress={() => {
+                  tapH();
+                  setDateKey(d.key);
+                }}
+              />
+            ))}
+          </ScrollView>
+        </Animated.View>
+
         <View style={styles.grid}>
           {CATEGORIES.map((item, i) => {
             const active = selected.includes(item.key);
@@ -490,6 +591,8 @@ const styles = StyleSheet.create({
     marginTop: Space.md,
   },
   advBody: { marginTop: 0 },
+  dateWrap: { paddingLeft: 16, marginBottom: Space.lg },
+  dateChips: { flexDirection: "row", gap: Space.sm, paddingRight: 16 },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
