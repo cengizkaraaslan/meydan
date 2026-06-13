@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-06-12T08:15:58.970Z",
+  "scrapedAt": "2026-06-13T07:40:01.506Z",
   "data": {
     "GASMEK": [
       {
@@ -211,6 +211,33 @@
         "open": true
       },
       {
+        "name": "Çocuk El Sanatları Atölyesi",
+        "center": "Beylikova Eğitim Merkezi",
+        "start": "08.07.2026",
+        "end": "12.08.2026",
+        "schedule": "Çar: 13:00 - 15:00",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Kendin Yap Atölyesi",
+        "center": "Beylikova Eğitim Merkezi",
+        "start": "10.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Cum: 11:00 - 13:00",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Resim",
+        "center": "Beylikova Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "10.08.2026",
+        "schedule": "Pzt: 13:00 - 15:00",
+        "full": false,
+        "open": true
+      },
+      {
         "name": "Çocuk Resim",
         "center": "Beylikova Eğitim Merkezi",
         "start": "02.02.2026",
@@ -218,6 +245,574 @@
         "schedule": "Pzt: 16:00 - 18:00 Sal: 16:00 - 18:00",
         "full": true,
         "open": false
+      },
+      {
+        "name": "Çocuk Tasarım Atölyesi",
+        "center": "Beylikova Eğitim Merkezi",
+        "start": "07.07.2026",
+        "end": "11.08.2026",
+        "schedule": "Sal: 13:00 - 15:00",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuklar için Takı Tasarımı",
+        "center": "Beylikova Eğitim Merkezi",
+        "start": "09.07.2026",
+        "end": "13.08.2026",
+        "schedule": "Per: 13:00 - 15:00",
+        "full": true,
+        "open": true
+      },
+      {
+        "name": "Yaz Okulu",
+        "center": "Beylikova Eğitim Merkezi",
+        "schedule": "Pzt: 10:00 - 13:00 Sal: 10:00 - 13:00 Çar: 10:00 - 13:00 Per: 10:00 - 13:00 Cum: 10:00 - 13:00",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Akıl ve Zeka Oyunları",
+        "center": "Emek Eğitim Merkezi",
+        "start": "08.07.2026",
+        "end": "12.08.2026",
+        "schedule": "Çar: 13:30 - 14:10",
+        "note": "7-8 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Akıl ve Zeka Oyunları",
+        "center": "Emek Eğitim Merkezi",
+        "start": "09.07.2026",
+        "end": "13.08.2026",
+        "schedule": "Per: 13:30 - 14:10",
+        "note": "8-9 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Akıl ve Zeka Oyunları",
+        "center": "Emek Eğitim Merkezi",
+        "start": "07.07.2026",
+        "end": "11.08.2026",
+        "schedule": "Sal: 13:30 - 14:10",
+        "note": "6-7 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Bağlama",
+        "center": "Emek Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "10.08.2026",
+        "schedule": "Pzt: 13:30 - 15:00",
+        "note": "7-13 YAŞ",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Drama",
+        "center": "Emek Eğitim Merkezi",
+        "start": "09.07.2026",
+        "end": "13.08.2026",
+        "schedule": "Per: 13:30 - 15:00",
+        "note": "6-8 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Gitar",
+        "center": "Emek Eğitim Merkezi",
+        "start": "09.07.2026",
+        "end": "13.08.2026",
+        "schedule": "Per: 13:30 - 15:00",
+        "note": "7-13 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk İngilizce",
+        "center": "Emek Eğitim Merkezi",
+        "start": "09.07.2026",
+        "end": "13.08.2026",
+        "schedule": "Per: 14:20 - 15:00",
+        "note": "8-9 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk İngilizce",
+        "center": "Emek Eğitim Merkezi",
+        "start": "08.07.2026",
+        "end": "12.08.2026",
+        "schedule": "Çar: 14:20 - 15:00",
+        "note": "7-8 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk İngilizce",
+        "center": "Emek Eğitim Merkezi",
+        "start": "07.07.2026",
+        "end": "11.08.2026",
+        "schedule": "Sal: 14:20 - 15:00",
+        "note": "5-6 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Jimnastik",
+        "center": "Emek Eğitim Merkezi",
+        "start": "08.07.2026",
+        "end": "12.08.2026",
+        "schedule": "Çar: 13:30 - 14:20",
+        "note": "5- 6 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Jimnastik",
+        "center": "Emek Eğitim Merkezi",
+        "start": "10.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Cum: 13:30 - 14:20",
+        "note": "5-6 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk KaraKalem Resim",
+        "center": "Emek Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "10.08.2026",
+        "schedule": "Pzt: 13:30 - 15:00",
+        "note": "9-13 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Mandala",
+        "center": "Emek Eğitim Merkezi",
+        "start": "10.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Cum: 13:30 - 15:00",
+        "note": "7-9 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Resim",
+        "center": "Emek Eğitim Merkezi",
+        "start": "10.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Cum: 13:30 - 15:00",
+        "note": "5-6 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Resim",
+        "center": "Emek Eğitim Merkezi",
+        "start": "08.07.2026",
+        "end": "12.08.2026",
+        "schedule": "Çar: 13:30 - 15:00",
+        "note": "8-10 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Satranç",
+        "center": "Emek Eğitim Merkezi",
+        "start": "07.07.2026",
+        "end": "11.08.2026",
+        "schedule": "Sal: 13:30 - 15:00",
+        "note": "5-7 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Seramik",
+        "center": "Emek Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "10.08.2026",
+        "schedule": "Pzt: 13:30 - 15:00",
+        "note": "5-6 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Seramik",
+        "center": "Emek Eğitim Merkezi",
+        "start": "08.07.2026",
+        "end": "12.08.2026",
+        "schedule": "Çar: 13:30 - 15:00",
+        "note": "7-9 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Tasarım Atölyesi",
+        "center": "Emek Eğitim Merkezi",
+        "start": "09.07.2026",
+        "end": "13.08.2026",
+        "schedule": "Per: 13:30 - 15:00",
+        "note": "9-10 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Tasarım Atölyesi",
+        "center": "Emek Eğitim Merkezi",
+        "start": "07.07.2026",
+        "end": "11.08.2026",
+        "schedule": "Sal: 13:30 - 15:00",
+        "note": "7-8 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Tasarım Atölyesi",
+        "center": "Emek Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "10.08.2026",
+        "schedule": "Pzt: 13:30 - 15:00",
+        "note": "6-7 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Tasarım Atölyesi",
+        "center": "Emek Eğitim Merkezi",
+        "start": "10.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Cum: 13:30 - 15:00",
+        "note": "7-8 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Zumba",
+        "center": "Emek Eğitim Merkezi",
+        "start": "07.07.2026",
+        "end": "11.08.2026",
+        "schedule": "Sal: 13:30 - 14:20",
+        "note": "6-7 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Zumba",
+        "center": "Emek Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "10.08.2026",
+        "schedule": "Pzt: 13:30 - 14:20",
+        "note": "4-5 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Zumba",
+        "center": "Emek Eğitim Merkezi",
+        "start": "09.07.2026",
+        "end": "13.08.2026",
+        "schedule": "Per: 13:30 - 14:20",
+        "note": "3-4 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Oyun Evi",
+        "center": "Emek Eğitim Merkezi",
+        "start": "07.07.2026",
+        "end": "11.08.2026",
+        "schedule": "Sal: 13:00 - 16:00",
+        "note": "4 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Oyun Evi",
+        "center": "Emek Eğitim Merkezi",
+        "start": "10.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Cum: 13:00 - 16:00",
+        "note": "3 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Oyun Evi",
+        "center": "Emek Eğitim Merkezi",
+        "start": "06.07.2026",
+        "schedule": "Pzt: 13:00 - 16:00",
+        "note": "3 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Oyun Evi",
+        "center": "Emek Eğitim Merkezi",
+        "start": "09.07.2026",
+        "end": "13.08.2026",
+        "schedule": "Per: 13:00 - 16:00",
+        "note": "6 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Oyun Evi",
+        "center": "Emek Eğitim Merkezi",
+        "start": "08.07.2026",
+        "end": "12.08.2026",
+        "schedule": "Çar: 13:00 - 16:00",
+        "note": "5 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Takı Tasarımı",
+        "center": "Emek Eğitim Merkezi",
+        "start": "07.07.2026",
+        "end": "11.08.2026",
+        "schedule": "Sal: 13:30 - 15:00",
+        "note": "7-9 Yaş",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Yaz Okulu",
+        "center": "Emek Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Pzt: 9:00 - 12:00 Sal: 9:00 - 12:00 Çar: 9:00 - 12:00 Per: 9:00 - 12:00 Cum: 9:00 - 12:00",
+        "note": "1.Sınıfı bitirenler kayıt yaptırabilirler.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Akıl ve Zeka Oyunları",
+        "center": "İnönü Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Pzt: 9:30 - 11:15",
+        "note": "Bu ders grubu, ortaokul öğrencileri için uygundur.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Drama",
+        "center": "İnönü Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Pzt: 9:30 - 11:15",
+        "note": "Bu ders grubu, ilkokul öğrencileri için uygundur.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk El Sanatları Atölyesi",
+        "center": "İnönü Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Pzt: 13:20 - 15:05",
+        "note": "Bu ders grubu, ortaokul öğrencileri için uygundur.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Geri Dönüşüm Atölyesi",
+        "center": "İnönü Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Cum: 15:10 - 16:55",
+        "note": "Bu ders grubu, ortaokul öğrencileri için uygundur.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Panç İşi",
+        "center": "İnönü Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Pzt: 15:10 - 16:55",
+        "note": "Bu ders grubu, ortaokul öğrencileri için uygundur.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Ritim Perküsyon",
+        "center": "İnönü Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Cum: 11:20 - 13:05",
+        "note": "Bu ders grubu, ilkokul öğrencileri için uygundur.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Sanat Etkinlikleri",
+        "center": "İnönü Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Çar: 13:20 - 15:05",
+        "note": "Bu ders grubu, ortaokul öğrencileri için uygundur.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Spor",
+        "center": "İnönü Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Çar: 9:30 - 11:15",
+        "note": "Bu ders grubu, ilkokul öğrencileri için uygundur.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuklar için Hızlı Okuma ve Diksiyon",
+        "center": "İnönü Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Cum: 11:20 - 13:05",
+        "note": "Bu ders grubu, ortaokul öğrencileri için uygundur.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuklar için Takı Tasarımı",
+        "center": "İnönü Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Cum: 13:20 - 15:05",
+        "note": "Bu ders grubu, ortaokul öğrencileri için uygundur.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Yaz Okulu",
+        "center": "İnönü Eğitim Merkezi",
+        "start": "06.07.2026",
+        "end": "14.08.2026",
+        "schedule": "Per: 9:30 - 13:05",
+        "note": "Bu ders grubu, okul öncesi öğrencileri için uygundur.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Boncuktan Stile",
+        "center": "Meslek Edindirme ve Eğitim Merkezi",
+        "schedule": "Per: 13:00 - 17:00",
+        "note": "15-25 yaş arası kayıt olabilir. Bileklik Yapma Atölyesidir. Atölye süresi 4 saattir. Kursiyer malzemelerini kendisi temin eder.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Dijital Beyin",
+        "center": "Meslek Edindirme ve Eğitim Merkezi",
+        "schedule": "Çar: 15:00 - 17:00 Cum: 15:00 - 17:00",
+        "note": "15-25 yaş arası kayıt olabilir. Yapay Zeka Araçları Kullanım kursudur. Kurs süresi 4 haftadır.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Dijital Görünürlük - Keşfetin Şifreleri",
+        "center": "Meslek Edindirme ve Eğitim Merkezi",
+        "schedule": "Sal: 13:00 - 15:00",
+        "note": "15-25 yaş arası kayıt olabilir. Sosyal Medyada Görünür Olma Kursudur. Kurs süresi 4 haftadır.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Ekrandan Kazanca",
+        "center": "Meslek Edindirme ve Eğitim Merkezi",
+        "schedule": "Çar: 13:00 - 15:00",
+        "note": "15-25 yaş arası kayıt olabilir. E-Ticaret ve Dijital Satış Eğitimidir. Eğitim süresi 4 haftadır.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Game Start",
+        "center": "Meslek Edindirme ve Eğitim Merkezi",
+        "schedule": "Pzt: 13:00 - 16:00",
+        "note": "15-25 yaş arası kayıt olabilir. Oyun Tasarımı Başlangıç Kursudur. Kurs süresi 4 haftadır.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Jean Ceketini Tasarla",
+        "center": "Meslek Edindirme ve Eğitim Merkezi",
+        "schedule": "Sal: 13:00 - 17:00",
+        "note": "15-25 yaş arası kayıt olabilir. Keçe ile Jean Ceketi Süsleme Atölyesidir. Kurs süresi 4 haftadır. Kursiyer malzemeleri kendisi temin eder.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Kahveni Taşıyan Sanat",
+        "center": "Meslek Edindirme ve Eğitim Merkezi",
+        "schedule": "Cum: 13:00 - 15:00",
+        "note": "15-25 yaş arası kayıt olabilir. Seramikten Kupa Yapma Atölyesidir. Atölye süresi 2 haftadır.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Karakterx",
+        "center": "Meslek Edindirme ve Eğitim Merkezi",
+        "schedule": "Cum: 13:00 - 15:00",
+        "note": "15-25 yaş arası kayıt olabilir. Dijital Çizim ve Karakter Tasarımı Kursudur. Kurs süresi 3 haftadır. Kursiyerler tabletleri ile derse katılabilirler.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Robocod",
+        "center": "Meslek Edindirme ve Eğitim Merkezi",
+        "schedule": "Per: 13:00 - 15:00",
+        "note": "15-25 yaş arası kayıt olabilir. Temel Robotik Kodlama Eğitimidir. Eğitim süresi 5 haftadır.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Tıkla Tasarla",
+        "center": "Meslek Edindirme ve Eğitim Merkezi",
+        "schedule": "Sal: 15:00 - 17:00 Per: 15:00 - 17:00",
+        "note": "15-25 yaş arası kayıt olabilir. Canva Tasarım Eğitimidir. Eğitim süresi 5 haftadır.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Travel Talk",
+        "center": "Meslek Edindirme ve Eğitim Merkezi",
+        "schedule": "Pzt: 13:00 - 15:00 Çar: 13:00 - 15:00",
+        "note": "Seyahat İngilizcesi Kursudur. Kurs süresi 4 haftadır.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Yaz Okulu",
+        "center": "Meslek Edindirme ve Eğitim Merkezi",
+        "schedule": "Pzt: 9:00 - 12:00 Sal: 9:00 - 12:00 Çar: 9:00 - 12:00 Per: 9:00 - 12:00 Cum: 9:00 - 12:00",
+        "note": "2. SINIFI BİTİRENLER KAYIT OLABİLİR. Müzik, Badminton, Jimnastik, Seramik, Resim, Geleneksel Sokak Oyunları, İngilizce, Origami, Zeka Oyunları, Kodlama",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "1. Sınıf Matematik",
+        "center": "Mihalıççık Eğitim Merkezi",
+        "start": "08.07.2026",
+        "end": "12.08.2026",
+        "schedule": "Çar: 13:00 - 15:00",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "1. Sınıf Okuma Yazma",
+        "center": "Mihalıççık Eğitim Merkezi",
+        "start": "07.07.2026",
+        "end": "11.08.2026",
+        "schedule": "Sal: 13:00 - 15:00",
+        "full": false,
+        "open": true
       },
       {
         "name": "2. Sınıf Matematik",
@@ -335,6 +930,94 @@
         "schedule": "Sal: 20:00 - 21:50 Per: 20:00 - 21:50",
         "full": true,
         "open": true
+      },
+      {
+        "name": "Çocuk Aerobik",
+        "center": "Şirintepe Eğitim Merkezi",
+        "schedule": "Pzt: 14:00 - 15:30",
+        "note": "5.ve 6. sınıfı bitirenler kayıt olabilir.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Akıl ve Zeka Oyunları",
+        "center": "Şirintepe Eğitim Merkezi",
+        "schedule": "Çar: 14:00 - 15:30",
+        "note": "5.ve 6. sınıfı bitirenler kayıt olabilir.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk El Sanatları Atölyesi",
+        "center": "Şirintepe Eğitim Merkezi",
+        "schedule": "Sal: 14:00 - 15:30",
+        "note": "5.ve 6. sınıfı bitirenler kayıt olabilir.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Satranç",
+        "center": "Şirintepe Eğitim Merkezi",
+        "schedule": "Çar: 14:00 - 15:30",
+        "note": "3.ve 4. sınıfı bitirenler kayıt olabilir.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuk Yaratıcı Drama",
+        "center": "Şirintepe Eğitim Merkezi",
+        "schedule": "Cum: 14:00 - 15:30",
+        "note": "1.ve 2. sınıfı bitirenler kayıt olabilir.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Çocuklar için Medya Okuryazarlığı",
+        "center": "Şirintepe Eğitim Merkezi",
+        "schedule": "Sal: 14:00 - 15:30",
+        "note": "3.ve 4. sınıfı bitirenler kayıt olabilir.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Eğlenceli İngilizce",
+        "center": "Şirintepe Eğitim Merkezi",
+        "schedule": "Sal: 14:00 - 15:30",
+        "note": "1.ve 2. sınıfı bitirenler kayıt olabilir.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Eğlenceli Matematik",
+        "center": "Şirintepe Eğitim Merkezi",
+        "schedule": "Çar: 14:00 - 15:30",
+        "note": "1.ve 2. sınıfı bitirenler kayıt olabilir.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Mandala",
+        "center": "Şirintepe Eğitim Merkezi",
+        "schedule": "Per: 14:00 - 15:30",
+        "note": "1.ve 2. sınıfı bitirenler kayıt olabilir.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Yaratıcı Drama",
+        "center": "Şirintepe Eğitim Merkezi",
+        "schedule": "Per: 14:00 - 15:30",
+        "note": "5.ve 6. sınıfı bitirenler kayıt olabilir.",
+        "full": false,
+        "open": true
+      },
+      {
+        "name": "Yaz Okulu",
+        "center": "Şirintepe Eğitim Merkezi",
+        "schedule": "Pzt: 9:00 - 11:50 Sal: 9:00 - 11:50 Çar: 9:00 - 11:50 Per: 9:00 - 11:50 Cum: 9:00 - 11:50",
+        "note": "2.SINIFI BİTİRENLER İÇİNDİR. Yaratıcı Drama,El Sanatları,Müzik,Akıl Zeka Oyunları,Eğlenceli İngilizce,Satranç,Mandala,Spor,Origami,Eğlenceli Matematik",
+        "full": false,
+        "open": true
       }
     ],
     "BURSA": [
@@ -359,6 +1042,7 @@
       "Bağlama (Bozuk Düzen)",
       "İlçe",
       "Eğitim Sağlayıcı",
+      "Kategoriler",
       "Eğitim Türü",
       "Eğitim Durumu"
     ]
