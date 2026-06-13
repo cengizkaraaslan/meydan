@@ -139,7 +139,7 @@ export default function KategorilerScreen() {
   // "Mevcut konumum" → GPS'ten şehri anında tespit edip şehir filtresine uygula.
   const onUseMyLocation = async () => {
     if (locating) return;
-    tapH();
+    tapHaptic(); // ses yok, sadece titreşim (lokasyon seçiminde ses istenmiyor)
     setLocating(true);
     try {
       const c = await detectCity();
@@ -356,7 +356,7 @@ export default function KategorilerScreen() {
         <Animated.View entering={FadeInDown.duration(450)} style={styles.locWrap}>
           <Pressable
             onPress={() => {
-              tapH();
+              tapHaptic(); // lokasyon — ses yok
               setCityOpen((v) => !v);
             }}
             style={[
@@ -381,7 +381,7 @@ export default function KategorilerScreen() {
                 label={t("all_cities")}
                 active={cityFilter === null}
                 onPress={() => {
-                  tapH();
+                  tapHaptic();
                   setCityFilter(null);
                   setCityInit(true);
                   setCityOpen(false);
@@ -393,7 +393,7 @@ export default function KategorilerScreen() {
                   label={c}
                   active={cityFilter === c}
                   onPress={() => {
-                    tapH();
+                    tapHaptic();
                     setCityFilter(c);
                     setCityInit(true);
                     setCityOpen(false);
@@ -467,7 +467,7 @@ export default function KategorilerScreen() {
                       label={t("all_districts")}
                       active={district === null}
                       onPress={() => {
-                        tapH();
+                        tapHaptic();
                         setDistrict(null);
                       }}
                     />
@@ -477,7 +477,7 @@ export default function KategorilerScreen() {
                         label={d}
                         active={district === d}
                         onPress={() => {
-                          tapH();
+                          tapHaptic();
                           setDistrict(district === d ? null : d);
                         }}
                       />

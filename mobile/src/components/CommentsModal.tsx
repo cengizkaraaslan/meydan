@@ -107,34 +107,30 @@ export function CommentsModal({ postId, authorName, onClose, onAdded }: Props) {
   const threads = sortedComments.map(postToThread);
 
   return (
-    <Modal visible={!!postId} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable
-          style={[styles.sheet, { backgroundColor: T.bgElevated, borderColor: T.hairline, paddingBottom: insets.bottom + 10, height: SCREEN_H * 0.82 }]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          {/* Tutamak — Instagram tarzı alt sayfa */}
-          <View style={[styles.handle, { backgroundColor: T.hairline }]} />
-          <View style={styles.header}>
-            <Text style={[Type.h2, { color: T.text }]}>
-              Yorumlar{comments.length ? ` · ${comments.length}` : ""}
-            </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              {comments.length > 1 ? (
-                <Pressable
-                  onPress={() => { tapH(); setSortBy((s) => SORT_NEXT[s]); }}
-                  hitSlop={8}
-                  style={[styles.sortBtn, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}
-                >
-                  <Text style={[Type.label, { color: T.text }]}>↕ {SORT_LABEL[sortBy]}</Text>
-                </Pressable>
-              ) : null}
-              <Pressable onPress={() => { tapH(); onClose(); }} hitSlop={10}>
-                <Text style={{ fontSize: 22, color: T.textDim }}>✕</Text>
+    <Modal visible={!!postId} animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+      {/* TAM EKRAN — klavye input'u kapatmasın diye KeyboardAvoidingView ile input yukarı çıkar. */}
+      <View style={[styles.full, { backgroundColor: T.bg, paddingTop: insets.top + 4 }]}>
+        <View style={[styles.header, { borderBottomColor: T.hairline }]}>
+          <Text style={[Type.h2, { color: T.text }]}>
+            Yorumlar{comments.length ? ` · ${comments.length}` : ""}
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            {comments.length > 1 ? (
+              <Pressable
+                onPress={() => { tapH(); setSortBy((s) => SORT_NEXT[s]); }}
+                hitSlop={8}
+                style={[styles.sortBtn, { borderColor: T.hairline, backgroundColor: T.surfaceStrong }]}
+              >
+                <Text style={[Type.label, { color: T.text }]}>↕ {SORT_LABEL[sortBy]}</Text>
               </Pressable>
-            </View>
+            ) : null}
+            <Pressable onPress={() => { tapH(); onClose(); }} hitSlop={10}>
+              <Text style={{ fontSize: 24, color: T.textDim }}>✕</Text>
+            </Pressable>
           </View>
+        </View>
 
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           {loading ? (
             <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
               <ActivityIndicator color={T.primary} />
@@ -145,54 +141,46 @@ export function CommentsModal({ postId, authorName, onClose, onAdded }: Props) {
               <Text style={[Type.body, { color: T.textFaint }]}>İlk yorumu sen yaz!</Text>
             </View>
           ) : (
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 4 }} keyboardShouldPersistTaps="handled">
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 6, paddingHorizontal: 16 }} keyboardShouldPersistTaps="handled">
               <CommentThread comments={threads} myDeviceId={myDeviceId} onReact={onReact} onReply={setReplyTo} />
             </ScrollView>
           )}
 
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-            {/* @mention önerileri (input'un üstünde) */}
-            <View style={{ paddingHorizontal: 12 }}>
-              <MentionSuggestions users={mention.results} onPick={mention.pick} />
-            </View>
-            {replyTo ? (
-              <ReplyComposerBar authorName={replyTo.authorName} snippet={replyTo.text} onCancel={() => setReplyTo(null)} />
-            ) : null}
-            <View style={[styles.inputRow, { borderColor: T.hairline }]}>
-              <TextInput
-                value={text}
-                onChangeText={mention.onChangeText}
-                placeholder={replyTo ? `${replyTo.authorName}'e yanıt yaz… 😊` : "Yorum yaz… 😊"}
-                placeholderTextColor={T.textFaint}
-                style={[styles.input, { color: T.text, backgroundColor: T.surface, borderColor: T.hairline }]}
-                multiline
-              />
-              <Pressable
-                onPress={submit}
-                disabled={!text.trim() || sending}
-                style={[styles.sendBtn, { backgroundColor: text.trim() ? T.primary : T.surfaceStrong }]}
-              >
-                <Text style={{ color: text.trim() ? "#fff" : T.textFaint, fontWeight: "800" }}>➤</Text>
-              </Pressable>
-            </View>
-          </KeyboardAvoidingView>
-        </Pressable>
-      </Pressable>
+          {/* @mention önerileri (input'un üstünde) */}
+          <View style={{ paddingHorizontal: 12 }}>
+            <MentionSuggestions users={mention.results} onPick={mention.pick} />
+          </View>
+          {replyTo ? (
+            <ReplyComposerBar authorName={replyTo.authorName} snippet={replyTo.text} onCancel={() => setReplyTo(null)} />
+          ) : null}
+          <View style={[styles.inputRow, { borderColor: T.hairline, paddingHorizontal: 16, paddingBottom: insets.bottom + 8 }]}>
+            <TextInput
+              value={text}
+              onChangeText={mention.onChangeText}
+              placeholder={replyTo ? `${replyTo.authorName}'e yanıt yaz… 😊` : "Yorum yaz… 😊"}
+              placeholderTextColor={T.textFaint}
+              style={[styles.input, { color: T.text, backgroundColor: T.surface, borderColor: T.hairline }]}
+              multiline
+            />
+            <Pressable
+              onPress={submit}
+              disabled={!text.trim() || sending}
+              style={[styles.sendBtn, { backgroundColor: text.trim() ? T.primary : T.surfaceStrong }]}
+            >
+              <Text style={{ color: text.trim() ? "#fff" : T.textFaint, fontWeight: "800" }}>➤</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
-  sheet: {
-    paddingHorizontal: 16, paddingTop: 14,
-    borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-  },
-  handle: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 10 },
+  full: { flex: 1 },
   sortBtn: { borderWidth: StyleSheet.hairlineWidth * 2, borderRadius: Radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
-  inputRow: { flexDirection: "row", alignItems: "flex-end", gap: 8, marginTop: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth * 2 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
+  inputRow: { flexDirection: "row", alignItems: "flex-end", gap: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth * 2 },
   input: { flex: 1, borderRadius: Radius.md, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 14, paddingVertical: 10, maxHeight: 100, ...Type.body },
   sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
 });
