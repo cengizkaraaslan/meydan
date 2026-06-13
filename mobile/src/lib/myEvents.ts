@@ -14,8 +14,10 @@ export interface MyEvent {
   instagram: string;
   facebook: string;
   tiktok: string;
+  phone?: string;
   imageUri: string | null;
   startsAt: string; // ISO
+  endsAt?: string; // ISO (opsiyonel bitiş)
   createdAt: number;
   creatorName?: string;
   creatorHidden?: boolean;

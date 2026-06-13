@@ -49,6 +49,9 @@ export default function CreateEventScreen() {
   // Etkinlik tarihi+saati — native takvim/saat seçici ile.
   const [when, setWhen] = useState<Date | null>(null);
   const [picker, setPicker] = useState<null | "date" | "time">(null);
+  // Bitiş tarihi (opsiyonel — çok günlü etkinlikler için).
+  const [endAt, setEndAt] = useState<Date | null>(null);
+  const [endPicker, setEndPicker] = useState<null | "date" | "time">(null);
   // Oluşturan kimliğini gizle (sonradan düzenlenebilir).
   const [creatorHidden, setCreatorHidden] = useState(false);
   const [desc, setDesc] = useState("");
@@ -57,6 +60,7 @@ export default function CreateEventScreen() {
   const [instagram, setInstagram] = useState("");
   const [facebook, setFacebook] = useState("");
   const [tiktok, setTiktok] = useState("");
+  const [phone, setPhone] = useState("");
 
   const [published, setPublished] = useState(false);
 
@@ -88,11 +92,16 @@ export default function CreateEventScreen() {
       setInstagram(ev.instagram);
       setFacebook(ev.facebook);
       setTiktok(ev.tiktok);
+      setPhone(ev.phone ?? "");
       setImage(ev.imageUri);
       setCreatorHidden(ev.creatorHidden ?? false);
       if (ev.startsAt) {
         const d = new Date(ev.startsAt);
         if (!isNaN(d.getTime())) setWhen(d);
+      }
+      if (ev.endsAt) {
+        const d2 = new Date(ev.endsAt);
+        if (!isNaN(d2.getTime())) setEndAt(d2);
       }
       pendingDistrict.current = ev.district;
       setCity(ev.city); // ilçe effect'ini tetikler → pendingDistrict uygulanır
@@ -211,6 +220,22 @@ export default function CreateEventScreen() {
     }
   };
 
+  // Bitiş tarihi seçimi (başlangıçla aynı takvim→saat akışı).
+  const onEndPickerChange = (e: DateTimePickerEvent, sel?: Date) => {
+    if (e.type === "dismissed") { setEndPicker(null); return; }
+    const base = sel ?? endAt ?? when ?? new Date();
+    const d = new Date(endAt ?? when ?? new Date());
+    if (endPicker === "date") {
+      d.setFullYear(base.getFullYear(), base.getMonth(), base.getDate());
+      setEndAt(d);
+      setEndPicker("time");
+    } else {
+      d.setHours(base.getHours(), base.getMinutes(), 0, 0);
+      setEndAt(d);
+      setEndPicker(null);
+    }
+  };
+
   async function publish() {
     if (!canPublish || published) return;
     impactH();
@@ -235,11 +260,13 @@ export default function CreateEventScreen() {
           city: city ?? "",
           district: district ?? "",
           startsAt: (when ?? new Date()).toISOString(),
+          endsAt: endAt ? endAt.toISOString() : undefined,
           description: desc.trim(),
           website: website.trim(),
           instagram: instagram.trim(),
           facebook: facebook.trim(),
           tiktok: tiktok.trim(),
+          phone: phone.trim(),
           imageUrl: imageToSend ?? "",
           creatorEmail: user?.email ?? "",
           creatorName: creatorHidden ? "" : (user?.name ?? ""),
@@ -265,8 +292,10 @@ export default function CreateEventScreen() {
         instagram: instagram.trim(),
         facebook: facebook.trim(),
         tiktok: tiktok.trim(),
+        phone: phone.trim(),
         imageUri: imageToSend,
         startsAt: (when ?? new Date()).toISOString(),
+        endsAt: endAt ? endAt.toISOString() : undefined,
         creatorName: user?.name ?? user?.email ?? "",
         creatorHidden,
         slug: serverSlug,
@@ -283,7 +312,7 @@ export default function CreateEventScreen() {
     placeholder: string,
     value: string,
     onChange: (v: string) => void,
-    opts?: { multiline?: boolean; icon?: string; keyboard?: "url" | "default" },
+    opts?: { multiline?: boolean; icon?: string; keyboard?: "url" | "default" | "phone" },
   ) => (
     <View
       style={[
@@ -302,7 +331,7 @@ export default function CreateEventScreen() {
         placeholder={placeholder}
         placeholderTextColor={T.textFaint}
         multiline={opts?.multiline}
-        keyboardType={opts?.keyboard === "url" ? "url" : "default"}
+        keyboardType={opts?.keyboard === "url" ? "url" : opts?.keyboard === "phone" ? "phone-pad" : "default"}
         autoCapitalize={opts?.keyboard === "url" ? "none" : "sentences"}
         style={[
           Type.body,
@@ -422,6 +451,35 @@ export default function CreateEventScreen() {
             />
           ) : null}
 
+          {/* Bitiş tarihi (opsiyonel — çok günlü etkinlikler için) */}
+          <Animated.View entering={FadeInDown.duration(450).delay(120)}>
+            <Pressable
+              onPress={() => { tapH(); setEndPicker("date"); }}
+              style={[styles.inputWrap, { backgroundColor: T.surfaceStrong, borderColor: T.hairline, alignItems: "center" }]}
+            >
+              <Text style={{ fontSize: 16 }}>🏁</Text>
+              <Text style={[Type.body, { flex: 1, color: endAt ? T.text : T.textFaint, marginLeft: 10 }]}>
+                {endAt ? whenLabel(endAt) : "Bitiş tarihi (opsiyonel)"}
+              </Text>
+              {endAt ? (
+                <Pressable onPress={() => { tapH(); setEndAt(null); }} hitSlop={10}>
+                  <Text style={{ color: T.textDim, fontSize: 16 }}>✕</Text>
+                </Pressable>
+              ) : (
+                <Text style={{ color: T.textDim }}>▾</Text>
+              )}
+            </Pressable>
+          </Animated.View>
+
+          {endPicker ? (
+            <DateTimePicker
+              value={endAt ?? when ?? new Date()}
+              mode={endPicker}
+              is24Hour
+              onChange={onEndPickerChange}
+            />
+          ) : null}
+
           {/* Oluşturan + kimlik gizleme */}
           <Animated.View entering={FadeInDown.duration(450).delay(140)} style={{ gap: 8 }}>
             <Text style={[Type.label, { color: T.textDim }]}>Oluşturan</Text>
@@ -515,6 +573,7 @@ export default function CreateEventScreen() {
 
           {/* Sosyal */}
           <Animated.View entering={FadeInDown.duration(450).delay(280)} style={{ gap: 12 }}>
+            {field("Telefon / WhatsApp", phone, setPhone, { icon: "📞", keyboard: "phone" })}
             {field(t("ev_website"), website, setWebsite, { icon: "🌐", keyboard: "url" })}
             {field(t("ev_instagram"), instagram, setInstagram, { icon: "📸", keyboard: "url" })}
             {field(t("ev_facebook"), facebook, setFacebook, { icon: "👍", keyboard: "url" })}

@@ -60,6 +60,7 @@ interface CreateEventBody {
   venue?: string;
   city?: string;
   startsAt?: string;
+  endsAt?: string;
   description?: string;
   website?: string;
   instagram?: string;
@@ -102,6 +103,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "startsAt geçerli ISO tarih olmalı" }, { status: 400 });
   }
 
+  // Bitiş tarihi opsiyonel: geçerli ve başlangıçtan SONRA ise sakla, değilse yok say.
+  const endsAtRaw = body.endsAt?.trim();
+  let endsAt: Date | null = null;
+  if (endsAtRaw) {
+    const d = new Date(endsAtRaw);
+    if (!Number.isNaN(d.getTime()) && d.getTime() > startsAt.getTime()) endsAt = d;
+  }
+
   const slug = slugify(title);
 
   await db.event.create({
@@ -115,6 +124,7 @@ export async function POST(request: NextRequest) {
       venue,
       city,
       startsAt,
+      endsAt,
       imageUrl: body.imageUrl?.trim() || null,
       website: body.website?.trim() || null,
       instagram: body.instagram?.trim() || null,
