@@ -257,7 +257,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Radius.lg, borderWidth: 0, padding: 14, gap: 8, ...glow("#000", 10, 0.15) },
+  card: { borderRadius: Radius.lg, borderWidth: 0, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 6, ...glow("#000", 10, 0.15) },
   head: { flexDirection: "row", alignItems: "center", gap: 10 },
   authorTap: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
   followPill: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6 },
@@ -265,13 +265,14 @@ const styles = StyleSheet.create({
   eventTag: { alignSelf: "flex-start", borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, maxWidth: "100%" },
   media: { width: "100%", height: 220, borderRadius: Radius.md, marginTop: 2 },
   // flexWrap + rowGap: çok tepki/uzun sayıda "yorum" yan yana sığmazsa alta sarar (yatay taşma yok).
-  footer: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", columnGap: 18, rowGap: 8, marginTop: 4, marginLeft: 8 },
+  footer: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", columnGap: 18, rowGap: 8, marginTop: 0, marginLeft: 8 },
   likeBtn: { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 7 },
   summary: { flexDirection: "row", marginLeft: 2 },
   summaryEmoji: { fontSize: 12 },
   pickerWrap: { position: "absolute", bottom: "100%", left: 0, marginBottom: 8, zIndex: 20 },
-  // Sistem / etkinlik kartı
-  sysCard: { borderRadius: Radius.lg, borderWidth: 0, padding: 14, gap: 6, ...glow("#000", 10, 0.15) },
+  // Sistem / etkinlik kartı — başlık (📣 SİSTEM · 9 sa) kartın üstüne daha yakın olsun
+  // diye üst padding azaltıldı (14→10).
+  sysCard: { borderRadius: Radius.lg, borderWidth: 0, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 14, gap: 6, ...glow("#000", 10, 0.15) },
   sysHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   sysIcon: { fontSize: 18 },
   sysBadge: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 10, paddingVertical: 5 },
