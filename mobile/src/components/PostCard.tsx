@@ -275,6 +275,8 @@ const styles = StyleSheet.create({
   sysHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   sysIcon: { fontSize: 18 },
   sysBadge: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 10, paddingVertical: 5 },
-  sysBody: { flexDirection: "row", gap: 12, alignItems: "flex-start", marginTop: 2 },
-  sysThumb: { width: 72, height: 72, borderRadius: Radius.md },
+  // alignItems center: kısa metinli kartta görsel (thumb) ile metin dikey ortalanır →
+  // metnin altında boşluk hissi kalkar (içerik–aksiyon arası gereksiz boşluk düzeldi).
+  sysBody: { flexDirection: "row", gap: 12, alignItems: "center", marginTop: 2 },
+  sysThumb: { width: 64, height: 64, borderRadius: Radius.md },
 });

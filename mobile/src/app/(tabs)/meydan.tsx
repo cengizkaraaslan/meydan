@@ -792,7 +792,7 @@ export default function MeydanScreen() {
             <EmptyState emoji="🌌" title="Henüz gönderi yok" sub="İlk paylaşan sen ol!" />
           )
         }
-        contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: insets.bottom + 116 }}
+        contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: insets.bottom + 150 }}
         style={{ flex: 1 }}
         ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
         showsVerticalScrollIndicator={false}
