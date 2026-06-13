@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import { withDb } from "./db-fallback";
+import { avatarUrlFor } from "./social-data";
 
 /**
  * Meydate (mobil tanışma) için deviceId-bazlı eşleşme + sohbet katmanı.
@@ -806,6 +807,48 @@ export async function deviceDisplayName(deviceId: string): Promise<string | null
       return null;
     },
     () => mem.matches.find((m) => m.partnerId === deviceId)?.partnerName ?? null,
+  );
+}
+
+/**
+ * Cihazın push/Bildirim avatarı (Instagram tarzı sağdaki kişi resmi). Öncelik:
+ *   1) kişinin YÜKLEDİĞİ foto (MobileProfile.avatar — Google foto override'ı)
+ *   2) GMAIL fotosu (User.image — Google girişinden)
+ *   3) ada göre üretilen VARSAYILAN portre
+ * Her zaman bir görsel döner (default dahil) → push'ta resim hep olur.
+ */
+export async function deviceAvatar(deviceId: string): Promise<string | null> {
+  const httpAvatar = (u: string | null | undefined) => (u && /^https?:\/\//.test(u) ? u : null);
+  return withDb(
+    async () => {
+      const direct = await db.mobileProfile.findUnique({
+        where: { deviceId },
+        select: { avatar: true, name: true, email: true },
+      });
+      let uploaded = httpAvatar(direct?.avatar);
+      let gmail: string | null = null;
+      let name = direct?.name ?? null;
+      const email = deviceId.startsWith("acct:")
+        ? deviceId.slice(5).toLowerCase()
+        : deviceId.includes("@")
+          ? deviceId.toLowerCase()
+          : direct?.email?.toLowerCase() ?? null;
+      if (email && (!uploaded || !name)) {
+        const [usr, prof] = await Promise.all([
+          db.user.findFirst({ where: { email }, select: { image: true, name: true } }).catch(() => null),
+          db.mobileProfile.findFirst({ where: { email }, select: { avatar: true, name: true } }).catch(() => null),
+        ]);
+        uploaded = uploaded || httpAvatar(prof?.avatar);
+        gmail = httpAvatar(usr?.image);
+        name = name || prof?.name || usr?.name || null;
+      }
+      // Öncelik: yüklenen > Gmail > varsayılan (ada göre).
+      return uploaded || gmail || (name ? avatarUrlFor(name) : null);
+    },
+    () => {
+      const m = mem.matches.find((x) => x.partnerId === deviceId);
+      return httpAvatar(m?.partnerAvatar);
+    },
   );
 }
 

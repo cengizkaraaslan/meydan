@@ -13,6 +13,8 @@ export interface ExpoPushMessage {
   title: string;
   body: string;
   data?: Record<string, unknown>;
+  /** Instagram tarzı bildirim görseli (gönderenin avatarı). Expo `richContent.image`. */
+  image?: string;
 }
 
 /** Geçerli bir Expo push token'ı mı (ExponentPushToken[...] / ExpoPushToken[...]). */
@@ -48,6 +50,8 @@ export async function sendExpoPush(messages: ExpoPushMessage[]): Promise<{ inval
             sound: "default",
             channelId: "mentions",
             priority: "high",
+            // Gönderenin avatarı → bildirimde görsel (iOS sağda thumbnail, Android büyük resim).
+            ...(m.image ? { richContent: { image: m.image } } : {}),
           })),
         ),
       });

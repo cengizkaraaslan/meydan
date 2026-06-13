@@ -6,6 +6,7 @@ import {
   deleteMessage,
   recipientDevicesForMatch,
   deviceDisplayName,
+  deviceAvatar,
   type MutationReason,
 } from "@/lib/mobile-chat-store";
 import { extractMentionEmails, notifyDevices, notifyEmails, preview } from "@/lib/mention-notify";
@@ -94,7 +95,10 @@ export async function POST(request: NextRequest) {
   if (!senderDeviceId.startsWith("bot_") && !text.startsWith(REACT_PREFIX) && !text.startsWith(BUZZ_PREFIX)) {
     void (async () => {
       const recipients = await recipientDevicesForMatch(matchKey, senderDeviceId);
-      const name = (await deviceDisplayName(senderDeviceId)) || "Biri";
+      const [name, avatar] = await Promise.all([
+        deviceDisplayName(senderDeviceId).then((n) => n || "Biri"),
+        deviceAvatar(senderDeviceId),
+      ]);
       const shown = text.startsWith(REPLY_PREFIX) ? replyInnerText(text) : text;
       // Push başlığı: "Ahmet Yılmaz sana mesaj yolladı!" (foto/ses'te uygun fiil); gövde = önizleme.
       const action = shown.startsWith(IMG_PREFIX)
@@ -111,12 +115,12 @@ export async function POST(request: NextRequest) {
       // url yok → mobil tip-bazlı (dm) yönlendirmeyle doğrudan /sohbet/[id] açılır; web fallback /mesajlar.
       const data = { type: "dm", matchKey, partnerId: senderDeviceId, name, url: "/mesajlar" };
       if (recipients.length) {
-        await notifyDevices(recipients, { title: `${name} ${action}`, body: bodyText, data, inApp: { type: "dm", actorId: senderDeviceId, actorName: name } });
+        await notifyDevices(recipients, { title: `${name} ${action}`, body: bodyText, data, image: avatar ?? undefined, inApp: { type: "dm", actorId: senderDeviceId, actorName: name } });
       }
       // DM içinde @email geçtiyse o kişilere de bildir (alıcıdan bağımsız).
       const emails = extractMentionEmails(text);
       if (emails.length) {
-        await notifyEmails(emails, { title: `${name} senden bahsetti`, body: bodyText, data, inApp: { type: "mention", actorId: senderDeviceId, actorName: name } });
+        await notifyEmails(emails, { title: `${name} senden bahsetti`, body: bodyText, data, image: avatar ?? undefined, inApp: { type: "mention", actorId: senderDeviceId, actorName: name } });
       }
     })().catch(() => {});
   }

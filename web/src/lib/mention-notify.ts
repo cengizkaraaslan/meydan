@@ -28,6 +28,8 @@ export interface NotifyPayload {
   body: string;
   /** Tıklayınca açılacak deep-link verisi (mobil) ve url (web). */
   data?: Record<string, unknown>;
+  /** Bildirim görseli (gönderenin avatarı) — Instagram tarzı. Verilirse Expo richContent.image. */
+  image?: string;
   /** Verilirse uygulama-içi Bildirimler listesine de kayıt düşülür. */
   inApp?: { type: string; actorId?: string | null; actorName?: string | null };
 }
@@ -50,7 +52,7 @@ async function pushToDevices(
 ): Promise<void> {
   const messages: ExpoPushMessage[] = rows
     .filter((r) => r.pushToken)
-    .map((r) => ({ to: r.pushToken as string, title: payload.title, body: payload.body, data: payload.data }));
+    .map((r) => ({ to: r.pushToken as string, title: payload.title, body: payload.body, data: payload.data, image: payload.image }));
   if (messages.length === 0) return;
   const { invalidTokens } = await sendExpoPush(messages);
   if (invalidTokens.length) {
