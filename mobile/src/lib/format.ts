@@ -39,20 +39,46 @@ export function isUniversitySource(source?: string | null): boolean {
 }
 
 /**
+ * Başlık bir şenlik/festival/şölen/panayır/kermes mi? Bu tür etkinlikler kategorisi yanlış
+ * atanmış olsa bile (örn. "Geleneksel Tepreş Şenliği" DIGER gelirse) fiyat yoksa ücretsizdir;
+ * scraper'da fiyat bulunamadı diye "Biletli" damgalanmasınlar. Konser/tiyatro vb. etkilenmez.
+ */
+const FESTIVAL_TITLE = /(şenlik|senlik|şenliğ|senliğ|şölen|solen|festival|\bfest\b|panayır|panayir|kermes)/i;
+
+/**
  * Etkinlik için doğru erişim/fiyat etiketi. Üniversite kaynağı ise "Ücretsiz/Biletli"
  * yerine "🎓 Öğrenciye açık" döner (hatalı "Ücretsiz" gösterimini engeller).
  */
 export function priceLabel(e: {
   source?: string | null;
   category?: string | null;
+  title?: string | null;
   is_free: boolean;
   price_min: number | null;
   price_max: number | null;
 }): string {
   if (isUniversitySource(e.source)) return "🎓 Öğrenciye açık";
-  // Festivalde fiyat bilgisi yoksa "Biletli" deme — fiyat yazmıyorsa ücretsizdir.
-  if (e.category === "FESTIVAL" && !e.is_free && e.price_min == null) return "Ücretsiz";
+  // Festival/şenlik vb.: fiyat bilgisi yoksa "Biletli" deme — fiyat yazmıyorsa ücretsizdir.
+  if (!e.is_free && e.price_min == null && (e.category === "FESTIVAL" || FESTIVAL_TITLE.test(e.title ?? ""))) {
+    return "Ücretsiz";
+  }
   return fmtPrice(e);
+}
+
+/**
+ * Etiketle TUTARLI renk için: etkinlik gerçekten biletli mi? priceLabel "Ücretsiz" ya da
+ * "🎓 Öğrenciye açık" döndürüyorsa biletli değildir (renk yeşil/cyan olmalı, gold değil).
+ */
+export function isTicketedLabel(e: {
+  source?: string | null;
+  category?: string | null;
+  title?: string | null;
+  is_free: boolean;
+  price_min: number | null;
+  price_max: number | null;
+}): boolean {
+  const l = priceLabel(e);
+  return l !== "Ücretsiz" && !l.startsWith("🎓");
 }
 
 /** Mesafe metni: <1km ise metre ("400 m"), değilse km (gerekirse tek ondalık). */

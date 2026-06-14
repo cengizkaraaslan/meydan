@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { Radius, Type } from "@/theme/aurora";
@@ -35,57 +35,101 @@ export function CommentThread({ comments, myDeviceId, isAdmin, editWindowMs = 0,
     !!onEdit && c.ownerDeviceId === myDeviceId && editWindowMs > 0 && Date.now() - new Date(c.createdAt).getTime() < editWindowMs;
   const canDelete = (c: ThreadComment) => !!onDelete && (c.ownerDeviceId === myDeviceId || !!isAdmin);
 
-  return (
-    <View style={{ gap: 14 }}>
-      {comments.map((c, i) => {
-        const entries = Object.entries(c.reactions).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
-        return (
-          <Animated.View key={c.id} entering={FadeInDown.duration(320).delay(Math.min(i, 8) * 30)}>
-            <Pressable onLongPress={() => open(c)} delayLongPress={280} style={styles.row}>
-              <StoryAvatar name={c.authorName} size={30} />
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Text style={[Type.label, { color: T.text }]} numberOfLines={1}>{c.authorName}</Text>
-                  <Text style={[Type.micro, { color: T.textFaint }]}>{commentRelTime(c.createdAt)}</Text>
-                </View>
+  // Düz yorum listesini ağaca çevir: kök yorumlar + altlarında (kronolojik) yanıtları.
+  // Kök sırası gelen diziden korunur (çağıranın sıralaması geçerli kalsın); yanıtlar her
+  // zaman eskiden yeniye sıralanır → yanıt artık ilgili yorumun ALTINDA, en üstte değil.
+  const nodes = useMemo(() => {
+    const byId = new Map(comments.map((c) => [c.id, c]));
+    const ts = (s: string) => new Date(s).getTime() || 0;
+    // Bir yorumun kök atasını bul (yanıt-zincirini yukarı takip et; döngüye karşı korumalı).
+    const rootIdOf = (c: ThreadComment) => {
+      let cur = c;
+      const seen = new Set<string>();
+      while (cur.replyTo && byId.has(cur.replyTo.id) && !seen.has(cur.id)) {
+        seen.add(cur.id);
+        cur = byId.get(cur.replyTo.id)!;
+      }
+      return cur.id;
+    };
+    const repliesByRoot = new Map<string, ThreadComment[]>();
+    const roots: ThreadComment[] = [];
+    for (const c of comments) {
+      const isRoot = !c.replyTo || !byId.has(c.replyTo.id);
+      const rid = isRoot ? c.id : rootIdOf(c);
+      if (isRoot || rid === c.id) { roots.push(c); continue; }
+      const arr = repliesByRoot.get(rid) ?? [];
+      arr.push(c);
+      repliesByRoot.set(rid, arr);
+    }
+    return roots.map((r) => ({
+      comment: r,
+      replies: (repliesByRoot.get(r.id) ?? []).sort((a, b) => ts(a.createdAt) - ts(b.createdAt)),
+    }));
+  }, [comments]);
 
-                {/* Alıntı bloğu (yanıtsa) */}
-                {c.replyTo ? (
-                  <View style={[styles.quote, { backgroundColor: T.surface, borderColor: T.hairline }]}>
-                    <View style={[styles.quoteBar, { backgroundColor: T.primary }]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[Type.micro, { color: T.primary, fontWeight: "700" }]} numberOfLines={1}>
-                        ↩ {c.replyTo.authorName}
-                      </Text>
-                      <Text style={[Type.micro, { color: T.textDim }]} numberOfLines={1}>{c.replyTo.snippet}</Text>
-                    </View>
-                  </View>
-                ) : null}
+  // Tek bir yorum satırı (kök ya da yanıt). isReply → biraz küçük avatar.
+  const renderRow = (c: ThreadComment, i: number, isReply: boolean) => {
+    const entries = Object.entries(c.reactions).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+    return (
+      <Animated.View key={c.id} entering={FadeInDown.duration(320).delay(Math.min(i, 8) * 30)}>
+        <Pressable onLongPress={() => open(c)} delayLongPress={280} style={styles.row}>
+          <StoryAvatar name={c.authorName} size={isReply ? 26 : 30} />
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={[Type.label, { color: T.text }]} numberOfLines={1}>{c.authorName}</Text>
+              <Text style={[Type.micro, { color: T.textFaint }]}>{commentRelTime(c.createdAt)}</Text>
+            </View>
 
-                <MentionText text={c.text} style={[Type.body, { color: T.textDim, marginTop: 2 }]} />
-
-                {/* Aksiyon satırı: tepki çipi + Yanıtla + Tepki ekle */}
-                <View style={styles.actions}>
-                  {entries.length ? (
-                    <Pressable onPress={() => open(c)} style={[styles.reactChip, { backgroundColor: T.surfaceStrong, borderColor: c.myReaction ? T.primary : T.hairline }]}>
-                      <Text style={{ fontSize: 12.5 }}>{entries.slice(0, 3).map(([e]) => e).join("")} {c.reactionTotal}</Text>
-                    </Pressable>
-                  ) : null}
-                  <Pressable onPress={() => { tapH(); onReply(c); }} hitSlop={6}>
-                    <Text style={[Type.micro, { color: T.textFaint, fontWeight: "700" }]}>Yanıtla</Text>
-                  </Pressable>
-                  {c.replyCount > 0 ? (
-                    <Text style={[Type.micro, { color: T.textFaint }]}>· {c.replyCount} yanıt</Text>
-                  ) : null}
-                  <Pressable onPress={() => open(c)} hitSlop={6} style={{ marginLeft: "auto" }}>
-                    <Text style={{ fontSize: 16 }}>😊</Text>
-                  </Pressable>
+            {/* Alıntı bloğu (yanıtsa) — iç içe görünümde kime yanıt verdiğini netleştirir */}
+            {c.replyTo ? (
+              <View style={[styles.quote, { backgroundColor: T.surface, borderColor: T.hairline }]}>
+                <View style={[styles.quoteBar, { backgroundColor: T.primary }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[Type.micro, { color: T.primary, fontWeight: "700" }]} numberOfLines={1}>
+                    ↩ {c.replyTo.authorName}
+                  </Text>
+                  <Text style={[Type.micro, { color: T.textDim }]} numberOfLines={1}>{c.replyTo.snippet}</Text>
                 </View>
               </View>
-            </Pressable>
-          </Animated.View>
-        );
-      })}
+            ) : null}
+
+            <MentionText text={c.text} style={[Type.body, { color: T.textDim, marginTop: 2 }]} />
+
+            {/* Aksiyon satırı: tepki çipi + Yanıtla + Tepki ekle */}
+            <View style={styles.actions}>
+              {entries.length ? (
+                <Pressable onPress={() => open(c)} style={[styles.reactChip, { backgroundColor: T.surfaceStrong, borderColor: c.myReaction ? T.primary : T.hairline }]}>
+                  <Text style={{ fontSize: 12.5 }}>{entries.slice(0, 3).map(([e]) => e).join("")} {c.reactionTotal}</Text>
+                </Pressable>
+              ) : null}
+              <Pressable onPress={() => { tapH(); onReply(c); }} hitSlop={6}>
+                <Text style={[Type.micro, { color: T.textFaint, fontWeight: "700" }]}>Yanıtla</Text>
+              </Pressable>
+              {!isReply && c.replyCount > 0 ? (
+                <Text style={[Type.micro, { color: T.textFaint }]}>· {c.replyCount} yanıt</Text>
+              ) : null}
+              <Pressable onPress={() => open(c)} hitSlop={6} style={{ marginLeft: "auto" }}>
+                <Text style={{ fontSize: 16 }}>👍</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Animated.View>
+    );
+  };
+
+  return (
+    <View style={{ gap: 14 }}>
+      {nodes.map(({ comment, replies }) => (
+        <View key={comment.id} style={{ gap: 12 }}>
+          {renderRow(comment, 0, false)}
+          {replies.length ? (
+            <View style={[styles.replyWrap, { borderLeftColor: T.hairline }]}>
+              {replies.map((r, ri) => renderRow(r, ri, true))}
+            </View>
+          ) : null}
+        </View>
+      ))}
 
       {/* Animasyonlu action-sheet (Alert YERİNE) */}
       <Modal visible={!!active} transparent animationType="fade" statusBarTranslucent onRequestClose={close}>
@@ -145,6 +189,8 @@ export function CommentThread({ comments, myDeviceId, isAdmin, editWindowMs = 0,
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
+  // Yanıtlar köke göre girintili + sol çizgili (ağaç hissi).
+  replyWrap: { marginLeft: 18, paddingLeft: 14, borderLeftWidth: StyleSheet.hairlineWidth * 2, gap: 12 },
   quote: { flexDirection: "row", gap: 7, marginTop: 4, paddingVertical: 4, paddingRight: 8, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth * 2, overflow: "hidden" },
   quoteBar: { width: 3, alignSelf: "stretch", borderRadius: 2 },
   actions: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 6 },

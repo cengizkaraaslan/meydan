@@ -35,9 +35,10 @@ export async function listFeed(input: { deviceId: string; filter: "all" | "follo
   let where: Record<string, unknown> = {};
   if (filter === "follow") {
     const ids = await listFollowingIds(deviceId);
-    // SADECE takip ettiklerin + kendi gönderilerin. Sistem (etkinlik duyuruları) bu sekmede
-    // GÖSTERİLMEZ; yalnız "Genel" akışta serpiştirilir. ("system" bilinçli olarak hariç.)
-    where = { authorId: { in: [...ids, deviceId] } };
+    // SADECE takip ettiğin hesapların gönderileri. Kendi gönderilerin ("Sen") ve sistem
+    // (etkinlik duyuruları) bu sekmede GÖSTERİLMEZ — onlar yalnız "Genel" akışta. Kimseyi
+    // takip etmiyorsan (ids boş) akış boş olur → "Takip akışın boş" durumu.
+    where = { authorId: { in: ids } };
   }
 
   let posts = await db.mobilePost.findMany({ where, orderBy: { createdAt: "desc" }, skip: offset, take: PAGE });

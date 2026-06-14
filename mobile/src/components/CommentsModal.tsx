@@ -2,9 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,6 +25,7 @@ import { getOrCreateDeviceId } from "@/lib/device";
 import { useMentionField } from "@/lib/mentions";
 import { MentionSuggestions } from "@/components/MentionSuggestions";
 import { CommentThread } from "@/components/CommentThread";
+import { KeyboardAvoider } from "@/components/KeyboardAvoider";
 import { ReplyComposerBar } from "@/components/ReplyComposerBar";
 import { postToThread, eventToThread, type ThreadComment } from "@/lib/commentThread";
 
@@ -119,9 +118,9 @@ export function CommentsModal({ postId, authorName, authorAvatar, eventSlug, onC
   }, [items, sortBy]);
 
   return (
-    <Modal visible={!!(postId || eventSlug)} animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+    <Modal visible={!!(postId || eventSlug)} animationType="slide" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
       {/* TAM EKRAN — klavye input'u kapatmasın diye KeyboardAvoidingView ile input yukarı çıkar. */}
-      <View style={[styles.full, { backgroundColor: T.bg, paddingTop: insets.top + 4 }]}>
+      <View style={[styles.full, { backgroundColor: T.bgElevated, paddingTop: insets.top + 4 }]}>
         <View style={[styles.header, { borderBottomColor: T.hairline }]}>
           <Text style={[Type.h2, { color: T.text }]}>
             Yorumlar{threads.length ? ` · ${threads.length}` : ""}
@@ -142,7 +141,7 @@ export function CommentsModal({ postId, authorName, authorAvatar, eventSlug, onC
           </View>
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <KeyboardAvoider style={{ flex: 1 }} modal>
           {loading ? (
             <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
               <ActivityIndicator color={T.primary} />
@@ -182,7 +181,7 @@ export function CommentsModal({ postId, authorName, authorAvatar, eventSlug, onC
               <Text style={{ color: text.trim() ? "#fff" : T.textFaint, fontWeight: "800" }}>➤</Text>
             </Pressable>
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardAvoider>
       </View>
     </Modal>
   );

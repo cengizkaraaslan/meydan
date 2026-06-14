@@ -151,7 +151,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
           </View>
 
           {post.eventTitle && hasEvent ? (
-            <Text style={[Type.label, { color: T.primary }]} numberOfLines={1}>🎟 {post.eventTitle}</Text>
+            <Text style={[Type.label, { color: T.primary, marginLeft: 6 }]} numberOfLines={1}>🎟 {post.eventTitle}</Text>
           ) : null}
 
           <View style={styles.sysBody}>
@@ -258,9 +258,11 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
 
 const styles = StyleSheet.create({
   card: { borderRadius: Radius.lg, borderWidth: 0, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 6, ...glow("#000", 10, 0.15) },
-  head: { flexDirection: "row", alignItems: "center", gap: 10 },
+  // Tüm başlık satırı (avatar + ad + zaman + Sen/takip) 7px yukarı — hepsi birlikte hizalı kalsın.
+  head: { flexDirection: "row", alignItems: "center", gap: 10, transform: [{ translateY: -7 }] },
   authorTap: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-  followPill: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6 },
+  // "Sen" / "+ Takip et" / "✓ Takip ediliyor" pill'i: 4px yukarı (avatar+ad bloğuyla daha hizalı).
+  followPill: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, transform: [{ translateY: -4 }] },
   moreBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2 },
   eventTag: { alignSelf: "flex-start", borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, maxWidth: "100%" },
   media: { width: "100%", height: 220, borderRadius: Radius.md, marginTop: 2 },
@@ -273,7 +275,8 @@ const styles = StyleSheet.create({
   // Sistem / etkinlik kartı — başlık (📣 SİSTEM · 9 sa) kartın üstüne daha yakın olsun
   // diye üst padding azaltıldı (14→10).
   sysCard: { borderRadius: Radius.lg, borderWidth: 0, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 14, gap: 6, ...glow("#000", 10, 0.15) },
-  sysHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+  // SİSTEM ikon + yazı bloğu 7px yukarı (kullanıcı gönderisindeki head ile aynı hizalama).
+  sysHead: { flexDirection: "row", alignItems: "center", gap: 8, transform: [{ translateY: -7 }] },
   sysIcon: { fontSize: 18 },
   sysBadge: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 10, paddingVertical: 5 },
   // alignItems center: kısa metinli kartta görsel (thumb) ile metin dikey ortalanır →

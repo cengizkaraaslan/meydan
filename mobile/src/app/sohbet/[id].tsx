@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -22,6 +22,7 @@ import { router, useLocalSearchParams, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { AuroraBackground } from "@/components/AuroraBackground";
+import { KeyboardAvoider } from "@/components/KeyboardAvoider";
 import { getPerson, type Person } from "@/lib/people";
 import { resolveAvatar } from "@/lib/avatar";
 import { useChat, canEditMsg, replySnippet, type Msg, type MsgReactions } from "@/lib/chat";
@@ -590,7 +591,7 @@ export default function ChatScreen() {
         </Pressable>
       </Modal>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoider style={{ flex: 1 }}>
         {/* Sohbet hazır olana kadar (ensureMatch + ilk fetch) şık bir loading; header zaten yukarıda anında çiziliyor. */}
         {ready ? (
           <Animated.View style={[{ flex: 1 }, shakeStyle]}>
@@ -738,7 +739,7 @@ export default function ChatScreen() {
             )}
           </View>
         )}
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
 
       {/* Mesaj uzun-bas action-sheet (tema uyumlu, alttan açılır) */}
       <Modal visible={!!actionMsg} transparent animationType="fade" onRequestClose={closeActionSheet}>

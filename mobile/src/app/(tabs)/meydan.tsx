@@ -49,6 +49,8 @@ import {
   editPost,
   deletePost,
   uploadImage,
+  readFeedCache,
+  writeFeedCache,
   FEED_PAGE,
   type FeedPost,
 } from "@/lib/social";
@@ -173,6 +175,8 @@ export default function MeydanScreen() {
       setEvents(ev);
       offsetRef.current = feed.length;
       setHasMore(feed.length >= FEED_PAGE);
+      // Bir sonraki açılışta anında çizmek için ilk sayfayı önbelleğe al.
+      void writeFeedCache(f, feed, ev);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -202,12 +206,29 @@ export default function MeydanScreen() {
   }, [filter, hasMore, loading, refreshing]);
 
   // Filtre hazır olunca + değişince ilk sayfayı yükle (offset sıfırla).
+  // Instagram gibi anında açılış: önce önbelleği HEMEN çiz (spinner yok), taze veri
+  // arkada gelince sessizce yenile. Önbellek yoksa (ilk kurulum) spinner göster.
   useEffect(() => {
     if (!filterReady) return;
-    setLoading(true);
+    let alive = true;
     setHasMore(true);
     offsetRef.current = 0;
-    void load(filter);
+    void (async () => {
+      // 1) Önbelleği HEMEN çiz (varsa spinner gösterme).
+      const c = await readFeedCache(filter);
+      if (!alive) return;
+      if (c && c.posts.length > 0) {
+        setPosts(c.posts);
+        setEvents(c.events);
+        offsetRef.current = c.posts.length;
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+      // 2) Sonra taze veriyi çek (önbellek üzerine yazar) — sıra garanti.
+      if (alive) await load(filter);
+    })();
+    return () => { alive = false; };
   }, [filter, filterReady, load]);
 
   // Ekrana her dönüşte sessiz yenile (yeni gönderi/etkinlik görünsün).

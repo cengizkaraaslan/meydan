@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, T
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { EventRow } from "@/components/EventCard";
 import { SectionHeader, Loader, EmptyState, Pill } from "@/ui/atoms";
@@ -352,8 +353,17 @@ export default function KategorilerScreen() {
         }}
         scrollEventThrottle={250}
       >
-        <Animated.View entering={FadeInDown.duration(450)}>
-          <Text style={[Type.h1, styles.title, { color: T.text }]}>{t("categories")}</Text>
+        <Animated.View entering={FadeInDown.duration(450)} style={styles.titleRow}>
+          <Text style={[Type.h1, { color: T.text }]}>{t("categories")}</Text>
+          {/* Tüm etkinlikleri tek takvimde gör → /takvim ekranı */}
+          <Pressable
+            onPress={() => { tapHaptic(); router.push("/takvim"); }}
+            style={[styles.calBtn, { backgroundColor: T.surfaceStrong, borderColor: T.primary }]}
+            hitSlop={8}
+          >
+            <Text style={{ fontSize: 14 }}>🗓️</Text>
+            <Text style={[Type.label, { color: T.primary, fontWeight: "700" }]}>Takvim</Text>
+          </Pressable>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.duration(450)} style={styles.locWrap}>
@@ -535,6 +545,10 @@ export default function KategorilerScreen() {
                     end={{ x: 1, y: 1 }}
                     style={[
                       styles.tile,
+                      // Solid arka plan YEDEĞİ: Android'de expo-linear-gradient toggle (re-render)
+                      // sonrası bazen SAYDAM çiziyor → seçili olmayan tile görünmez kalıyordu
+                      // (ör. Tiyatro). Altta gradient'in ilk rengi solid durunca tile hep görünür.
+                      { backgroundColor: item.gradient[0] },
                       active && styles.tileActive,
                     ]}
                   >
@@ -576,10 +590,13 @@ export default function KategorilerScreen() {
                 <SectionHeader
                   title={selected.length === 1 ? catMeta(selected[0]).label : `${selected.length} ${t("categories")}`}
                 />
-                {visibleEvents.map((e, i) => (
-                  <Animated.View key={e.id} entering={FadeInDown.delay(Math.min(i, 8) * 55).duration(420)}>
+                {/* Düz View: kategori toggle'ında liste yeniden render olunca reanimated
+                    entering animasyonu öğeleri opacity 0'da bırakıp GÖRÜNMEZ yapıyordu
+                    (tile'larda da aynı sebeple kaldırılmıştı). */}
+                {visibleEvents.map((e) => (
+                  <View key={e.id}>
                     <EventRow event={e} />
-                  </Animated.View>
+                  </View>
                 ))}
                 {/* Sonsuz kaydırma: kaydırınca oto-yükle (onScroll); altta dönen spinner. */}
                 {page < totalPages ? (
@@ -612,6 +629,8 @@ function T_suffix(city: string): string {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   title: { paddingHorizontal: 16, marginBottom: Space.md },
+  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, marginBottom: Space.md },
+  calBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 14, paddingVertical: 8 },
   locWrap: { paddingHorizontal: 16, marginBottom: Space.lg },
   locHeader: {
     flexDirection: "row",

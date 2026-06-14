@@ -1,5 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
-import { API_BASE } from "./api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { API_BASE, type ApiEvent } from "./api";
 import { getOrCreateDeviceId } from "./device";
 import { getProfileKey } from "./profileSync";
 
@@ -156,6 +157,44 @@ export async function fetchFeed(filter: "all" | "follow", offset = 0): Promise<F
     {},
   );
   return r.data ?? [];
+}
+
+// ─── Feed önbelleği (stale-while-revalidate) ─────────────────────────────────
+// Instagram gibi anında açılış için: son görülen feed (ilk sayfa + serpiştirilen
+// etkinlikler) cihazda saklanır; ekran açılınca önbellek HEMEN çizilir, taze veri
+// arkada gelince sessizce yenilenir. Boş ekran/spinner sadece ilk kurulumda görünür.
+export interface FeedCache {
+  posts: FeedPost[];
+  events: ApiEvent[];
+  ts: number;
+}
+const FEED_CACHE_KEY = (f: string) => `meydanfest:feedCache:${f}`;
+// İlk sayfa kadarını sakla (FlatList header + birkaç ekran içeriği yeter).
+const FEED_CACHE_MAX = 24;
+
+export async function readFeedCache(filter: string): Promise<FeedCache | null> {
+  try {
+    const v = await AsyncStorage.getItem(FEED_CACHE_KEY(filter));
+    if (!v) return null;
+    const c = JSON.parse(v) as FeedCache;
+    if (!Array.isArray(c.posts)) return null;
+    return { posts: c.posts, events: Array.isArray(c.events) ? c.events : [], ts: c.ts ?? 0 };
+  } catch {
+    return null;
+  }
+}
+
+export async function writeFeedCache(filter: string, posts: FeedPost[], events: ApiEvent[]): Promise<void> {
+  try {
+    const payload: FeedCache = {
+      posts: posts.slice(0, FEED_CACHE_MAX),
+      events: events.slice(0, 8),
+      ts: Date.now(),
+    };
+    await AsyncStorage.setItem(FEED_CACHE_KEY(filter), JSON.stringify(payload));
+  } catch {
+    /* sessiz */
+  }
 }
 
 /** Kendi gönderini 10 dk içinde düzenle. */

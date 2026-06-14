@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { catMeta } from "@/lib/categories";
-import { fmtLong, priceLabel, isUniversitySource } from "@/lib/format";
+import { fmtLong, priceLabel, isUniversitySource, isTicketedLabel } from "@/lib/format";
 import { API_BASE, fetchEventById, getCachedEvent, imageFor, type ApiEvent } from "@/lib/api";
 import { getDeviceId } from "@/lib/profileSync";
 import {
@@ -770,9 +770,9 @@ export default function EventDetail() {
     const place = event.venue || event.city || "Türkiye";
     const priceLine = isUniversitySource(event.source)
       ? "🎓 Öğrenciye açık"
-      : event.is_free
-        ? "🆓 Ücretsiz"
-        : "🎟️ Biletli";
+      : isTicketedLabel(event)
+        ? "🎟️ Biletli"
+        : "🆓 Ücretsiz";
     // Davet metni — buz kırıcı + net bilgi + link.
     const message =
       `🎉 Seni bu etkinliğe davet ediyorum!\n\n` +
@@ -897,9 +897,9 @@ export default function EventDetail() {
               icon={isUniversitySource(event.source) ? "🎓" : "🎟️"}
               label={isUniversitySource(event.source) ? "Erişim" : t("ticket")}
               value={priceLabel(event)}
-              valueColor={isUniversitySource(event.source) ? T.cyan : event.is_free ? T.success : T.gold}
+              valueColor={isUniversitySource(event.source) ? T.cyan : isTicketedLabel(event) ? T.gold : T.success}
               onPress={event.ticket_url ? openTicket : undefined}
-              actionLabel={event.ticket_url ? (isUniversitySource(event.source) || event.is_free ? t("go_detail") : t("buy_ticket")) : undefined}
+              actionLabel={event.ticket_url ? (isUniversitySource(event.source) || !isTicketedLabel(event) ? t("go_detail") : t("buy_ticket")) : undefined}
             />
             {event.organizer ? (
               <>
