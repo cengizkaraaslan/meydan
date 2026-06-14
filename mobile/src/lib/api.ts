@@ -468,6 +468,20 @@ export async function apiSendMessage(input: {
   return data?.message ?? null;
 }
 
+/** Sesli arama "çaldır" — backend, callee'ye yüksek öncelikli Expo push (call-ring) atar
+ *  → karşı taraf hangi ekranda olursa olsun gelen arama UI'ı çıkar. */
+export async function apiRingCall(input: {
+  matchKey: string;
+  toId: string;
+  fromDeviceId: string;
+}): Promise<void> {
+  try {
+    await postJson("/api/v1/dating/call-ring", input);
+  } catch {
+    /* sessiz — push gitmese de sohbet-kanalı offer'ı yine akar */
+  }
+}
+
 /** Genel amaçlı JSON istek yardımcısı (PATCH/DELETE). ok + reason döndürür. */
 async function sendJson(
   method: "PATCH" | "DELETE",

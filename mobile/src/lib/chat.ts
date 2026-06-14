@@ -456,8 +456,8 @@ export function useChat(personId: string, override?: { name?: string | null; ava
 
   const messages = useMemo<Msg[]>(() => {
     const fromServer: Msg[] = serverMsgs
-      // Tepki mesajları balon olarak çizilmez (aşağıda reactions map'ine ayrıştırılır).
-      .filter((m) => !m.text.startsWith(REACT_PREFIX))
+      // Tepki mesajları + sesli arama sinyalleri ("[call]...") balon olarak çizilmez.
+      .filter((m) => !m.text.startsWith(REACT_PREFIX) && !m.text.startsWith("[call]"))
       .map((m) => {
         // Alıntı/yanıt: "[reply]<id><qMine><özet><metin>" → düz metin balonu + üstte alıntı bloğu.
         const rep = parseReply(m.text);
@@ -533,5 +533,5 @@ export function useChat(personId: string, override?: { name?: string | null; ava
     }
   }, [matchKey, deviceId, refetch]);
 
-  return { messages, reactions, react, loadOlder, hasMoreOlder, loadingOlder, typing: typing || partnerTyping, partnerPresence, notifyTyping, send, sendImage, sendVoice, sendBuzz, editMessage, deleteMessage, matchKey, ready: !!matchKey };
+  return { messages, reactions, react, loadOlder, hasMoreOlder, loadingOlder, typing: typing || partnerTyping, partnerPresence, notifyTyping, send, sendImage, sendVoice, sendBuzz, editMessage, deleteMessage, matchKey, deviceId, ready: !!matchKey };
 }

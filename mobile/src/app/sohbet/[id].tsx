@@ -24,6 +24,7 @@ import { Radius, Type, glow } from "@/theme/aurora";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { KeyboardAvoider } from "@/components/KeyboardAvoider";
 import { RecordingWave } from "@/components/RecordingWave";
+import { useCall } from "@/components/CallProvider";
 import { getPerson, type Person } from "@/lib/people";
 import { resolveAvatar } from "@/lib/avatar";
 import { useChat, canEditMsg, replySnippet, type Msg, type MsgReactions } from "@/lib/chat";
@@ -105,11 +106,13 @@ export default function ChatScreen() {
           gender: "male",
         }
       : null);
-  const { messages, reactions, react, loadOlder, hasMoreOlder, loadingOlder, typing, partnerPresence, notifyTyping, send, sendImage, sendVoice, sendBuzz, editMessage, deleteMessage, matchKey, ready } = useChat(String(id), {
+  const { messages, reactions, react, loadOlder, hasMoreOlder, loadingOlder, typing, partnerPresence, notifyTyping, send, sendImage, sendVoice, sendBuzz, editMessage, deleteMessage, matchKey, deviceId, ready } = useChat(String(id), {
     name: pName,
     avatar: pAvatar,
     matchKey: pMatchKey,
   });
+  // Sesli arama context'i (engine + UI root'taki CallProvider'da; çalma her ekranda çalışır).
+  const callCtx = useCall();
   const [text, setText] = useState("");
   const [editing, setEditing] = useState<Msg | null>(null);
   const [tipVisible, setTipVisible] = useState(false);
@@ -550,6 +553,17 @@ export default function ChatScreen() {
                     : ""}
           </Text>
         </Pressable>
+        {/* Sesli arama — yalnız gerçek kullanıcıda (mock kişi cevap veremez) ve sohbet hazırken. */}
+        {!realPerson ? (
+          <Pressable
+            onPress={() => { tapH(); if (matchKey) callCtx?.startCall({ matchKey, partnerId: String(id), name: person?.name ?? "Kullanıcı", avatar: person?.avatar }); }}
+            disabled={!ready}
+            hitSlop={10}
+            style={[styles.back, { backgroundColor: T.surfaceStrong, opacity: ready ? 1 : 0.4 }]}
+          >
+            <Ionicons name="call" size={18} color={T.primary} />
+          </Pressable>
+        ) : null}
         {/* Sohbeti komple sil → listeye dön. Sohbet hazır (matchKey bilinene) kadar pasif. */}
         <Pressable onPress={onDeleteConversation} disabled={!ready} hitSlop={10} style={[styles.back, { backgroundColor: T.surfaceStrong, opacity: ready ? 1 : 0.4 }]}>
           <Ionicons name="trash-outline" size={19} color="#FF3B30" />

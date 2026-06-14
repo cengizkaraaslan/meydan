@@ -17,6 +17,7 @@ import { GlobalSignInPrompt } from "@/components/SignInPrompt";
 import { FavHintModal } from "@/components/FavHintModal";
 import { onReplayTour } from "@/lib/prefs";
 import { initNotifications, registerPushToken, scheduleNearbyTeaser, useNearbyNotificationNav } from "@/lib/notify";
+import { CallProvider } from "@/components/CallProvider";
 import { primeWidget } from "@/widget/widgetTaskHandler";
 
 // Native splash'ı biz kontrol edelim (yoksa üstte takılı kalabiliyor).
@@ -135,9 +136,11 @@ export default function RootLayout() {
         <I18nProvider>
           <PaletteProvider>
             <AuthProvider>
-              <RootNavigator />
-              <GlobalSignInPrompt />
-              <FavHintModal />
+              <CallProvider>
+                <RootNavigator />
+                <GlobalSignInPrompt />
+                <FavHintModal />
+              </CallProvider>
             </AuthProvider>
           </PaletteProvider>
         </I18nProvider>
