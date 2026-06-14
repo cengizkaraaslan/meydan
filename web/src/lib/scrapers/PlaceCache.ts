@@ -96,7 +96,7 @@ export async function setPlacesForSource(
   }
 
   const items = places.map((p) => {
-    const data = {
+    const createData = {
       slug: buildPlaceSlug(p),
       name: p.name,
       type: p.type,
@@ -112,14 +112,33 @@ export async function setPlacesForSource(
       phone: p.phone ?? null,
       lastScrapedAt: now,
     };
-    return { externalId: p.externalId, data };
+    // UPDATE: zenginleştirme alanları (görsel/saat/adres/açıklama…) YALNIZ bu run'da
+    // doluysa yazılır. Böylece bütçe-limitli (liste-only) bir cron run'ı önceki gerçek
+    // görseli/saati NULL'a EZMEZ. Ad/şehir/tip/slug hep güncellenir.
+    const updateData = {
+      slug: createData.slug,
+      name: p.name,
+      type: p.type,
+      city: p.city,
+      lastScrapedAt: now,
+      ...(p.distId ? { distId: p.distId } : {}),
+      ...(p.district ? { district: p.district } : {}),
+      ...(p.address ? { address: p.address } : {}),
+      ...(p.description ? { description: p.description } : {}),
+      ...(p.imageUrl ? { imageUrl: p.imageUrl } : {}),
+      ...(p.openTime ? { openTime: p.openTime } : {}),
+      ...(p.closeTime ? { closeTime: p.closeTime } : {}),
+      ...(p.website ? { website: p.website } : {}),
+      ...(p.phone ? { phone: p.phone } : {}),
+    };
+    return { externalId: p.externalId, createData, updateData };
   });
 
   const upsertOne = (it: (typeof items)[number]) =>
     db.place.upsert({
       where: { source_externalId: { source, externalId: it.externalId } },
-      create: { source, externalId: it.externalId, ...it.data },
-      update: it.data,
+      create: { source, externalId: it.externalId, ...it.createData },
+      update: it.updateData,
     });
 
   let written = 0;
