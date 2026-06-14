@@ -620,6 +620,7 @@ model Place {
   phone         String?
   lat           Float?
   lng           Float?
+  fee           String?  // "PAID" (ücretli) | "FREE" (ücretsiz) | null = bilinmiyor
   featured      Boolean  @default(false)
   hidden        Boolean  @default(false)
   lastScrapedAt DateTime @default(now())

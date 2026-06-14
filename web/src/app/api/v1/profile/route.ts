@@ -98,10 +98,12 @@ export async function POST(request: NextRequest) {
   const data: Record<string, unknown> = {};
   // deviceId bir e-posta/acct ise email kolonunu da doldur → "E-posta ile devam et"te
   // eşleşen hesap email'den de bulunur (ve kanonik kimlik çözümü çalışır).
-  const emailFromKey = deviceId.includes("@")
-    ? deviceId.toLowerCase()
-    : deviceId.startsWith("acct:")
-      ? deviceId.slice(5).toLowerCase()
+  // ÖNEMLİ: "acct:" önekini "@" kontrolünden ÖNCE soy — yoksa "acct:x@y" tümüyle email'e
+  // yazılıp ("acct:" önekli bozuk email) email-bazlı eşleştirmeyi bozar.
+  const emailFromKey = deviceId.startsWith("acct:")
+    ? deviceId.slice(5).toLowerCase()
+    : deviceId.includes("@")
+      ? deviceId.toLowerCase()
       : null;
   if (emailFromKey) data.email = emailFromKey;
   // Ad — "E-posta ile devam"ta hesabın adı saklanmalı ki tekrar girişte yüklensin.

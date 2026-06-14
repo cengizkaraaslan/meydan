@@ -204,3 +204,15 @@ export function approxDistanceLabel(e: Pick<ApiEvent, "city" | "country">, user:
   if (km < 1.5) return "yakınında";
   return `~${fmtDistance(km)}`;
 }
+
+/** Yer (müze) GERÇEK lat/lng taşır → kullanıcıya net km mesafe. Koordinat/konum yoksa null. */
+export function placeDistanceKm(p: { lat?: number | null; lng?: number | null }, user: Coords | null): number | null {
+  if (!user || p.lat == null || p.lng == null) return null;
+  return haversineKm(user, { lat: p.lat, lng: p.lng });
+}
+
+/** Yer için mesafe etiketi ("450 m" / "12 km"). Bilinmezse null. */
+export function placeDistanceLabel(p: { lat?: number | null; lng?: number | null }, user: Coords | null): string | null {
+  const km = placeDistanceKm(p, user);
+  return km == null ? null : fmtDistance(km);
+}

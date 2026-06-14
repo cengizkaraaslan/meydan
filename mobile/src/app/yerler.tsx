@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,6 +7,7 @@ import { Radius, Type } from "@/theme/aurora";
 import { useTheme } from "@/lib/theme";
 import { fetchPlaces, type ApiPlace } from "@/lib/api";
 import { PlaceRow } from "@/components/PlaceCard";
+import { useUserCoords, placeDistanceKm } from "@/lib/geo";
 import { tapH } from "@/lib/haptics";
 
 const TYPES: { key: string; label: string }[] = [
@@ -29,6 +30,18 @@ export default function PlacesScreen() {
   const [type, setType] = useState("");
   const [search, setSearch] = useState("");
   const reqId = useRef(0);
+  const user = useUserCoords();
+  // Yüklenen yerleri yakından uzağa sırala (koordinatsızlar sona).
+  const sorted = useMemo(() => {
+    return [...items].sort((a, b) => {
+      const da = placeDistanceKm(a, user);
+      const db = placeDistanceKm(b, user);
+      if (da == null && db == null) return 0;
+      if (da == null) return 1;
+      if (db == null) return -1;
+      return da - db;
+    });
+  }, [items, user]);
 
   const load = useCallback(async (p: number, q: { type: string; search: string }) => {
     const my = ++reqId.current;
@@ -100,7 +113,7 @@ export default function PlacesScreen() {
       </View>
 
       <FlatList
-        data={items}
+        data={sorted}
         keyExtractor={(p) => p.id}
         renderItem={({ item }) => <PlaceRow place={item} />}
         contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: insets.bottom + 24 }}

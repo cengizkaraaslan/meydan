@@ -45,6 +45,9 @@ export async function GET(request: NextRequest) {
         close_time: p.closeTime ?? null,
         website: p.website ?? null,
         phone: p.phone ?? null,
+        lat: p.lat ?? null,
+        lng: p.lng ?? null,
+        fee: p.fee ?? null, // "PAID" | "FREE" | null=bilinmiyor
         featured: p.featured,
       })),
       meta: {

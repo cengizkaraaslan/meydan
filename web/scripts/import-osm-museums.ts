@@ -84,7 +84,18 @@ function guessType(name: string): string {
 interface OsmEl {
   type: string;
   id: number;
+  lat?: number;
+  lon?: number;
+  center?: { lat: number; lon: number };
   tags?: Record<string, string>;
+}
+
+/** OSM fee tag → "PAID" | "FREE" | null (bilinmiyor). */
+function feeOf(tags: Record<string, string>): string | null {
+  const f = (tags.fee || "").toLowerCase();
+  if (f === "yes" || f === "ücretli" || f === "paid") return "PAID";
+  if (f === "no" || f === "ücretsiz" || f === "free" || f === "donation") return "FREE";
+  return null;
 }
 
 async function overpass(query: string): Promise<OsmEl[]> {
@@ -146,7 +157,8 @@ async function imageFor(tags: Record<string, string>): Promise<string | null> {
 }
 
 async function main() {
-  const { db } = await import("../src/lib/db");
+  const { PrismaClient } = await import("@prisma/client");
+  const db = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
 
   // Çakışma kontrolü: mevcut tüm yerlerin normAd|şehir seti (MUZE_GOV dahil).
   const existing = await db.place.findMany({ select: { name: true, city: true, source: true, externalId: true } });
@@ -173,20 +185,27 @@ async function main() {
       const externalId = `osm-${el.type}-${el.id}`;
       const img = await imageFor(tags);
       if (img) withImg++;
-      if (WRITE && !osmIds.has(externalId)) {
-        const data = {
-          slug: `yer-${slugify(name)}-${shortHash(externalId)}`,
-          name,
-          type: guessType(name),
-          city: prov,
-          imageUrl: img,
-          website: tags.website || tags["contact:website"] || null,
-          lastScrapedAt: new Date(),
-        };
+      const lat = el.lat ?? el.center?.lat ?? null;
+      const lng = el.lon ?? el.center?.lon ?? null;
+      const fee = feeOf(tags);
+      if (WRITE) {
+        const type = guessType(name);
+        const website = tags.website || tags["contact:website"] || null;
         await db.place.upsert({
           where: { source_externalId: { source: "OSM", externalId } },
-          create: { source: "OSM", externalId, ...data },
-          update: { imageUrl: img ?? undefined, website: data.website ?? undefined, name, city: prov, type: data.type },
+          create: {
+            source: "OSM", externalId, slug: `yer-${slugify(name)}-${shortHash(externalId)}`,
+            name, type, city: prov, imageUrl: img, website, lat, lng, fee, lastScrapedAt: new Date(),
+          },
+          // Var olan satırda: koordinat/fee/görsel doluysa güncelle (boşla ezme).
+          update: {
+            name, city: prov, type,
+            ...(img ? { imageUrl: img } : {}),
+            ...(website ? { website } : {}),
+            ...(lat != null ? { lat } : {}),
+            ...(lng != null ? { lng } : {}),
+            ...(fee ? { fee } : {}),
+          },
         });
       }
       added++;

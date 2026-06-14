@@ -169,6 +169,9 @@ export interface ApiPlace {
   close_time: string | null;
   website: string | null;
   phone: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  fee?: string | null; // "PAID" (ücretli) | "FREE" (ücretsiz) | null=bilinmiyor
   featured?: boolean;
 }
 

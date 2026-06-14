@@ -25,14 +25,16 @@ export function buildPlaceSlug(p: { source: string; externalId: string; name: st
 const SELECT = {
   id: true, slug: true, source: true, externalId: true, name: true, type: true,
   city: true, district: true, address: true, description: true, imageUrl: true,
-  openTime: true, closeTime: true, website: true, phone: true, featured: true,
+  openTime: true, closeTime: true, website: true, phone: true,
+  lat: true, lng: true, fee: true, featured: true,
 } as const;
 
 interface PlaceRow {
   id: string; slug: string; source: string; externalId: string; name: string; type: string;
   city: string; district: string | null; address: string | null; description: string | null;
   imageUrl: string | null; openTime: string | null; closeTime: string | null;
-  website: string | null; phone: string | null; featured: boolean;
+  website: string | null; phone: string | null;
+  lat: number | null; lng: number | null; fee: string | null; featured: boolean;
 }
 
 function rowToItem(r: PlaceRow): PlaceListItem {
@@ -52,6 +54,9 @@ function rowToItem(r: PlaceRow): PlaceListItem {
     closeTime: r.closeTime ?? undefined,
     website: r.website ?? undefined,
     phone: r.phone ?? undefined,
+    lat: r.lat ?? undefined,
+    lng: r.lng ?? undefined,
+    fee: r.fee ?? undefined,
     featured: r.featured,
   };
 }

@@ -27,6 +27,9 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ slug: s
       close_time: place.closeTime ?? null,
       website: place.website ?? null,
       phone: place.phone ?? null,
+      lat: place.lat ?? null,
+      lng: place.lng ?? null,
+      fee: place.fee ?? null,
       featured: place.featured,
     },
   });

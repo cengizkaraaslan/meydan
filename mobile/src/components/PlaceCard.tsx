@@ -7,6 +7,7 @@ import { router } from "expo-router";
 import { Radius, Type, glow } from "../theme/aurora";
 import { useTheme } from "../lib/theme";
 import { cachePlace, placeImageFor, type ApiPlace } from "../lib/api";
+import { useUserCoords, placeDistanceLabel } from "../lib/geo";
 import { Badge } from "../ui/atoms";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -15,6 +16,14 @@ const TYPE_LABEL: Record<string, string> = {
   SARAY: "Saray & Köşk",
   DIGER: "Gezilecek Yer",
 };
+
+/** Ücret etiketi: ücretliyse "Ücretli", ücretsizse "Ücretsiz", bilinmiyorsa "Bilinmiyor". */
+function feeLabel(fee?: string | null): string {
+  return fee === "PAID" ? "💳 Ücretli" : fee === "FREE" ? "🆓 Ücretsiz" : "❔ Bilinmiyor";
+}
+function feeColor(fee: string | null | undefined, T: ReturnType<typeof useTheme>["t"]): string {
+  return fee === "PAID" ? T.gold : fee === "FREE" ? T.success : T.textFaint;
+}
 
 function open(p: ApiPlace) {
   Haptics.selectionAsync();
@@ -32,6 +41,7 @@ export function PlaceHeroCard({ place, width }: { place: ApiPlace; width: number
   const GRAD = T.primaryGradient;
   const [imgErr, setImgErr] = useState(false);
   const hours = hoursOf(place);
+  const dist = placeDistanceLabel(place, useUserCoords());
   return (
     <Pressable onPress={() => open(place)} style={[{ width }, glow(GRAD[0], 24, 0.5)]}>
       <View style={[styles.hero, { borderRadius: Radius.xl }]}>
@@ -50,6 +60,15 @@ export function PlaceHeroCard({ place, width }: { place: ApiPlace; width: number
           <Text style={[Type.hero, { color: "#fff" }]} numberOfLines={2}>{place.name}</Text>
           <View style={styles.metaRow}>
             <Text style={[Type.body, { color: GRAD[0], fontWeight: "800" }]}>📍 {place.city}</Text>
+            {dist ? (
+              <>
+                <View style={[styles.dot, { backgroundColor: T.textFaint }]} />
+                <Text style={[Type.body, { color: "#fff", fontWeight: "700" }]}>📏 {dist}</Text>
+              </>
+            ) : null}
+          </View>
+          <View style={styles.metaRow}>
+            <Text style={[Type.body, { color: feeColor(place.fee, T), fontWeight: "700" }]}>{feeLabel(place.fee)}</Text>
             {hours ? (
               <>
                 <View style={[styles.dot, { backgroundColor: T.textFaint }]} />
@@ -69,6 +88,7 @@ export function PlaceRow({ place }: { place: ApiPlace }) {
   const GRAD = T.primaryGradient;
   const [imgErr, setImgErr] = useState(false);
   const hours = hoursOf(place);
+  const dist = placeDistanceLabel(place, useUserCoords());
   return (
     <Pressable onPress={() => open(place)} style={[styles.row, { backgroundColor: T.surface }]}>
       <View style={styles.rowImgWrap}>
@@ -84,9 +104,12 @@ export function PlaceRow({ place }: { place: ApiPlace }) {
         <Text style={[Type.title, { color: T.text }]} numberOfLines={2}>{place.name}</Text>
         <Text style={[Type.label, { color: T.textFaint }]} numberOfLines={1}>
           📍 {place.district ? `${place.district} · ${place.city}` : place.city}
+          {dist ? `  ·  📏 ${dist}` : ""}
         </Text>
         <View style={styles.metaRow}>
           <Text style={[Type.label, { color: GRAD[0] }]}>{TYPE_LABEL[place.type] ?? "Gezilecek Yer"}</Text>
+          <View style={[styles.dot, { backgroundColor: T.textFaint }]} />
+          <Text style={[Type.label, { color: feeColor(place.fee, T) }]}>{feeLabel(place.fee)}</Text>
           {hours ? (
             <>
               <View style={[styles.dot, { backgroundColor: T.textFaint }]} />

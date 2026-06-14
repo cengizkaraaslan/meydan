@@ -273,6 +273,9 @@ export interface PlaceListItem {
   closeTime?: string;
   website?: string;
   phone?: string;
+  lat?: number;
+  lng?: number;
+  fee?: string; // "PAID" | "FREE" | undefined=bilinmiyor
   featured: boolean;
 }
 

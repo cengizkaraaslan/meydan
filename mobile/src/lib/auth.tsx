@@ -175,12 +175,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { queryParams } = Linking.parse(res.url);
         const email = String(queryParams?.email ?? "");
         if (email) {
+          const clean = email.toLowerCase();
+          // E-posta ile devam'la AYNI: mevcut hesabın profilini (ad/avatar/şehir/tanışma)
+          // sunucudan geri yükle → Google ile girince de "yeni hesap" değil ESKİ hesap gelir.
+          setAccountKey(clean);
+          const existing = await fetchProfile().catch(() => null);
+          const existingName =
+            existing && typeof existing.name === "string" && existing.name.trim() ? existing.name.trim() : "";
           await handleUser({
-            id: `google-${email.toLowerCase()}`,
-            name: String(queryParams?.name ?? "") || email.split("@")[0],
-            email: email.toLowerCase(),
+            id: `google-${clean}`,
+            name: existingName || String(queryParams?.name ?? "") || clean.split("@")[0],
+            email: clean,
             photo: queryParams?.photo ? String(queryParams.photo) : undefined,
           });
+          if (existing) await restoreProfileLocally(existing);
         }
       }
     } catch {
