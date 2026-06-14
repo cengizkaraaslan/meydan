@@ -101,7 +101,6 @@ export default function PersonScreen() {
   const isSelf = !!myId && (followId === myId || String(id) === myId);
 
   const [isFollowing, setIsFollowing] = React.useState(false);
-  const [followBusy, setFollowBusy] = React.useState(false);
   const [statsOpen, setStatsOpen] = React.useState(false);
 
   // Bu kişinin story'leri (başkasının gözünden görüntüleme).
@@ -147,21 +146,21 @@ export default function PersonScreen() {
     };
   }, [followId]);
 
-  const toggleFollow = React.useCallback(async () => {
-    if (followBusy) return;
+  const toggleFollow = React.useCallback(() => {
     impactH();
-    setFollowBusy(true);
     const next = !isFollowing;
-    setIsFollowing(next); // iyimser
-    try {
-      if (next) await followUser(followId, person?.name);
-      else await unfollowUser(followId);
-    } catch {
-      setIsFollowing(!next); // geri al
-    } finally {
-      setFollowBusy(false);
-    }
-  }, [followBusy, isFollowing, followId, person?.name]);
+    setIsFollowing(next); // iyimser: UI ANINDA değişir, butonu bekletme
+    // Sunucu çağrısı ARKA PLANDA (fire-and-forget) → buton hiç disable olmaz, anlık his.
+    void (async () => {
+      try {
+        if (next) await followUser(followId, person?.name);
+        else await unfollowUser(followId);
+      } catch {
+        // Yalnız kullanıcı o yönde bırakmışsa geri al (arada tekrar dokunduysa dokunma).
+        setIsFollowing((cur) => (cur === next ? !next : cur));
+      }
+    })();
+  }, [isFollowing, followId, person?.name]);
 
   if (!person) {
     return (
@@ -313,8 +312,7 @@ export default function PersonScreen() {
           <Animated.View entering={FadeInDown.delay(285).duration(460)} style={{ marginTop: 8 }}>
             <Pressable
               onPress={toggleFollow}
-              disabled={followBusy}
-              style={{ borderRadius: Radius.pill, overflow: "hidden", opacity: followBusy ? 0.7 : 1 }}
+              style={{ borderRadius: Radius.pill, overflow: "hidden" }}
             >
               {isFollowing ? (
                 <View

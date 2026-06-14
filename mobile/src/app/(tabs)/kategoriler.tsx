@@ -203,45 +203,61 @@ export default function KategorilerScreen() {
     };
   }, [cityFilter]);
 
-  // Her kategoride kaç etkinlik var → tile rozeti. Şehir/ücretsiz filtresi değişince
-  // yeniden say. Sadece meta.total okunur (page_size=1, hafif). 9 kategori paralel.
+  // Her kategoride kaç etkinlik var → tile rozeti. Şehir/ücretsiz/tarih filtresi değişince
+  // yeniden say (9 kategori paralel, page_size=1 hafif). PERFORMANS:
+  //  • Önbellek: aynı filtre kombinasyonuna dönünce 9 isteği TEKRAR atma, anında göster.
+  //  • Debounce: hızlı filtre değişiminde (ör. tarih çiplerinde gezinme) her adımda değil,
+  //    300ms durunca tek sefer iste.
   useEffect(() => {
+    const cacheKey = `${cityFilter ?? ""}|${priceFilter}|${dateFrom ?? ""}|${dateTo ?? ""}`;
+    const cached = countsCache.get(cacheKey);
+    if (cached) {
+      setCounts(cached);
+      return; // önbellekten anında — ağ isteği yok
+    }
     let alive = true;
-    (async () => {
-      const entries = await Promise.all(
-        CATEGORIES.map(async (c) => {
-          try {
-            const res = await fetchEvents({
-              city: cityFilter ?? undefined,
-              category: c.key,
-              freeOnly: priceFilter === "free",
-              from: dateFrom,
-              to: dateTo,
-              page: 1,
-              pageSize: 1,
-            });
-            return [c.key, res.meta.total] as const;
-          } catch {
-            return [c.key, 0] as const;
-          }
-        }),
-      );
-      if (alive) setCounts(Object.fromEntries(entries));
-    })();
+    const timer = setTimeout(() => {
+      (async () => {
+        const entries = await Promise.all(
+          CATEGORIES.map(async (c) => {
+            try {
+              const res = await fetchEvents({
+                city: cityFilter ?? undefined,
+                category: c.key,
+                freeOnly: priceFilter === "free",
+                from: dateFrom,
+                to: dateTo,
+                page: 1,
+                pageSize: 1,
+              });
+              return [c.key, res.meta.total] as const;
+            } catch {
+              return [c.key, 0] as const;
+            }
+          }),
+        );
+        if (!alive) return;
+        const obj = Object.fromEntries(entries);
+        countsCache.set(cacheKey, obj);
+        setCounts(obj);
+      })();
+    }, 300);
     return () => {
       alive = false;
+      clearTimeout(timer);
     };
   }, [cityFilter, priceFilter, dateFrom, dateTo]);
 
   // Etkinlikleri çek. Şehir + fiyat (free) filtresi sunucu tarafında uygulanır.
-  // Kategori dizisi `selected` değiştiğinde (string'e çevrilerek) yeniden tetiklenir.
-  const selectedKey = selected.join(",");
   // Tek kategori seçiliyse sunucu `category` paramıyla verimli/doğru sayfalama;
   // çoklu/tüm seçimde kategori filtresi client'ta (visibleEvents) uygulanır.
   const serverCategory = selected.length === 1 ? selected[0] : undefined;
 
   // Filtre değişince sayfa 1'den taze çek. Sonuç HAM şehir feed'i olarak tutulur;
   // kategori/fiyat/ilçe filtreleri visibleEvents'te uygulanır (sayfalama bozulmasın).
+  // PERFORMANS: deps'te selectedKey YOK → çoklu seçimde kategori dokunuşu (serverCategory
+  // hep undefined kalır) aynı şehir feed'ini GEREKSİZ yere yeniden çekmez; visibleEvents
+  // client'ta anında filtreler. Yalnız serverCategory/şehir/fiyat/tarih/arama değişince çeker.
   useEffect(() => {
     if (selected.length === 0) {
       setEvents([]);
@@ -280,7 +296,7 @@ export default function KategorilerScreen() {
     return () => {
       alive = false;
     };
-  }, [selectedKey, serverCategory, cityFilter, priceFilter, dateFrom, dateTo, search]);
+  }, [serverCategory, cityFilter, priceFilter, dateFrom, dateTo, search]);
 
   // Sonraki sayfayı çek ve listeye ekle (10'ar 10'ar).
   const loadMore = useCallback(async () => {
