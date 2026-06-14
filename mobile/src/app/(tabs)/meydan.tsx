@@ -731,7 +731,7 @@ export default function MeydanScreen() {
           {/* Kim paylaşıyor — avatar + ad (kullanıcının kendi profili). */}
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
             <StoryAvatar uri={myAvatar} name={myName} size={36} />
-            <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>{myName}</Text>
+            <Text style={[Type.title, { color: T.text, flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">{myName}</Text>
           </View>
           <TextInput
             value={compose}

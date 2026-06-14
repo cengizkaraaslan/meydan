@@ -189,8 +189,8 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
       <View style={styles.head}>
         <Pressable onPress={openAuthor} style={styles.authorTap} hitSlop={4}>
           <StoryAvatar uri={post.authorAvatar} name={post.authorName ?? "✦"} size={38} />
-          <View style={{ flex: 1 }}>
-            <Text style={[Type.title, { color: T.text }]} numberOfLines={1}>
+          <View style={{ flex: 1, flexShrink: 1, minWidth: 0 }}>
+            <Text style={[Type.title, { color: T.text }]} numberOfLines={1} ellipsizeMode="tail">
               {post.authorName?.trim() || "Meydanlı"}
             </Text>
             <Text style={[Type.label, { color: T.textFaint }]}>{relTime(post.createdAt)}</Text>
@@ -261,8 +261,9 @@ const styles = StyleSheet.create({
   // Tüm başlık satırı (avatar + ad + zaman + Sen/takip) 7px yukarı — hepsi birlikte hizalı kalsın.
   head: { flexDirection: "row", alignItems: "center", gap: 10, transform: [{ translateY: -7 }] },
   authorTap: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-  // "Sen" / "+ Takip et" / "✓ Takip ediliyor" pill'i: 4px yukarı (avatar+ad bloğuyla daha hizalı).
-  followPill: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, transform: [{ translateY: -4 }] },
+  // "Sen" / "+ Takip et" / "✓ Takip ediliyor" pill'i: 6px yukarı (avatar+ad bloğuyla daha hizalı).
+  // flexShrink:0 → uzun isimde pill sıkışmaz; bunun yerine isim kısalır (ellipsis).
+  followPill: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, flexShrink: 0, transform: [{ translateY: -6 }] },
   moreBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2 },
   eventTag: { alignSelf: "flex-start", borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, maxWidth: "100%" },
   media: { width: "100%", height: 220, borderRadius: Radius.md, marginTop: 2 },

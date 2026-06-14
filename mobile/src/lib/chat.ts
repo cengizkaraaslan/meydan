@@ -86,6 +86,30 @@ const REPLIES = [
 const imgKey = (mk: string) => `meydanfest:imgmsgs:${mk}`;
 const botId = (personId: string) => `bot_${personId}`;
 
+// ─── Mesaj önbelleği (stale-while-revalidate) ────────────────────────────────
+// Sohbete girince mesajlar ANINDA görünsün diye son pencere cihazda saklanır;
+// açılışta önbellek hemen çizilir, ağdan taze veri gelince sessizce güncellenir.
+const msgCacheKey = (mk: string) => `meydanfest:chatcache:${mk}`;
+const MSG_CACHE_MAX = 40;
+
+async function readMsgCache(mk: string): Promise<ChatMessage[]> {
+  try {
+    const v = await AsyncStorage.getItem(msgCacheKey(mk));
+    if (!v) return [];
+    const arr = JSON.parse(v) as ChatMessage[];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+function writeMsgCache(mk: string, msgs: ChatMessage[]): void {
+  try {
+    void AsyncStorage.setItem(msgCacheKey(mk), JSON.stringify(msgs.slice(-MSG_CACHE_MAX)));
+  } catch {
+    /* sessiz */
+  }
+}
+
 /** Backend metin mesajının bir fotoğraf olduğunu işaretleyen önek. text = "[img]<R2 url>". */
 const IMG_PREFIX = "[img]";
 /** Sesli mesaj öneki. text = "[voice]<saniye>:<R2 url>" (saniye süreyi, url ses dosyasını taşır). */
@@ -176,7 +200,9 @@ export function useChat(personId: string, override?: { name?: string | null; ava
         if (live.length === 0) return prev;
         const liveStart = live[0].at;
         const older = prev.filter((m) => m.at < liveStart);
-        return mergeById(older, live);
+        const merged = mergeById(older, live);
+        writeMsgCache(mk, merged); // bir sonraki açılış için son pencereyi sakla
+        return merged;
       });
       return live;
     },
@@ -219,6 +245,14 @@ export function useChat(personId: string, override?: { name?: string | null; ava
         }));
       if (!alive || !mk) return;
       setMatchKey(mk);
+
+      // Önbellekten mesajları ANINDA göster (Instagram gibi) → boş ekran/gecikme yok.
+      // Ağdan taze veri (refetch) gelince sessizce güncellenir.
+      const cached = await readMsgCache(mk);
+      if (alive && cached.length > 0) {
+        setServerMsgs((prev) => (prev.length > 0 ? prev : cached));
+        setHasMoreOlder(cached.length >= PAGE_SIZE);
+      }
 
       const raw = await AsyncStorage.getItem(imgKey(mk));
       if (alive && raw) {
