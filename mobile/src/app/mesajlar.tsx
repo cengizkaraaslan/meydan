@@ -33,6 +33,9 @@ import {
 import { useIsAdmin } from "@/lib/admin";
 import { searchMentionUsers, type MentionUser } from "@/lib/mentions";
 import { ChatSettingsSheet } from "@/components/ChatSettingsSheet";
+import { StoryAvatar } from "@/components/StoryAvatar";
+import { EventStoryViewer, type StoryGroup } from "@/components/EventStoryViewer";
+import { fetchStoriesFor } from "@/lib/social";
 
 /**
  * Instagram-Direct tarzı tam ekran mesaj kutusu.
@@ -170,6 +173,21 @@ export default function MesajlarScreen() {
     setSheetConfirmDel(false);
   }, []);
 
+  // Sohbet listesinde kişi story paylaşmışsa avatarına basınca açılan story izleyici.
+  const [storyGroup, setStoryGroup] = useState<StoryGroup | null>(null);
+  const openStory = useCallback(async (c: Conversation) => {
+    if (!c.storyOwnerId) { openChat(c); return; } // story yoksa sohbeti aç
+    tapHaptic();
+    const stories = await fetchStoriesFor([c.storyOwnerId]);
+    if (stories.length === 0) { openChat(c); return; } // 24s'te story kalmadıysa sohbete düş
+    setStoryGroup({
+      id: c.storyOwnerId,
+      name: c.name,
+      avatar: c.avatar,
+      segments: stories.map((s) => ({ id: s.id, uri: s.imageUrl, caption: s.caption ?? undefined, eventTitle: s.eventTitle ?? undefined })),
+    });
+  }, [openChat]);
+
   // Sohbet listesini ada göre filtrele (Türkçe-duyarlı).
   const filteredConvos = useMemo(() => {
     const q = convoQuery.trim().toLocaleLowerCase("tr");
@@ -294,7 +312,7 @@ export default function MesajlarScreen() {
             </View>
           }
           renderItem={({ item, index }) => (
-            <ConvoRow T={T} c={item} index={index} onPress={() => openChat(item)} onLongPress={() => onLongPressConvo(item)} />
+            <ConvoRow T={T} c={item} index={index} onPress={() => openChat(item)} onLongPress={() => onLongPressConvo(item)} onAvatarPress={() => openStory(item)} />
           )}
         />
       )}
@@ -351,6 +369,11 @@ export default function MesajlarScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Sohbet listesinde kişinin story'sine dokununca açılan Instagram-tarzı izleyici */}
+      {storyGroup ? (
+        <EventStoryViewer groups={[storyGroup]} startIndex={0} onClose={() => setStoryGroup(null)} />
+      ) : null}
     </View>
   );
 }
@@ -371,7 +394,7 @@ function convoTime(ms: number): string {
     : `${dm}.${String(d.getFullYear()).slice(2)} ${hhmm}`;
 }
 
-function ConvoRow({ T, c, index, onPress, onLongPress }: { T: Palette; c: Conversation; index: number; onPress: () => void; onLongPress: () => void }) {
+function ConvoRow({ T, c, index, onPress, onLongPress, onAvatarPress }: { T: Palette; c: Conversation; index: number; onPress: () => void; onLongPress: () => void; onAvatarPress: () => void }) {
   const unread = c.unread > 0;
   return (
     // Kademeli giriş: her satır sırayla aşağıdan belirir (premium his).
@@ -392,10 +415,15 @@ function ConvoRow({ T, c, index, onPress, onLongPress }: { T: Palette; c: Conver
           <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.unreadBar} />
         ) : null}
 
-        <View>
-          <Image source={{ uri: c.avatar }} style={styles.avatar} contentFit="cover" transition={150} />
-          {c.online ? <View style={[styles.onlineDot, { backgroundColor: T.success, borderColor: T.bg }]} /> : null}
-        </View>
+        {/* Avatar: story varsa renkli halka + dokununca story açılır (yoksa sohbeti açar). */}
+        {c.hasStory ? (
+          <StoryAvatar uri={c.avatar} name={c.name} size={46} hasStory online={c.online} onPress={onAvatarPress} />
+        ) : (
+          <View>
+            <Image source={{ uri: c.avatar }} style={styles.avatar} contentFit="cover" transition={150} />
+            {c.online ? <View style={[styles.onlineDot, { backgroundColor: T.success, borderColor: T.bg }]} /> : null}
+          </View>
+        )}
 
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>

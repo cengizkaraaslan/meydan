@@ -17,6 +17,8 @@ export interface Conversation {
   lastText: string | null;
   lastAt: number | null; // son mesaj zamanı (epoch ms) — listede tarih+saat göstermek için
   unread: number;
+  hasStory: boolean; // partnerın son 24 saatte story'si var mı → listede halka
+  storyOwnerId: string | null; // story sahibi ham deviceId (fetchStoriesFor ile çek/aç)
 }
 
 /** Son mesaj önizlemesi: foto mesajı ("[img]<url>") ve sesli mesaj ham URL/işaret yerine
@@ -61,6 +63,8 @@ export async function listConversations(): Promise<Conversation[]> {
       lastText: previewText(m.lastMessage),
       lastAt: m.lastAt ? Date.parse(m.lastAt) : null,
       unread: m.unread,
+      hasStory: !!m.hasStory,
+      storyOwnerId: m.storyOwnerId ?? null,
     };
   });
   // Bir sonraki açılışta anında göstermek için cache'le.

@@ -19,6 +19,10 @@ export interface MatchView {
   lastAt: string | null; // ISO
   unread: number;
   createdAt: string; // ISO
+  // Sohbet listesinde Instagram-tarzı story halkası için: partnerın son 24 saatte
+  // story'si var mı + story sahibinin ham deviceId'si (mobil bununla story'leri çeker/açar).
+  hasStory?: boolean;
+  storyOwnerId?: string | null;
 }
 
 export interface MessageView {
@@ -526,6 +530,36 @@ export async function listMatches(deviceId: string): Promise<MatchView[]> {
       const userMap = new Map(users.map((u) => [u.id, u]));
       const userEmailMap = new Map(users.map((u) => [u.email.toLowerCase(), u]));
       const httpAvatar = (u: string | null | undefined) => (u && /^https?:\/\//.test(u) ? u : null);
+
+      // ── Story halkası: partnerların son 24 saatte story'si var mı? ──────────────
+      // Story'ler ham deviceId ile saklanır; partner kimliği acct:email olabilir → e-postadan
+      // tüm cihaz satırlarını topla, hepsini story sorgusuna kat (kimlik eşleme).
+      const profsByEmail = new Map<string, string[]>();
+      for (const p of profs) {
+        if (!p.email) continue;
+        const k = p.email.toLowerCase();
+        profsByEmail.set(k, [...(profsByEmail.get(k) ?? []), p.deviceId]);
+      }
+      const rawDeviceIds = ids.filter((id) => !id.startsWith("acct:") && !id.includes("@"));
+      const storyCandidateIds = [...new Set([...profs.map((p) => p.deviceId), ...rawDeviceIds])];
+      const storyDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const storyOwnerSet = new Set<string>();
+      if (storyCandidateIds.length) {
+        const storyRows = await db.mobileStory.findMany({
+          where: { deviceId: { in: storyCandidateIds }, createdAt: { gte: storyDayAgo } },
+          select: { deviceId: true },
+        });
+        for (const s of storyRows) storyOwnerSet.add(s.deviceId);
+      }
+      // Bir partner için story sahibi ham deviceId'yi bul (varsa) — yoksa null.
+      const findStoryOwner = (partnerId: string, pEmail: string | null): string | null => {
+        const cands = [
+          ...(rawDeviceIds.includes(partnerId) ? [partnerId] : []),
+          ...(pEmail ? profsByEmail.get(pEmail) ?? [] : []),
+          ...(profMap.get(partnerId) ? [partnerId] : []),
+        ];
+        return cands.find((d) => storyOwnerSet.has(d)) ?? null;
+      };
       // Aynı kişi birden çok partner kimliğiyle (acct:email + cihaz UUID; kanonikleştirme
       // öncesi açılmış) iki satır olabilir → AYNI e-postaya çözülenleri TEK girişte birleştir.
       // Okunmamışları topla; temsilci olarak daha güncel mesajlı (eşitse kanonik) odayı seç.
@@ -549,6 +583,7 @@ export async function listMatches(deviceId: string): Promise<MatchView[]> {
         const realAvatar = httpAvatar(prof?.avatar) || httpAvatar(usr?.image) || httpAvatar(r.partnerAvatar) || null;
         // Kayıtlı isim partnerId'nin kendisiyse (eski hata) onu gösterme.
         const storedName = r.partnerName && r.partnerName !== r.partnerId ? r.partnerName : null;
+        const storyOwnerId = findStoryOwner(r.partnerId, pEmail);
         const view: MatchView = {
           matchKey: r.matchKey,
           partnerId: r.partnerId,
@@ -558,6 +593,8 @@ export async function listMatches(deviceId: string): Promise<MatchView[]> {
           lastAt: last ? last.createdAt.toISOString() : null,
           unread,
           createdAt: r.createdAt.toISOString(),
+          hasStory: !!storyOwnerId,
+          storyOwnerId,
         };
         // Birleştirme anahtarı: çözülebilen e-posta (acct:/partnerId/profil/User), yoksa partnerId.
         const groupEmail = pEmail || prof?.email?.toLowerCase() || usr?.email?.toLowerCase() || null;
@@ -577,6 +614,9 @@ export async function listMatches(deviceId: string): Promise<MatchView[]> {
           unread: existing.unread + view.unread, // okunmamış kaybolmasın
           partnerName: existing.partnerName !== "Kullanıcı" ? existing.partnerName : view.partnerName,
           partnerAvatar: existing.partnerAvatar || view.partnerAvatar,
+          // Story herhangi bir satırda varsa korunur (iki kimlik satırı birleşince kaybolmasın).
+          hasStory: existing.hasStory || view.hasStory,
+          storyOwnerId: existing.storyOwnerId || view.storyOwnerId,
         });
       }
       return [...byKey.values()].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));

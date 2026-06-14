@@ -173,6 +173,9 @@ export interface MatchSummary {
   lastAt: string | null;
   unread: number;
   createdAt: string;
+  // Story halkası: partnerın son 24 saatte story'si var mı + story sahibi ham deviceId.
+  hasStory?: boolean;
+  storyOwnerId?: string | null;
 }
 
 const JSON_HEADERS = { "Content-Type": "application/json", Accept: "application/json" };

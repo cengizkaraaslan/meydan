@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Radius, Type, glow } from "@/theme/aurora";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { KeyboardAvoider } from "@/components/KeyboardAvoider";
+import { RecordingWave } from "@/components/RecordingWave";
 import { getPerson, type Person } from "@/lib/people";
 import { resolveAvatar } from "@/lib/avatar";
 import { useChat, canEditMsg, replySnippet, type Msg, type MsgReactions } from "@/lib/chat";
@@ -691,7 +692,7 @@ export default function ChatScreen() {
             <View style={[styles.recBar, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
               <View style={styles.recDot} />
               <Text style={[Type.body, { color: T.text }]}>{mmss(recState.durationMillis ?? 0)}</Text>
-              <Text style={[Type.label, { color: T.textFaint, marginLeft: 10 }]}>Kaydediliyor…</Text>
+              <RecordingWave color={T.primary} />
             </View>
             <Pressable onPress={stopRecordingAndSend}>
               <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.send}>
