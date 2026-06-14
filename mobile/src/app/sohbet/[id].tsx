@@ -128,9 +128,12 @@ export default function ChatScreen() {
   const { height: winH } = useWindowDimensions();
   // Action-sheet içinde "Sil" onayı görünür mü?
   const [confirmDel, setConfirmDel] = useState(false);
-  // Mesaj iletme (forward): iletilecek mesaj + hedef sohbet listesi (null = kapalı).
-  const [forwardMsg, setForwardMsg] = useState<Msg | null>(null);
+  // Mesaj iletme (forward): iletilecek mesaj(lar) + hedef sohbet listesi (null = kapalı).
+  const [forwardMsgs, setForwardMsgs] = useState<Msg[] | null>(null);
   const [forwardList, setForwardList] = useState<Conversation[]>([]);
+  // Çoklu seçim modu (toplu sil / ilet).
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // Sohbet içi arama (geçmiş mesajlarda kelime ara).
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQ, setSearchQ] = useState("");
@@ -490,34 +493,95 @@ export default function ChatScreen() {
     return m.text;
   };
 
-  // "İlet" → hedef sohbet seçiciyi aç (mevcut sohbet listeden çıkarılır).
-  const onForwardFromSheet = () => {
-    const m = actionMsg;
-    if (!m) return;
-    tapH();
-    closeActionSheet();
-    setForwardMsg(m);
+  // Hedef sohbet seçiciyi aç (iletilebilir mesajlarla). Mevcut sohbet listeden çıkarılır.
+  const openForward = (msgs: Msg[]) => {
+    const targets = msgs.filter(canForward);
+    if (targets.length === 0) { Alert.alert("İletilemez", "Seçilen mesaj(lar) iletilemiyor."); return; }
+    setForwardMsgs(targets);
     const cur = matchKey || pMatchKey;
     const exclude = (list: Conversation[]) => list.filter((c) => c.matchKey !== cur);
     getCachedConversations().then((l) => setForwardList(exclude(l))).catch(() => {});
     listConversations().then((l) => setForwardList(exclude(l))).catch(() => {});
   };
 
-  // Seçilen sohbete ilet → o sohbeti aç (kullanıcı iletildiğini görsün).
-  const doForward = (c: Conversation) => {
-    const m = forwardMsg;
+  // "İlet" (tek mesaj) → seçiciyi aç.
+  const onForwardFromSheet = () => {
+    const m = actionMsg;
     if (!m) return;
     tapH();
-    const wire = forwardWire(m);
-    setForwardMsg(null);
+    closeActionSheet();
+    openForward([m]);
+  };
+
+  // Seçilen sohbete ilet (tek veya çoklu) → o sohbeti aç (kullanıcı iletildiğini görsün).
+  const doForward = (c: Conversation) => {
+    const msgs = forwardMsgs;
+    if (!msgs || msgs.length === 0) return;
+    tapH();
+    setForwardMsgs(null);
+    exitSelect();
     void (async () => {
-      const ok = await forwardToMatch(c.matchKey, wire);
-      if (ok) {
+      let okAny = false;
+      // Kronolojik sırayla ilet (eski → yeni).
+      for (const m of [...msgs].sort((a, b) => a.at - b.at)) {
+        const ok = await forwardToMatch(c.matchKey, forwardWire(m));
+        okAny = okAny || ok;
+      }
+      if (okAny) {
         router.push({ pathname: "/sohbet/[id]", params: { id: c.id, name: c.name, avatar: c.avatar, matchKey: c.matchKey } });
       } else {
         Alert.alert("İletilemedi", "Mesaj iletilemedi, tekrar dene.");
       }
     })();
+  };
+
+  // ── Çoklu seçim modu ──
+  const enterSelect = (m: Msg) => { setSelectMode(true); setSelectedIds(new Set([m.id])); };
+  const exitSelect = () => { setSelectMode(false); setSelectedIds(new Set()); };
+  const toggleSelect = (id: string) => {
+    Haptics.selectionAsync();
+    setSelectedIds((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+  // Popover'dan "Seç" → seçim moduna gir, bu mesajı işaretle.
+  const onSelectFromSheet = () => {
+    const m = actionMsg;
+    if (!m) return;
+    tapH();
+    closeActionSheet();
+    enterSelect(m);
+  };
+  // Toplu ilet: seçili mesajları hedef seçiciye taşı.
+  const onBulkForward = () => {
+    tapH();
+    openForward(messages.filter((m) => selectedIds.has(m.id)));
+  };
+  // Toplu sil: yalnız kendi & 10 dk içindekiler silinir; gerisi atlanır ve özetlenir.
+  const onBulkDelete = () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    tapH();
+    Alert.alert(
+      "Mesajları sil",
+      `${ids.length} mesaj silinsin mi? (Yalnız kendi son 10 dk mesajların silinir)`,
+      [
+        { text: "Vazgeç", style: "cancel" },
+        {
+          text: "Sil",
+          style: "destructive",
+          onPress: () => void (async () => {
+            let fail = 0;
+            for (const id of ids) { const r = await deleteMessage(id); if (!r.ok) fail++; }
+            exitSelect();
+            if (fail > 0) Alert.alert("Bazıları silinemedi", `${fail} mesaj silinemedi (başkasının veya 10 dk'yı geçmiş).`);
+          })(),
+        },
+      ],
+      { cancelable: true },
+    );
   };
 
   // ── Üç nokta menüsü: Şikayet et / Engelle ──
@@ -600,7 +664,24 @@ export default function ChatScreen() {
   return (
     <View style={{ flex: 1 }}>
       <AuroraBackground />
+      {/* Seçim modu başlığı: seçili sayı + toplu ilet/sil */}
+      {selectMode ? (
+        <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: T.hairline }]}>
+          <Pressable onPress={exitSelect} hitSlop={10} style={[styles.back, { backgroundColor: T.surfaceStrong }]}>
+            <Ionicons name="close" size={20} color={T.text} />
+          </Pressable>
+          <Text style={[Type.title, { color: T.text, flex: 1 }]}>{selectedIds.size} seçildi</Text>
+          <Pressable onPress={onBulkForward} disabled={selectedIds.size === 0} hitSlop={10} style={[styles.back, { backgroundColor: T.surfaceStrong, opacity: selectedIds.size === 0 ? 0.4 : 1 }]}>
+            <Ionicons name="arrow-redo" size={18} color={T.primary} />
+          </Pressable>
+          <Pressable onPress={onBulkDelete} disabled={selectedIds.size === 0} hitSlop={10} style={[styles.back, { backgroundColor: T.surfaceStrong, opacity: selectedIds.size === 0 ? 0.4 : 1 }]}>
+            <Ionicons name="trash-outline" size={19} color="#FF3B30" />
+          </Pressable>
+        </View>
+      ) : null}
+
       {/* Header — titreşimde isim + sil/üç-nokta ikonları da sarsılsın (shakeStyle). */}
+      {!selectMode ? (
       <Animated.View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: T.hairline }, shakeStyle]}>
         <Pressable onPress={() => { tapH(); router.back(); }} hitSlop={10} style={[styles.back, { backgroundColor: T.surfaceStrong }]}>
           <Ionicons name="chevron-back" size={22} color="#fff" />
@@ -642,6 +723,7 @@ export default function ChatScreen() {
           <Ionicons name="ellipsis-vertical" size={19} color={T.text} />
         </Pressable>
       </Animated.View>
+      ) : null}
 
       {/* Sohbet içi arama çubuğu (büyüteçle açılır) */}
       {searchOpen ? (
@@ -736,21 +818,35 @@ export default function ChatScreen() {
                 </View>
               ) : null
             }
-            renderItem={({ item, index }) => (
-              <SwipeToReply T={T} onReply={() => beginReply(item)}>
-                <Bubble
-                  T={T}
-                  m={item}
-                  read={item.fromMe && !item.pending && item.readAt != null}
-                  reaction={reactions[item.id]}
-                  partnerName={person.name}
-                  // Yalnızca en sondaki KENDİ balonum, üstelik az önce gönderilmişse "pop" girişi yapar.
-                  justSent={item.fromMe && index === messages.length - 1 && item.at >= lastSentAt && lastSentAt > 0}
-                  onLongPress={(e) => onLongPressMsg(item, e)}
-                  onImagePress={setViewerUri}
-                />
-              </SwipeToReply>
-            )}
+            renderItem={({ item, index }) => {
+              // Seçim modunda: solda onay dairesi + dokununca seç/bırak (balon tıklamayı yutmaz).
+              if (selectMode) {
+                const sel = selectedIds.has(item.id);
+                return (
+                  <Pressable onPress={() => { if (!item.pending) toggleSelect(item.id); }} style={[styles.selectRow, sel ? { backgroundColor: T.surfaceStrong } : null]}>
+                    <Ionicons name={sel ? "checkmark-circle" : "ellipse-outline"} size={22} color={sel ? T.primary : T.textFaint} />
+                    <View style={{ flex: 1 }} pointerEvents="none">
+                      <Bubble T={T} m={item} read={item.fromMe && !item.pending && item.readAt != null} reaction={reactions[item.id]} partnerName={person.name} />
+                    </View>
+                  </Pressable>
+                );
+              }
+              return (
+                <SwipeToReply T={T} onReply={() => beginReply(item)}>
+                  <Bubble
+                    T={T}
+                    m={item}
+                    read={item.fromMe && !item.pending && item.readAt != null}
+                    reaction={reactions[item.id]}
+                    partnerName={person.name}
+                    // Yalnızca en sondaki KENDİ balonum, üstelik az önce gönderilmişse "pop" girişi yapar.
+                    justSent={item.fromMe && index === messages.length - 1 && item.at >= lastSentAt && lastSentAt > 0}
+                    onLongPress={(e) => onLongPressMsg(item, e)}
+                    onImagePress={setViewerUri}
+                  />
+                </SwipeToReply>
+              );
+            }}
             ListFooterComponent={
               searching ? null : typing ? (
                 <TypingBubble T={T} />
@@ -803,8 +899,8 @@ export default function ChatScreen() {
           </View>
         ) : null}
 
-        {/* Girdi / Sesli mesaj kayıt çubuğu */}
-        {recording ? (
+        {/* Girdi / Sesli mesaj kayıt çubuğu — seçim modunda gizli */}
+        {selectMode ? null : recording ? (
           <View style={[styles.inputBar, { paddingBottom: insets.bottom ? insets.bottom : 12, borderTopColor: T.hairline }]}>
             <Pressable onPress={cancelRecording} hitSlop={8} style={[styles.attach, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
               <Ionicons name="trash-outline" size={20} color="#FF3B30" />
@@ -894,8 +990,8 @@ export default function ChatScreen() {
                 {actionMsg && isServerMsgId(actionMsg.id) ? (
                   <ReactionPicker myReaction={reactions[actionMsg.id]?.mine ?? null} onPick={onReactFromSheet} />
                 ) : null}
-                {/* Kopyala (yalnız metin) + İlet (metin veya uzak medya) — herkesin mesajında. */}
-                {actionMsg && (canForward(actionMsg) || (!actionMsg.imageUri && !actionMsg.audioUri)) ? (
+                {/* Kopyala (yalnız metin) + İlet (metin/uzak medya) + Seç (çoklu) — herkesin mesajında. */}
+                {actionMsg ? (
                   <View style={styles.popActions}>
                     {!actionMsg.imageUri && !actionMsg.audioUri ? (
                       <Pressable onPress={onCopyFromSheet} style={[styles.popBtn, { backgroundColor: T.bgElevated, borderColor: T.hairline }]}>
@@ -907,6 +1003,9 @@ export default function ChatScreen() {
                         <Text style={[Type.label, { color: T.text }]}>↪️ İlet</Text>
                       </Pressable>
                     ) : null}
+                    <Pressable onPress={onSelectFromSheet} style={[styles.popBtn, { backgroundColor: T.bgElevated, borderColor: T.hairline }]}>
+                      <Text style={[Type.label, { color: T.text }]}>☑️ Seç</Text>
+                    </Pressable>
                   </View>
                 ) : null}
                 {/* Düzenle/Sil yalnız KENDİ mesajın & 10 dk içinde — emojilerin altında küçük butonlar. */}
@@ -929,11 +1028,13 @@ export default function ChatScreen() {
       </Modal>
 
       {/* Mesaj iletme (forward) hedef seçici — alttan açılır sohbet listesi */}
-      <Modal visible={!!forwardMsg} transparent animationType="slide" onRequestClose={() => setForwardMsg(null)}>
-        <Pressable style={styles.menuBackdrop} onPress={() => setForwardMsg(null)}>
+      <Modal visible={!!forwardMsgs} transparent animationType="slide" onRequestClose={() => setForwardMsgs(null)}>
+        <Pressable style={styles.menuBackdrop} onPress={() => setForwardMsgs(null)}>
           <Pressable style={[styles.menuSheet, { backgroundColor: T.bg, borderColor: T.hairline, paddingBottom: insets.bottom + 12, maxHeight: "70%" }]} onPress={() => {}}>
             <View style={[styles.menuHandle, { backgroundColor: T.hairline }]} />
-            <Text style={[Type.title, { color: T.text, paddingHorizontal: 18, paddingBottom: 8 }]}>İlet</Text>
+            <Text style={[Type.title, { color: T.text, paddingHorizontal: 18, paddingBottom: 8 }]}>
+              İlet{forwardMsgs && forwardMsgs.length > 1 ? ` (${forwardMsgs.length} mesaj)` : ""}
+            </Text>
             {forwardList.length === 0 ? (
               <Text style={[Type.label, { color: T.textFaint, paddingHorizontal: 18, paddingVertical: 12 }]}>İletilecek başka sohbet yok.</Text>
             ) : (
@@ -1282,6 +1383,7 @@ const styles = StyleSheet.create({
   },
   back: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   searchBar: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 14, marginTop: 8, paddingHorizontal: 14, height: 42, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2 },
+  selectRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 },
   hAvatarWrap: { borderRadius: 21 },
   menuBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
   menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth },
