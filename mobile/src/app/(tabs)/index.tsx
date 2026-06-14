@@ -8,6 +8,7 @@ import { ChatBubble } from "@/components/ChatBubble";
 import { HeroCard } from "@/components/EventCard";
 import { CourseSection } from "@/components/CourseSection";
 import { MovieSection } from "@/components/MovieSection";
+import { PlacesSection } from "@/components/PlacesSection";
 import { PastEventsSection } from "@/components/PastEventsSection";
 import { Loader, Pill } from "@/ui/atoms";
 import { Radius, Type, Space } from "@/theme/aurora";
@@ -416,6 +417,9 @@ export default function DiscoverScreen() {
 
             {/* Vizyondaki filmler (şehre göre + km) */}
             <MovieSection />
+
+            {/* Gezilecek yerler / müzeler (şehre göre) */}
+            <PlacesSection />
 
             {/* Biten etkinlikler (geçmiş + paylaşımlar) */}
             <PastEventsSection />

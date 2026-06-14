@@ -192,6 +192,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   BOGAZICI: "Boğaziçi Üniversitesi",
   TOBB: "TOBB Fuar Takvimi",
   INSTAGRAM: "Instagram",
+  MUZE_GOV: "Müzeler (Kültür Bakanlığı)",
   MANUAL: "Manuel",
 };
 
@@ -222,3 +223,63 @@ export const CITIES = [
   "Yalova", "Yozgat",
   "Zonguldak",
 ] as const;
+
+// ---------------------------------------------------------------------------
+// Gezilecek Yerler / Müzeler — KALICI yerler (Event'ten ayrı; tarih/startsAt YOK).
+// ---------------------------------------------------------------------------
+
+/** Yer türü. muze.gov.tr ad metninden tahmin edilir; ileride genişletilebilir. */
+export type PlaceType = "MUZE" | "OREN_YERI" | "SARAY" | "DIGER";
+
+export const PLACE_TYPE_LABELS: Record<PlaceType, string> = {
+  MUZE: "Müze",
+  OREN_YERI: "Örenyeri",
+  SARAY: "Saray & Köşk",
+  DIGER: "Gezilecek Yer",
+};
+
+/** Scraper'dan çıkan ham yer kaydı (DB'ye yazılmadan önce). */
+export interface ScrapedPlace {
+  source: string; // "MUZE_GOV"
+  externalId: string; // SectionId
+  distId?: string;
+  name: string;
+  type: PlaceType;
+  city: string;
+  district?: string;
+  address?: string;
+  description?: string;
+  imageUrl?: string;
+  openTime?: string;
+  closeTime?: string;
+  website?: string;
+  phone?: string;
+}
+
+/** UI/listeleme için yer kaydı (DB'den okunmuş, slug'lı). */
+export interface PlaceListItem {
+  id: string;
+  slug: string;
+  source: string;
+  externalId: string;
+  name: string;
+  type: PlaceType;
+  city: string;
+  district?: string;
+  address?: string;
+  description?: string;
+  imageUrl?: string;
+  openTime?: string;
+  closeTime?: string;
+  website?: string;
+  phone?: string;
+  featured: boolean;
+}
+
+export interface PlaceFilters {
+  city?: string;
+  type?: PlaceType;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}

@@ -190,7 +190,9 @@ function routeFromNotification(data: Record<string, unknown> | undefined): void 
     return;
   }
   // 3) Bilinen alanlar: etkinlik hatırlatıcısı / DM / yakındaki kişi.
-  if (typeof data.eventId === "string") router.push(`/etkinlik/${data.eventId}`);
+  // "yer-" önekli slug → müze/gezilecek yer detayına; aksi halde etkinlik.
+  if (typeof data.eventId === "string")
+    router.push((data.eventId.startsWith("yer-") ? `/yer/${data.eventId}` : `/etkinlik/${data.eventId}`) as never);
   else if (typeof data.partnerId === "string") router.push(`/sohbet/${data.partnerId}`);
   else if (data.matchKey) router.push("/mesajlar" as never);
   else if (typeof data.personId === "string") router.push(`/kisi/${data.personId}`);

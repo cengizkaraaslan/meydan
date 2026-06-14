@@ -49,6 +49,13 @@ export default async function AdminScrapersPage() {
   const adminEmail = session?.user?.email ?? "";
   const sources = scrapers.map((s) => ({ source: String(s.source), label: s.displayName }));
 
+  // MuzeScraper registry'de DEĞİL (günlük event cron'unu bozmasın) → kartını elle ekle.
+  // ScrapeNowButton'a EKLENMEZ (o yolla tetiklenmez); yalnız son çalışma/hata gösterimi için.
+  const cards = [
+    ...scrapers.map((s) => ({ source: String(s.source), baseUrl: s.baseUrl })),
+    { source: "MUZE_GOV", baseUrl: "https://muze.gov.tr" },
+  ];
+
   // ÖNCE kalıcı DB'den oku; DB boş/yapılandırılmamışsa in-memory tracker'a düş.
   const dbSummary = await getDbSummary(48);
   const useDb = dbSummary.totalRuns > 0;
@@ -108,7 +115,7 @@ export default async function AdminScrapersPage() {
       )}
 
       <div className="grid sm:grid-cols-2 gap-4">
-        {scrapers.map((s) => {
+        {cards.map((s) => {
           const view = viewForSource(s.source);
 
           const statusColor = !view

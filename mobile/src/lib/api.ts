@@ -151,6 +151,91 @@ export function imageFor(e: ApiEvent): string {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
+// Gezilecek Yerler / Müzeler — KALICI yerler (/api/v1/places). Tarih yok.
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface ApiPlace {
+  id: string;
+  slug: string;
+  source: string;
+  name: string;
+  type: string; // MUZE | OREN_YERI | SARAY | DIGER
+  description: string | null;
+  city: string;
+  district: string | null;
+  address: string | null;
+  image_url: string | null;
+  open_time: string | null;
+  close_time: string | null;
+  website: string | null;
+  phone: string | null;
+  featured?: boolean;
+}
+
+export interface PlacesResponse {
+  data: ApiPlace[];
+  meta: EventsMeta;
+}
+
+export interface PlaceQuery {
+  city?: string;
+  type?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function fetchPlaces(q: PlaceQuery = {}): Promise<PlacesResponse> {
+  const sp = new URLSearchParams();
+  if (q.city) sp.set("city", q.city);
+  if (q.type) sp.set("type", q.type);
+  if (q.search) sp.set("q", q.search);
+  sp.set("page", String(q.page ?? 1));
+  sp.set("page_size", String(q.pageSize ?? 20));
+  const res = await fetch(`${API_BASE}/api/v1/places?${sp.toString()}`, {
+    headers: { "x-api-key": API_KEY, Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  return (await res.json()) as PlacesResponse;
+}
+
+const _placeCache = new Map<string, ApiPlace>();
+export function cachePlace(p: ApiPlace): string {
+  const key = p.slug || p.id || "";
+  if (key) _placeCache.set(key, p);
+  return key;
+}
+export function getCachedPlace(key: string): ApiPlace | null {
+  return _placeCache.get(key) ?? null;
+}
+
+export async function fetchPlaceBySlug(slug: string): Promise<ApiPlace | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/places/${encodeURIComponent(slug)}`, {
+      headers: { "x-api-key": API_KEY, Accept: "application/json" },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data) return json.data as ApiPlace;
+    }
+  } catch {
+    /* ağ hatası → liste yedeği */
+  }
+  try {
+    const res = await fetchPlaces({ pageSize: 100 });
+    return res.data.find((p) => p.slug === slug || p.id === slug) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Yer görseli (yoksa müze temalı Unsplash fallback). */
+export function placeImageFor(p: ApiPlace): string {
+  if (p.image_url) return hiRes(p.image_url);
+  return "https://images.unsplash.com/photo-1565060169187-5284a3673b75?auto=format&fit=crop&w=1600&q=85";
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 // Dating (eşleşme + sohbet) API'leri — base aynı, API key gerekmez, kimlik=deviceId
 // ───────────────────────────────────────────────────────────────────────────
 

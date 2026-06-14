@@ -5,6 +5,8 @@ import { StoryStripClient } from "./StoryStripClient";
 
 interface StoryStripProps {
   eventSlug?: string;
+  /** Başlığı doğrudan ver (yer/müze gibi Event olmayan slug'lar için — getEventBySlug boş döner). */
+  eventTitle?: string;
 }
 
 /**
@@ -13,14 +15,14 @@ interface StoryStripProps {
  *
  * Strip + login değil + boşsa render edilmez.
  */
-export async function StoryStrip({ eventSlug }: StoryStripProps) {
+export async function StoryStrip({ eventSlug, eventTitle: eventTitleProp }: StoryStripProps) {
   const session = await auth().catch(() => null);
   const isLoggedIn = !!session?.user?.email;
   const viewerEmail = session?.user?.email ?? null;
   const activeUsers = await getActiveUsers(viewerEmail, { eventSlug });
 
-  let eventTitle: string | undefined;
-  if (eventSlug) {
+  let eventTitle: string | undefined = eventTitleProp;
+  if (eventSlug && !eventTitle) {
     const ev = await getEventBySlug(eventSlug).catch(() => null);
     eventTitle = ev?.title;
   }

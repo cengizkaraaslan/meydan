@@ -56,13 +56,16 @@ export async function POST(request: NextRequest) {
   const replyToId = body.replyToId?.trim() || null;
   const comment = await addEventComment({ eventSlug, deviceId, authorName, avatar: body.avatar ?? null, text, replyToId });
 
+  // Yer/müze slug'ları "yer-" önekli → bildirim /yer/'e, etkinlikler /etkinlik/'e gider.
+  const targetUrl = eventSlug.startsWith("yer-") ? `/yer/${eventSlug}` : `/etkinlik/${eventSlug}`;
+
   // @mention → bahsedilen email'lere bildirim (mobil + web). Tıklayınca etkinliğe gider.
   const emails = extractMentionEmails(text);
   if (emails.length) {
     void notifyEmails(emails, {
       title: `${authorName} bir yorumda senden bahsetti`,
       body: preview(text),
-      data: { type: "comment", eventId: eventSlug, url: `/etkinlik/${eventSlug}` },
+      data: { type: "comment", eventId: eventSlug, url: targetUrl },
       inApp: { type: "comment", actorId: deviceId, actorName: authorName },
     }).catch(() => {});
   }
@@ -75,7 +78,7 @@ export async function POST(request: NextRequest) {
         await notifyDevices([owner], {
           title: `${authorName} yorumuna yanıt verdi`,
           body: preview(text),
-          data: { type: "comment", eventId: eventSlug, url: `/etkinlik/${eventSlug}` },
+          data: { type: "comment", eventId: eventSlug, url: targetUrl },
           inApp: { type: "comment", actorId: deviceId, actorName: authorName },
         });
       }

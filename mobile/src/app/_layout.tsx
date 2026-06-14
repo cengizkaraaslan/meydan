@@ -82,6 +82,8 @@ function RootNavigator() {
       <Stack.Protected guard={!showAuthFlow}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="etkinlik/[id]" options={{ animation: "slide_from_bottom" }} />
+        <Stack.Screen name="yer/[id]" options={{ animation: "slide_from_bottom" }} />
+        <Stack.Screen name="yerler" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="mesajlar" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="sohbet/[id]" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="kisi/[id]" options={{ animation: "slide_from_bottom" }} />

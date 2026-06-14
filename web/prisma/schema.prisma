@@ -599,6 +599,39 @@ model Event {
   @@index([creatorEmail])
 }
 
+/// Gezilecek yer / müze (KALICI). Event'ten ayrı: startsAt/tarih YOK.
+/// Yorum/story/foto, slug-bazlı uçlar üzerinden (slug "yer-" önekli) tekrar kullanılır.
+model Place {
+  id            String   @id @default(cuid())
+  source        String   // "MUZE_GOV"
+  externalId    String   // muze.gov.tr SectionId
+  distId        String?  // DistId — detay URL'i yeniden kurmak için
+  slug          String   @unique // "yer-topkapi-sarayi-x7a9c2"
+  name          String
+  type          String   @default("MUZE") // MUZE | OREN_YERI | SARAY | ...
+  city          String
+  district      String?
+  address       String?  @db.Text
+  description   String?  @db.Text
+  imageUrl      String?  @db.Text
+  openTime      String? // "08:30"
+  closeTime     String? // "19:00"
+  website       String?
+  phone         String?
+  lat           Float?
+  lng           Float?
+  featured      Boolean  @default(false)
+  hidden        Boolean  @default(false)
+  lastScrapedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([source, externalId])
+  @@index([city])
+  @@index([type])
+  @@index([featured])
+}
+
 model PriceHistory {
   id        String   @id @default(cuid())
   eventId   String

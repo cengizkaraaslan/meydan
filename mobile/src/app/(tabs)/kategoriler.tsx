@@ -547,6 +547,19 @@ export default function KategorilerScreen() {
           </ScrollView>
         </Animated.View>
 
+        {/* Gezilecek Yerler / Müzeler — ayrı bölüm girişi */}
+        <Pressable
+          onPress={() => { tapH(); router.push("/yerler" as never); }}
+          style={[styles.placesBanner, { backgroundColor: T.surface, borderColor: T.hairline }]}
+        >
+          <Text style={{ fontSize: 26 }}>🏛️</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[Type.title, { color: T.text }]}>Gezilecek Yerler</Text>
+            <Text style={[Type.label, { color: T.textFaint }]}>Müzeler, örenyerleri & tarihî mekanlar</Text>
+          </View>
+          <Text style={[Type.title, { color: T.primary }]}>→</Text>
+        </Pressable>
+
         <View style={styles.grid}>
           {CATEGORIES.map((item, i) => {
             const active = selected.includes(item.key);
@@ -690,6 +703,16 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     paddingHorizontal: 16,
     gap: Space.md,
+  },
+  placesBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginHorizontal: 16,
+    marginBottom: Space.md,
+    padding: 14,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth * 2,
   },
   cell: { width: "47%", flexGrow: 1 },
   tile: {

@@ -10,7 +10,9 @@ import { CommunitySection } from "@/components/CommunitySection";
 import { PageFade } from "@/components/motion/PageFade";
 import { StaggerGrid } from "@/components/motion/StaggerGrid";
 import { StoryStrip } from "@/components/StoryStrip";
+import { PlaceCard } from "@/components/PlaceCard";
 import { getFeaturedEvents, getEvents } from "@/lib/events";
+import { getFeaturedPlaces } from "@/lib/places";
 import { MOCK_EVENTS } from "@/lib/mock-data";
 
 export const revalidate = 60;
@@ -61,6 +63,7 @@ export default async function HomePage() {
       <FeaturedSection city={city} />
       <CommunitySection />
       <FreeSection city={city} />
+      <PlacesSection city={city} />
     </PageFade>
   );
 }
@@ -134,6 +137,33 @@ async function FreeGrid({ city }: { city: string }) {
     <StaggerGrid className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {events.map((e, i) => (
         <EventCard key={e.id} event={e} index={i} />
+      ))}
+    </StaggerGrid>
+  );
+}
+
+async function PlacesSection({ city }: { city: string }) {
+  return (
+    <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+      <SectionHeader
+        title={`🏛️ Gezilecek Yerler · ${city}`}
+        subtitle="Müzeler, örenyerleri ve tarihî mekanlar"
+        href={`/yerler?city=${encodeURIComponent(city)}`}
+      />
+      <Suspense fallback={<EventGridSkeleton />}>
+        <PlacesGrid city={city} />
+      </Suspense>
+    </section>
+  );
+}
+
+async function PlacesGrid({ city }: { city: string }) {
+  const places = await getFeaturedPlaces(6, city);
+  if (places.length === 0) return null;
+  return (
+    <StaggerGrid className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {places.map((p, i) => (
+        <PlaceCard key={p.id} place={p} index={i} />
       ))}
     </StaggerGrid>
   );

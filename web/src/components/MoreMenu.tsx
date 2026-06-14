@@ -5,13 +5,14 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Menu, X, CalendarDays, Map, Lightbulb,
-  LayoutDashboard, Code2, Award, PartyPopper, Film, GraduationCap,
+  LayoutDashboard, Code2, Award, PartyPopper, Film, GraduationCap, Landmark,
 } from "lucide-react";
 
 // BottomNav'da olan (Anasayfa, Etkinlikler, +Aç, Yakınımda, Profil),
 // FloatingChatBubble'da olan (Mesajlar), UserDropdown'da olan (Ayarlar)
 // burada tekrar etmez.
 const ITEMS = [
+  { href: "/yerler",       icon: Landmark,        title: "Gezilecek Yerler", desc: "Müzeler & örenyerleri" },
   { href: "/takvim",       icon: CalendarDays,    title: "Takvim",         desc: "Aylık görünüm" },
   { href: "/harita",       icon: Map,             title: "Harita",         desc: "Türkiye haritasında" },
   { href: "/hafta-sonu",   icon: PartyPopper,     title: "Hafta Sonu",     desc: "Cmt + Paz" },
