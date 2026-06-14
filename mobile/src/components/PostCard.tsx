@@ -164,7 +164,7 @@ export function PostCard({ post, isMine, following, canEdit, onReact, onOpenComm
           </View>
 
           {hasEvent ? (
-            <Text style={[Type.label, { color: T.primary }]}>Etkinliğe git →</Text>
+            <Text style={[Type.label, { color: T.primary, marginLeft: 8 }]}>Etkinliğe git →</Text>
           ) : null}
         </Pressable>
 
@@ -261,10 +261,10 @@ const styles = StyleSheet.create({
   // Tüm başlık satırı (avatar + ad + zaman + Sen/takip) 7px yukarı — hepsi birlikte hizalı kalsın.
   head: { flexDirection: "row", alignItems: "center", gap: 10, transform: [{ translateY: -7 }] },
   authorTap: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-  // "Sen" / "+ Takip et" / "✓ Takip ediliyor" pill'i: 6px yukarı (avatar+ad bloğuyla daha hizalı).
+  // "Sen" / "+ Takip et" / "✓ Takip ediliyor" pill'i: 8px yukarı (avatar+ad bloğuyla daha hizalı).
   // flexShrink:0 → uzun isimde pill sıkışmaz; bunun yerine isim kısalır (ellipsis).
-  followPill: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, flexShrink: 0, transform: [{ translateY: -6 }] },
-  moreBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2 },
+  followPill: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, flexShrink: 0, transform: [{ translateY: -8 }] },
+  moreBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2, transform: [{ translateY: -8 }] },
   eventTag: { alignSelf: "flex-start", borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, maxWidth: "100%" },
   media: { width: "100%", height: 220, borderRadius: Radius.md, marginTop: 2 },
   // flexWrap + rowGap: çok tepki/uzun sayıda "yorum" yan yana sığmazsa alta sarar (yatay taşma yok).
