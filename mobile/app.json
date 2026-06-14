@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "app.meydanfest",
-      "versionCode": 81,
+      "versionCode": 82,
       "adaptiveIcon": {
         "backgroundColor": "#08070D",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
