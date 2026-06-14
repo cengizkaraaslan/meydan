@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
   const message = await sendMessage({ matchKey, senderDeviceId, text });
 
   // Alıcıya önizlemeli bildirim (Instagram tarzı) + @mention. Bot/sistem & tepki mesajını atla.
-  if (!senderDeviceId.startsWith("bot_") && !text.startsWith(REACT_PREFIX) && !text.startsWith(BUZZ_PREFIX)) {
+  if (!senderDeviceId.startsWith("bot_") && !text.startsWith(REACT_PREFIX) && !text.startsWith(BUZZ_PREFIX) && !text.startsWith("[call]")) {
     void (async () => {
       const recipients = await recipientDevicesForMatch(matchKey, senderDeviceId);
       const [name, avatar] = await Promise.all([

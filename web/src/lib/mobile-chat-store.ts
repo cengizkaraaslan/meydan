@@ -567,13 +567,17 @@ export async function listMatches(deviceId: string): Promise<MatchView[]> {
       const isCanonical = (mk: string) => mk.startsWith("r_acct:");
       const byKey = new Map<string, MatchView>();
       for (const r of rows) {
-        // Tepki ("[react]...") mesajları gerçek mesaj değil → önizleme & okunmamış sayısına girmez.
+        // Tepki ("[react]"), sesli arama sinyali ("[call]") ve titreşim ("[buzz]") gerçek mesaj
+        // değil → önizleme & okunmamış sayısına girmez.
+        const notSignal = {
+          NOT: { OR: [{ text: { startsWith: "[react]" } }, { text: { startsWith: "[call]" } }, { text: { startsWith: "[buzz]" } }] },
+        };
         const last = await db.mobileMessage.findFirst({
-          where: { matchKey: r.matchKey, NOT: { text: { startsWith: "[react]" } } },
+          where: { matchKey: r.matchKey, ...notSignal },
           orderBy: { createdAt: "desc" },
         });
         const unread = await db.mobileMessage.count({
-          where: { matchKey: r.matchKey, senderDeviceId: { not: deviceId }, readAt: null, NOT: { text: { startsWith: "[react]" } } },
+          where: { matchKey: r.matchKey, senderDeviceId: { not: deviceId }, readAt: null, ...notSignal },
         });
         const pEmail = emailOf(r.partnerId);
         const prof = profMap.get(r.partnerId) || (pEmail ? profEmailMap.get(pEmail) : undefined);
@@ -626,7 +630,9 @@ export async function listMatches(deviceId: string): Promise<MatchView[]> {
         .filter((m) => m.deviceId === deviceId)
         .sort((a, b) => b.createdAt - a.createdAt)
         .map((r) => {
-          const msgs = mem.messages.filter((x) => x.matchKey === r.matchKey).sort((a, b) => a.createdAt - b.createdAt);
+          const msgs = mem.messages
+            .filter((x) => x.matchKey === r.matchKey && !/^\[(react|call|buzz)\]/.test(x.text))
+            .sort((a, b) => a.createdAt - b.createdAt);
           const last = msgs[msgs.length - 1];
           const unread = msgs.filter((x) => x.senderDeviceId !== deviceId && x.readAt == null).length;
           return {
