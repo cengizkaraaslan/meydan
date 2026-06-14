@@ -261,10 +261,10 @@ const styles = StyleSheet.create({
   // Tüm başlık satırı (avatar + ad + zaman + Sen/takip) 7px yukarı — hepsi birlikte hizalı kalsın.
   head: { flexDirection: "row", alignItems: "center", gap: 10, transform: [{ translateY: -7 }] },
   authorTap: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-  // "Sen" / "+ Takip et" / "✓ Takip ediliyor" pill'i: 10px yukarı (avatar+ad bloğuyla daha hizalı).
+  // "Sen" / "+ Takip et" / "✓ Takip ediliyor" pill'i: 12px yukarı (avatar+ad bloğuyla daha hizalı).
   // flexShrink:0 → uzun isimde pill sıkışmaz; bunun yerine isim kısalır (ellipsis).
-  followPill: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, flexShrink: 0, transform: [{ translateY: -10 }] },
-  moreBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2, transform: [{ translateY: -10 }] },
+  followPill: { borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, flexShrink: 0, transform: [{ translateY: -12 }] },
+  moreBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth * 2, transform: [{ translateY: -12 }] },
   eventTag: { alignSelf: "flex-start", borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth * 2, paddingHorizontal: 12, paddingVertical: 6, maxWidth: "100%" },
   media: { width: "100%", height: 220, borderRadius: Radius.md, marginTop: 2 },
   // flexWrap + rowGap: çok tepki/uzun sayıda "yorum" yan yana sığmazsa alta sarar (yatay taşma yok).
@@ -283,5 +283,5 @@ const styles = StyleSheet.create({
   // alignItems center: kısa metinli kartta görsel (thumb) ile metin dikey ortalanır →
   // metnin altında boşluk hissi kalkar (içerik–aksiyon arası gereksiz boşluk düzeldi).
   sysBody: { flexDirection: "row", gap: 12, alignItems: "center", marginTop: 2 },
-  sysThumb: { width: 64, height: 64, borderRadius: Radius.md },
+  sysThumb: { width: 64, height: 64, borderRadius: Radius.md, marginLeft: 3 },
 });

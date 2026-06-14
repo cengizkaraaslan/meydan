@@ -91,6 +91,13 @@ function rangeFor(key: DateKey): { from?: string; to?: string } {
 /** Sayfa başına kayıt (10'ar 10'ar pagination). */
 const PAGE_SIZE = 10;
 
+/**
+ * Kategori sayımları (tile rozetleri) önbelleği — anahtar: şehir|fiyat|from|to.
+ * Aynı filtre kombinasyonuna dönünce 9 sayım isteğini TEKRAR atmadan anında gösterir
+ * (oturum boyu bellek). Yeni kombinasyonda istek debounce ile bir kez atılır.
+ */
+const countsCache = new Map<string, Record<string, number>>();
+
 export default function KategorilerScreen() {
   const insets = useSafeAreaInsets();
   const { t: T } = useTheme();
