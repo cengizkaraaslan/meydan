@@ -72,6 +72,23 @@ export async function sendStoryReply(personId: string, text: string): Promise<bo
   }
 }
 
+/**
+ * Bir mesajı başka bir sohbete (matchKey) iletir (forward).
+ * `wire` = backend kablo metni: düz metin, "[img]<url>" veya "[voice]<sn>:<url>".
+ * useChat'e bağlı değildir; doğrudan apiSendMessage yapar.
+ */
+export async function forwardToMatch(matchKey: string, wire: string): Promise<boolean> {
+  const text = wire.trim();
+  if (!text || !matchKey) return false;
+  try {
+    const did = await getProfileKey();
+    const sent = await apiSendMessage({ matchKey, senderDeviceId: did, text });
+    return !!sent;
+  } catch {
+    return false;
+  }
+}
+
 const OPENER = "Selam! 👋 Yaklaşan etkinliklerden hangisine gidiyorsun?";
 const REPLIES = [
   "Süper, ben de oradayım! Orada buluşalım mı? 😄",

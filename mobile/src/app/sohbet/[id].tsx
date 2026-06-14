@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
@@ -27,7 +27,9 @@ import { RecordingWave } from "@/components/RecordingWave";
 import { useCall } from "@/components/CallProvider";
 import { getPerson, type Person } from "@/lib/people";
 import { resolveAvatar } from "@/lib/avatar";
-import { useChat, canEditMsg, replySnippet, type Msg, type MsgReactions } from "@/lib/chat";
+import * as Clipboard from "expo-clipboard";
+import { useChat, canEditMsg, replySnippet, forwardToMatch, type Msg, type MsgReactions } from "@/lib/chat";
+import { listConversations, getCachedConversations, type Conversation } from "@/lib/conversations";
 import { useAuth } from "@/lib/auth";
 import { useTheme, type Palette } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
@@ -126,6 +128,12 @@ export default function ChatScreen() {
   const { height: winH } = useWindowDimensions();
   // Action-sheet içinde "Sil" onayı görünür mü?
   const [confirmDel, setConfirmDel] = useState(false);
+  // Mesaj iletme (forward): iletilecek mesaj + hedef sohbet listesi (null = kapalı).
+  const [forwardMsg, setForwardMsg] = useState<Msg | null>(null);
+  const [forwardList, setForwardList] = useState<Conversation[]>([]);
+  // Sohbet içi arama (geçmiş mesajlarda kelime ara).
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
   // Yalnızca yeni gönderdiğim balona giriş animasyonu uygulamak için son gönderim zamanını tutuyoruz.
   const [lastSentAt, setLastSentAt] = useState(0);
   const listRef = useRef<FlatList<Msg>>(null);
@@ -318,6 +326,14 @@ export default function ChatScreen() {
     return () => timers.forEach(clearTimeout);
   }, [ready, messages.length]);
 
+  // Sohbet içi arama aktifse listeyi eşleşen metin mesajlarıyla filtrele (Türkçe-duyarlı).
+  const searching = searchOpen && searchQ.trim().length > 0;
+  const displayMessages = useMemo(() => {
+    if (!searching) return messages;
+    const q = searchQ.trim().toLocaleLowerCase("tr");
+    return messages.filter((m) => m.text && m.text.toLocaleLowerCase("tr").includes(q));
+  }, [messages, searching, searchQ]);
+
   if (!person) {
     return (
       <View style={{ flex: 1, backgroundColor: T.bg, alignItems: "center", justifyContent: "center" }}>
@@ -451,6 +467,59 @@ export default function ChatScreen() {
     setText("");
   };
 
+  // Mesaj metnini panoya kopyala (yalnız metin mesajı).
+  const onCopyFromSheet = () => {
+    const m = actionMsg;
+    if (!m) return;
+    tapH();
+    closeActionSheet();
+    void Clipboard.setStringAsync(m.text);
+  };
+
+  // Bir mesaj iletilebilir mi? Metin VEYA uzak (http) medya. Yerel offline medya iletilemez.
+  const canForward = (m: Msg): boolean => {
+    if (m.imageUri) return m.imageUri.startsWith("http");
+    if (m.audioUri) return m.audioUri.startsWith("http");
+    return !!m.text.trim();
+  };
+
+  // Mesajı backend kablo metnine çevir (forward için): metin / [img]<url> / [voice]<sn>:<url>.
+  const forwardWire = (m: Msg): string => {
+    if (m.imageUri) return `[img]${m.imageUri}`;
+    if (m.audioUri) return `[voice]${m.audioSec ?? 1}:${m.audioUri}`;
+    return m.text;
+  };
+
+  // "İlet" → hedef sohbet seçiciyi aç (mevcut sohbet listeden çıkarılır).
+  const onForwardFromSheet = () => {
+    const m = actionMsg;
+    if (!m) return;
+    tapH();
+    closeActionSheet();
+    setForwardMsg(m);
+    const cur = matchKey || pMatchKey;
+    const exclude = (list: Conversation[]) => list.filter((c) => c.matchKey !== cur);
+    getCachedConversations().then((l) => setForwardList(exclude(l))).catch(() => {});
+    listConversations().then((l) => setForwardList(exclude(l))).catch(() => {});
+  };
+
+  // Seçilen sohbete ilet → o sohbeti aç (kullanıcı iletildiğini görsün).
+  const doForward = (c: Conversation) => {
+    const m = forwardMsg;
+    if (!m) return;
+    tapH();
+    const wire = forwardWire(m);
+    setForwardMsg(null);
+    void (async () => {
+      const ok = await forwardToMatch(c.matchKey, wire);
+      if (ok) {
+        router.push({ pathname: "/sohbet/[id]", params: { id: c.id, name: c.name, avatar: c.avatar, matchKey: c.matchKey } });
+      } else {
+        Alert.alert("İletilemedi", "Mesaj iletilemedi, tekrar dene.");
+      }
+    })();
+  };
+
   // ── Üç nokta menüsü: Şikayet et / Engelle ──
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuMode, setMenuMode] = useState<"menu" | "report">("menu");
@@ -540,7 +609,7 @@ export default function ChatScreen() {
           <Image source={{ uri: person.avatar }} style={styles.hAvatar} contentFit="cover" />
         </Pressable>
         <Pressable style={{ flex: 1 }} onPress={() => { tapH(); router.push({ pathname: "/kisi/[id]", params: { id: person.id, name: person.name, avatar: person.avatar } }); }}>
-          <Text style={[Type.title, { color: T.text }]}>{canSeeAges && person.age ? `${person.name}, ${person.age}` : person.name}</Text>
+          <Text style={[Type.title, { color: T.text }]} numberOfLines={1} ellipsizeMode="tail">{canSeeAges && person.age ? `${person.name}, ${person.age}` : person.name}</Text>
           <Text style={[Type.label, { color: typing || partnerPresence.online ? (partnerPresence.online && !typing ? T.success : T.primary) : T.textFaint }]}>
             {typing
               ? `${t("typing")}`
@@ -553,6 +622,10 @@ export default function ChatScreen() {
                     : ""}
           </Text>
         </Pressable>
+        {/* Sohbet içi arama (geçmiş mesajlarda kelime ara) */}
+        <Pressable onPress={() => { tapH(); setSearchOpen((v) => { if (v) setSearchQ(""); return !v; }); }} hitSlop={10} style={[styles.back, { backgroundColor: T.surfaceStrong }]}>
+          <Ionicons name={searchOpen ? "close" : "search"} size={18} color={T.text} />
+        </Pressable>
         {/* Sesli arama — yalnız gerçek kullanıcıda (mock kişi cevap veremez) ve sohbet hazırken. */}
         {!realPerson ? (
           <Pressable
@@ -564,15 +637,32 @@ export default function ChatScreen() {
             <Ionicons name="call" size={18} color={T.primary} />
           </Pressable>
         ) : null}
-        {/* Sohbeti komple sil → listeye dön. Sohbet hazır (matchKey bilinene) kadar pasif. */}
-        <Pressable onPress={onDeleteConversation} disabled={!ready} hitSlop={10} style={[styles.back, { backgroundColor: T.surfaceStrong, opacity: ready ? 1 : 0.4 }]}>
-          <Ionicons name="trash-outline" size={19} color="#FF3B30" />
-        </Pressable>
-        {/* Üç nokta: Şikayet et / Engelle */}
+        {/* Üç nokta: Şikayet et / Engelle / Sohbeti sil */}
         <Pressable onPress={openMenu} hitSlop={10} style={[styles.back, { backgroundColor: T.surfaceStrong }]}>
           <Ionicons name="ellipsis-vertical" size={19} color={T.text} />
         </Pressable>
       </Animated.View>
+
+      {/* Sohbet içi arama çubuğu (büyüteçle açılır) */}
+      {searchOpen ? (
+        <View style={[styles.searchBar, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
+          <Ionicons name="search" size={17} color={T.textFaint} />
+          <TextInput
+            value={searchQ}
+            onChangeText={setSearchQ}
+            placeholder="Bu sohbette ara"
+            placeholderTextColor={T.textFaint}
+            style={[Type.body, { color: T.text, flex: 1, padding: 0 }]}
+            autoFocus
+            autoCorrect={false}
+          />
+          {searchQ.length > 0 ? (
+            <Pressable onPress={() => setSearchQ("")} hitSlop={8}>
+              <Ionicons name="close-circle" size={17} color={T.textFaint} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       {/* Üç nokta menüsü (alt sayfa): Şikayet et / Engelle + şikayet nedeni seçimi */}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
@@ -589,6 +679,15 @@ export default function ChatScreen() {
                 <Pressable style={styles.menuRow} onPress={onBlock}>
                   <Ionicons name="ban-outline" size={20} color="#FF3B30" />
                   <Text style={[Type.title, { color: "#FF3B30" }]}>Engelle</Text>
+                </Pressable>
+                <View style={[styles.menuSep, { backgroundColor: T.hairline }]} />
+                <Pressable
+                  style={[styles.menuRow, !ready && { opacity: 0.4 }]}
+                  disabled={!ready}
+                  onPress={() => { setMenuOpen(false); onDeleteConversation(); }}
+                >
+                  <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                  <Text style={[Type.title, { color: "#FF3B30" }]}>Sohbeti sil</Text>
                 </Pressable>
               </>
             ) : (
@@ -612,13 +711,20 @@ export default function ChatScreen() {
           <Animated.View style={[{ flex: 1 }, shakeStyle]}>
           <FlatList
             ref={listRef}
-            data={messages}
+            data={displayMessages}
             keyExtractor={(m) => m.id}
             contentContainerStyle={{ padding: 16, gap: 8, paddingBottom: 16 }}
             showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              searching ? (
+                <View style={{ alignItems: "center", paddingTop: 60 }}>
+                  <Text style={[Type.body, { color: T.textFaint }]}>"{searchQ.trim()}" ile mesaj bulunamadı</Text>
+                </View>
+              ) : null
+            }
             // Yukarı kaydırınca eski mesajları yükle; eklenince görünür konum sabit kalsın (zıplamasın).
             onScroll={(e) => {
-              if (e.nativeEvent.contentOffset.y <= 48 && hasMoreOlder && !loadingOlder) void loadOlder();
+              if (!searching && e.nativeEvent.contentOffset.y <= 48 && hasMoreOlder && !loadingOlder) void loadOlder();
             }}
             scrollEventThrottle={16}
             onContentSizeChange={onContentSize}
@@ -646,7 +752,7 @@ export default function ChatScreen() {
               </SwipeToReply>
             )}
             ListFooterComponent={
-              typing ? (
+              searching ? null : typing ? (
                 <TypingBubble T={T} />
               ) : (() => {
                 // WhatsApp/Instagram tarzı "Görüldü {saat}" — son mesajım okunduysa, en altta.
@@ -788,6 +894,21 @@ export default function ChatScreen() {
                 {actionMsg && isServerMsgId(actionMsg.id) ? (
                   <ReactionPicker myReaction={reactions[actionMsg.id]?.mine ?? null} onPick={onReactFromSheet} />
                 ) : null}
+                {/* Kopyala (yalnız metin) + İlet (metin veya uzak medya) — herkesin mesajında. */}
+                {actionMsg && (canForward(actionMsg) || (!actionMsg.imageUri && !actionMsg.audioUri)) ? (
+                  <View style={styles.popActions}>
+                    {!actionMsg.imageUri && !actionMsg.audioUri ? (
+                      <Pressable onPress={onCopyFromSheet} style={[styles.popBtn, { backgroundColor: T.bgElevated, borderColor: T.hairline }]}>
+                        <Text style={[Type.label, { color: T.text }]}>📋 Kopyala</Text>
+                      </Pressable>
+                    ) : null}
+                    {canForward(actionMsg) ? (
+                      <Pressable onPress={onForwardFromSheet} style={[styles.popBtn, { backgroundColor: T.bgElevated, borderColor: T.hairline }]}>
+                        <Text style={[Type.label, { color: T.text }]}>↪️ İlet</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : null}
                 {/* Düzenle/Sil yalnız KENDİ mesajın & 10 dk içinde — emojilerin altında küçük butonlar. */}
                 {actionMsg && canEditMsg(actionMsg) ? (
                   <View style={styles.popActions}>
@@ -804,6 +925,32 @@ export default function ChatScreen() {
               </>
             )}
           </View>
+        </Pressable>
+      </Modal>
+
+      {/* Mesaj iletme (forward) hedef seçici — alttan açılır sohbet listesi */}
+      <Modal visible={!!forwardMsg} transparent animationType="slide" onRequestClose={() => setForwardMsg(null)}>
+        <Pressable style={styles.menuBackdrop} onPress={() => setForwardMsg(null)}>
+          <Pressable style={[styles.menuSheet, { backgroundColor: T.bg, borderColor: T.hairline, paddingBottom: insets.bottom + 12, maxHeight: "70%" }]} onPress={() => {}}>
+            <View style={[styles.menuHandle, { backgroundColor: T.hairline }]} />
+            <Text style={[Type.title, { color: T.text, paddingHorizontal: 18, paddingBottom: 8 }]}>İlet</Text>
+            {forwardList.length === 0 ? (
+              <Text style={[Type.label, { color: T.textFaint, paddingHorizontal: 18, paddingVertical: 12 }]}>İletilecek başka sohbet yok.</Text>
+            ) : (
+              <FlatList
+                data={forwardList}
+                keyExtractor={(c) => c.matchKey}
+                keyboardShouldPersistTaps="handled"
+                renderItem={({ item }) => (
+                  <Pressable style={styles.menuRow} onPress={() => doForward(item)}>
+                    <Image source={{ uri: item.avatar }} style={{ width: 40, height: 40, borderRadius: 20 }} contentFit="cover" />
+                    <Text style={[Type.title, { color: T.text, flex: 1 }]} numberOfLines={1}>{item.name}</Text>
+                    <Ionicons name="arrow-redo" size={18} color={T.primary} />
+                  </Pressable>
+                )}
+              />
+            )}
+          </Pressable>
         </Pressable>
       </Modal>
 
@@ -954,7 +1101,7 @@ function Bubble({ T, m, read, reaction, partnerName, justSent, onLongPress, onIm
           <LinearGradient colors={T.primarySoft} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.bubble, styles.mine, isImage && styles.imgBubble]}>
             {m.replyTo ? <QuoteBlock T={T} replyTo={m.replyTo} mineMsg partnerName={partnerName} onPrimary /> : null}
             {isAudio ? (
-              <VoiceMessage uri={m.audioUri!} sec={m.audioSec} tint="#fff" track="rgba(255,255,255,0.35)" />
+              <VoiceMessage uri={m.audioUri!} sec={m.audioSec} tint="#fff" track="rgba(255,255,255,0.35)" mine />
             ) : isImage ? (
               <Pressable onPress={() => onImagePress?.(m.imageUri!)} onLongPress={onLongPress} delayLongPress={300}>
                 <Image source={{ uri: m.imageUri }} style={styles.img} contentFit="cover" transition={150} />
@@ -986,7 +1133,7 @@ function Bubble({ T, m, read, reaction, partnerName, justSent, onLongPress, onIm
         <View style={[styles.bubble, styles.theirs, isImage && styles.imgBubble, { backgroundColor: T.surfaceStrong, borderColor: T.hairline }]}>
           {m.replyTo ? <QuoteBlock T={T} replyTo={m.replyTo} mineMsg={false} partnerName={partnerName} /> : null}
           {isAudio ? (
-            <VoiceMessage uri={m.audioUri!} sec={m.audioSec} tint={T.text} track={T.hairline} />
+            <VoiceMessage uri={m.audioUri!} sec={m.audioSec} tint={T.text} track={T.hairline} mine={false} />
           ) : isImage ? (
             <Pressable onPress={() => onImagePress?.(m.imageUri!)} onLongPress={onLongPress} delayLongPress={300}>
               <Image source={{ uri: m.imageUri }} style={styles.img} contentFit="cover" transition={150} />
@@ -1018,7 +1165,7 @@ function voiceCacheName(uri: string): string {
   return `voice-${(h >>> 0).toString(36)}.m4a`;
 }
 
-function VoiceMessage({ uri, sec, tint, track }: { uri: string; sec?: number; tint: string; track: string }) {
+function VoiceMessage({ uri, sec, tint, track, mine }: { uri: string; sec?: number; tint: string; track: string; mine: boolean }) {
   // Uzak (http) sesi ÖNCE yerele indir, sonra yerelden çal. ExoPlayer/AVPlayer uzak
   // URL'den stream ederken proxy'nin Range/stream davranışına takılıp sessiz kalabiliyor;
   // yerel m4a ise sorunsuz çalar. İndirme olmazsa uzak uri ile çalmayı dene (fallback).
@@ -1048,6 +1195,17 @@ function VoiceMessage({ uri, sec, tint, track }: { uri: string; sec?: number; ti
   const playing = status.playing;
   const progress = dur > 0 ? Math.min(cur / dur, 1) : 0;
   const shown = playing || cur > 0.05 ? cur : dur;
+  // Oynatma hızı: 1x → 1.5x → 2x → 1x (WhatsApp/Telegram tarzı).
+  const [speed, setSpeed] = useState(1);
+  // Dinlendi işareti: bir kez sonuna gelince işaretle (gelen seste mavi nokta kalkar).
+  const [played, setPlayed] = useState(false);
+  useEffect(() => { if (status.didJustFinish) setPlayed(true); }, [status.didJustFinish]);
+  const cycleSpeed = () => {
+    tapHaptic();
+    const next = speed === 1 ? 1.5 : speed === 1.5 ? 2 : 1;
+    setSpeed(next);
+    try { player.setPlaybackRate(next); } catch { /* yoksay */ }
+  };
   const toggle = async () => {
     tapHaptic(); // sessiz — play tuşunda tıklama sesi olmasın
     if (playing) {
@@ -1064,6 +1222,8 @@ function VoiceMessage({ uri, sec, tint, track }: { uri: string; sec?: number; ti
     }
     // Bittiyse (veya sona gelmişse) başa sar, sonra çal; aksi halde kaldığı yerden devam.
     if (status.didJustFinish || (dur > 0 && cur >= dur - 0.15)) player.seekTo(0);
+    try { player.setPlaybackRate(speed); } catch { /* yoksay */ }
+    setPlayed(true);
     player.play();
   };
   return (
@@ -1071,10 +1231,18 @@ function VoiceMessage({ uri, sec, tint, track }: { uri: string; sec?: number; ti
       <Pressable onPress={toggle} hitSlop={8}>
         <Ionicons name={playing ? "pause" : "play"} size={22} color={tint} />
       </Pressable>
+      {/* Gelen sesli mesaj henüz dinlenmediyse mavi nokta (WhatsApp). */}
+      {!mine && !played ? <View style={[styles.voiceUnplayed, { backgroundColor: "#34B7F1" }]} /> : null}
       <View style={[styles.voiceTrack, { backgroundColor: track }]}>
         <View style={[styles.voiceFill, { backgroundColor: tint, width: `${progress * 100}%` }]} />
       </View>
       <Text style={[styles.voiceTime, { color: tint }]}>{mmss(shown * 1000)}</Text>
+      {/* Hız değiştir: yalnız oynarken veya başlatıldıktan sonra göster. */}
+      {playing || cur > 0.05 ? (
+        <Pressable onPress={cycleSpeed} hitSlop={6} style={[styles.voiceSpeed, { borderColor: tint }]}>
+          <Text style={[styles.voiceSpeedTxt, { color: tint }]}>{speed === 1 ? "1x" : speed === 1.5 ? "1.5x" : "2x"}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -1113,6 +1281,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(8,7,13,0.5)",
   },
   back: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  searchBar: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 14, marginTop: 8, paddingHorizontal: 14, height: 42, borderRadius: Radius.lg, borderWidth: StyleSheet.hairlineWidth * 2 },
   hAvatarWrap: { borderRadius: 21 },
   menuBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
   menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth },
@@ -1153,6 +1322,9 @@ const styles = StyleSheet.create({
   voiceTrack: { flex: 1, height: 4, borderRadius: 2, overflow: "hidden", minWidth: 92 },
   voiceFill: { height: 4, borderRadius: 2 },
   voiceTime: { fontSize: 11, minWidth: 32, textAlign: "right" },
+  voiceUnplayed: { width: 8, height: 8, borderRadius: 4, marginLeft: -4 },
+  voiceSpeed: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth * 2 },
+  voiceSpeedTxt: { fontSize: 10.5, fontWeight: "700" },
   editBar: {
     flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 8,
     borderTopWidth: StyleSheet.hairlineWidth * 2,

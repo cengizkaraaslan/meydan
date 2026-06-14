@@ -28,6 +28,10 @@ import {
   deleteConversation,
   markConversationRead,
   totalUnread,
+  getConvoFlags,
+  decorateConvos,
+  togglePinned,
+  toggleMuted,
   type Conversation,
 } from "@/lib/conversations";
 import { useIsAdmin } from "@/lib/admin";
@@ -49,6 +53,8 @@ export default function MesajlarScreen() {
   const insets = useSafeAreaInsets();
 
   const [convos, setConvos] = useState<Conversation[]>([]);
+  // Sabitlenen/susturulan sohbet bayrakları (cihaz-yerel; matchKey kümeleri).
+  const [flags, setFlags] = useState<{ pinned: Set<string>; muted: Set<string> }>({ pinned: new Set(), muted: new Set() });
   // Sohbet listesi araması (kişi adına göre filtre — herkese açık).
   const [convoQuery, setConvoQuery] = useState("");
   // Basılı tutunca açılan tema-uyumlu işlem sayfası (null = kapalı) + sil onayı.
@@ -94,6 +100,7 @@ export default function MesajlarScreen() {
         setLoading(false);
       }
     }).catch(() => {});
+    getConvoFlags().then(setFlags).catch(() => {});
   }, []);
 
   const load = useCallback(async (background: boolean) => {
@@ -162,6 +169,28 @@ export default function MesajlarScreen() {
     if (!ok) void load(true);
   }, [load]);
 
+  // Sohbeti sabitle/kaldır → bayrağı güncelle (liste useMemo ile yeniden sıralanır).
+  const onTogglePin = useCallback(async (c: Conversation) => {
+    tapH();
+    const on = await togglePinned(c.matchKey);
+    setFlags((f) => {
+      const pinned = new Set(f.pinned);
+      if (on) pinned.add(c.matchKey); else pinned.delete(c.matchKey);
+      return { ...f, pinned };
+    });
+  }, []);
+
+  // Sohbeti sustur/sesi aç → bayrağı güncelle (rozet/sayaç gizlenir).
+  const onToggleMute = useCallback(async (c: Conversation) => {
+    tapH();
+    const on = await toggleMuted(c.matchKey);
+    setFlags((f) => {
+      const muted = new Set(f.muted);
+      if (on) muted.add(c.matchKey); else muted.delete(c.matchKey);
+      return { ...f, muted };
+    });
+  }, []);
+
   // Satıra basılı tutunca tema-uyumlu işlem sayfasını aç.
   const onLongPressConvo = useCallback((c: Conversation) => {
     impactH();
@@ -188,12 +217,14 @@ export default function MesajlarScreen() {
     });
   }, [openChat]);
 
-  // Sohbet listesini ada göre filtrele (Türkçe-duyarlı).
+  // Sabit/sessiz bayraklarını işle + sabitlenenleri üste al (rozet sayımı da bunu kullanır).
+  const decoratedConvos = useMemo(() => decorateConvos(convos, flags), [convos, flags]);
+  // Ada göre filtrele (Türkçe-duyarlı).
   const filteredConvos = useMemo(() => {
     const q = convoQuery.trim().toLocaleLowerCase("tr");
-    if (!q) return convos;
-    return convos.filter((c) => c.name.toLocaleLowerCase("tr").includes(q));
-  }, [convos, convoQuery]);
+    if (!q) return decoratedConvos;
+    return decoratedConvos.filter((c) => c.name.toLocaleLowerCase("tr").includes(q));
+  }, [decoratedConvos, convoQuery]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -208,9 +239,9 @@ export default function MesajlarScreen() {
           {t("chats_title")}
         </Text>
         {/* Toplam okunmamış rozeti — başlığın yanında (kişi-başı rozetlere ek). */}
-        {totalUnread(convos) > 0 ? (
+        {totalUnread(decoratedConvos) > 0 ? (
           <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.headerBadge, glow(T.primary, 10, 0.5)]}>
-            <Text style={styles.badgeText}>{totalUnread(convos) > 99 ? "99+" : totalUnread(convos)}</Text>
+            <Text style={styles.badgeText}>{totalUnread(decoratedConvos) > 99 ? "99+" : totalUnread(decoratedConvos)}</Text>
           </LinearGradient>
         ) : null}
         <View style={{ flex: 1 }} />
@@ -358,6 +389,18 @@ export default function MesajlarScreen() {
                     <Text style={[Type.body, { color: T.text }]}>✓  Okundu işaretle</Text>
                   </Pressable>
                 ) : null}
+                <Pressable
+                  onPress={() => { const c = sheetConvo; closeSheet(); if (c) void onTogglePin(c); }}
+                  style={[styles.sheetRow, { backgroundColor: T.surfaceStrong, marginTop: 8 }]}
+                >
+                  <Text style={[Type.body, { color: T.text }]}>{sheetConvo?.pinned ? "📌  Sabiti kaldır" : "📌  Sabitle"}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { const c = sheetConvo; closeSheet(); if (c) void onToggleMute(c); }}
+                  style={[styles.sheetRow, { backgroundColor: T.surfaceStrong, marginTop: 8 }]}
+                >
+                  <Text style={[Type.body, { color: T.text }]}>{sheetConvo?.muted ? "🔔  Sesi aç" : "🔕  Sustur"}</Text>
+                </Pressable>
                 <Pressable onPress={() => { tapH(); setSheetConfirmDel(true); }} style={[styles.sheetRow, { backgroundColor: T.surfaceStrong, marginTop: 8 }]}>
                   <Text style={[Type.body, { color: "#FF3B30", fontWeight: "600" }]}>🗑️  Sohbeti sil</Text>
                 </Pressable>
@@ -430,6 +473,8 @@ function ConvoRow({ T, c, index, onPress, onLongPress, onAvatarPress }: { T: Pal
             <Text style={[Type.title, { color: T.text, fontWeight: unread ? "800" : "600", flexShrink: 1 }]} numberOfLines={1}>
               {c.name}
             </Text>
+            {c.pinned ? <Ionicons name="pin" size={13} color={T.textFaint} /> : null}
+            {c.muted ? <Ionicons name="notifications-off" size={13} color={T.textFaint} /> : null}
             {c.online ? <Text style={[Type.label, { color: T.success, fontSize: 11, fontWeight: "700" }]}>Aktif</Text> : null}
           </View>
           <Text
@@ -447,7 +492,12 @@ function ConvoRow({ T, c, index, onPress, onLongPress, onAvatarPress }: { T: Pal
               {convoTime(c.lastAt)}
             </Text>
           ) : null}
-          {unread ? (
+          {unread && c.muted ? (
+            // Susturulmuş: gri (sessiz) rozet — dikkat çekmesin ama okunmamış görünür.
+            <View style={[styles.badge, { backgroundColor: T.surfaceStrong }]}>
+              <Text style={[styles.badgeText, { color: T.textFaint }]}>{c.unread > 99 ? "99+" : c.unread}</Text>
+            </View>
+          ) : unread ? (
             <LinearGradient colors={T.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.badge, glow(T.primary, 10, 0.5)]}>
               <Text style={styles.badgeText}>{c.unread > 99 ? "99+" : c.unread}</Text>
             </LinearGradient>
